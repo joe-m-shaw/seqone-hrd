@@ -53,13 +53,19 @@ for (i in seqone_reports) {
   tmp_output <- data.frame("sample" = sample,
                            "hrd_score" = hrd_score,
                            "status" = status,
-                           "lga" = lga,
-                           "lpc" = lpc,
-                           "ccne1" = ccne1,
-                           "rad51b" = rad51b,
-                           "ncc" = ncc,
-                           "coverage" = coverage,
-                           "percent_mapping" = percent_mapping)
+                           "lga" = as.numeric(lga),
+                           "lpc" = as.numeric(lpc),
+                           "ccne1" = as.numeric(ccne1),
+                           "rad51b" = as.numeric(rad51b),
+                           "ncc_percent" = as.numeric(gsub(x = ncc,
+                                                           pattern = "%",
+                                                           replacement = "")),
+                           "coverage_x" = as.numeric(gsub(x = coverage,
+                                                        pattern = "X",
+                                                        replacement = "")),
+                           "percent_mapping" = as.numeric(gsub(x = percent_mapping,
+                                                               pattern = "%",
+                                                               replacement = "")))
   
   collated_info <- rbind(collated_info, tmp_output)
   
@@ -102,9 +108,9 @@ comparison_plot <- ggplot(seqone_vs_myriad, aes(x = gis_score, y = hrd_score)) +
 ggsave(plot = comparison_plot, 
        filename = paste0("comparison_plot_",
                          format(Sys.time(), "%Y%m%d_%H%M%S"),
-                         ".tiff"),
+                         ".jpg"),
        path = "~/homologous_recombination_deficiency/plots/", 
-       device='tiff',
+       device='jpeg',
        units = "cm",
        width = 15,
        height = 15)
