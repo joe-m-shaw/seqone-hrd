@@ -96,6 +96,7 @@ seqone_vs_myriad <- collated_edit %>%
 comparison_plot <- ggplot(seqone_vs_myriad, aes(x = gis_score, y = hrd_score)) +
   geom_point(size = 2, alpha = 0.5) +
   theme_bw() +
+  theme(panel.grid = element_blank()) +
   scale_x_continuous(limits = c(0,100),
                      breaks = c(0, 25, 42, 50, 75, 100)) +
   ylim(0, 1) +
