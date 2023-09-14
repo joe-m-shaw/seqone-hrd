@@ -100,8 +100,6 @@ collated_edit <- collated_info %>%
 
 source("scripts/hrd_samples.R")
 
-# Add on test number calculation
-
 seqone_vs_myriad <- collated_edit %>%
   inner_join(sample_info, by = "specimen_number")
 
