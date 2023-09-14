@@ -16,7 +16,7 @@ library(tidyverse)
 # Read PDFs
 ##################################################
 
-location <- "~/homologous_recombination_deficiency/data/seqone_reports/"
+location <- "~/homologous_recombination_deficiency/data/seqone_new_downloads/"
 
 seqone_reports <- list.files(location)
 
@@ -50,6 +50,12 @@ for (i in seqone_reports) {
   
   sample <- page1_text[[24]]
   
+  month <- page1_text[[44]]
+  
+  day <- page1_text[[45]]
+  
+  year <- page1_text[[46]]
+  
   tmp_output <- data.frame("sample" = sample,
                            "hrd_score" = hrd_score,
                            "status" = status,
@@ -65,7 +71,11 @@ for (i in seqone_reports) {
                                                         replacement = "")),
                            "percent_mapping" = as.numeric(gsub(x = percent_mapping,
                                                                pattern = "%",
-                                                               replacement = "")))
+                                                               replacement = "")),
+                           "date_analysed" = paste0(day,
+                                                    " ", month,
+                                                    " ", year),
+                           "filename" = i)
   
   collated_info <- rbind(collated_info, tmp_output)
   
@@ -89,6 +99,8 @@ collated_edit <- collated_info %>%
 ##################################################
 
 source("scripts/hrd_samples.R")
+
+# Add on test number calculation
 
 seqone_vs_myriad <- collated_edit %>%
   inner_join(sample_info, by = "specimen_number")
