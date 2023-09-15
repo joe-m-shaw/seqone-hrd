@@ -179,3 +179,43 @@ write.csv(annotated_hrd_sample_list,
           row.names = FALSE)
 
 ##################################################
+# Sample Concentrations
+##################################################
+
+# Check how many samples would be excluded by setting DNA input limits
+# at different thresholds.
+
+dlms_info %>%
+  filter(concentration < 500) %>%
+  ggplot(aes(x = disease, y = concentration)) +
+  geom_jitter() +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+
+# 50ng input at 15ul
+upper_threshold <- 50/15
+# 15ng input at 15ul
+lower_threshold <- 15/15
+
+check_thresholds <- dlms_info %>%
+  filter(!is.na(concentration)) %>%
+  mutate(
+    pass_upper_threshold = case_when(
+    concentration >= upper_threshold ~"Yes",
+    concentration < upper_threshold ~"No"),
+    
+    pass_lower_threshold = case_when(
+      concentration >= lower_threshold ~"Yes",
+      concentration < lower_threshold ~"No"))
+
+check_thresholds %>%
+  group_by(pass_upper_threshold) %>%
+  summarise(total = n()) %>%
+  mutate(percent = (round(total / sum(total), 3))*100)
+
+check_thresholds %>%
+  group_by(pass_lower_threshold) %>%
+  summarise(total = n()) %>%
+  mutate(percent = (round(total / sum(total), 3))*100)
+
+##################################################
