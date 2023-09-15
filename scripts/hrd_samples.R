@@ -128,11 +128,11 @@ new_samples <- c(
   20125849, 20112754, 21003752, 21016766,
   21035096, 21001595, 21006928, 21011999, 
   # Positive GIS
-  21006858, 21012001, 21008471)
+  21013520, 21012001, 21008471)
 
 repeat_samples <- c(
-  # Biobank samples
-  23033288, 23033285, 23033279,
+  # Seraseq control samples
+  23031639, 23032088, 23032086, 
   # Breast cancer patients
   20103853, 20104105, 20112141, 20127786, 21012359, 21003549)
 
@@ -173,7 +173,9 @@ annotated_hrd_sample_list %>%
 ##################################################
 
 write.csv(annotated_hrd_sample_list, 
-          file = paste0(homepath, "outputs/annotated_hrd_sample_list.csv"),
+          file = paste0(homepath, "outputs/annotated_hrd_sample_list_", 
+                                         format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
+                                         ".csv"),
           row.names = FALSE)
 
 ##################################################

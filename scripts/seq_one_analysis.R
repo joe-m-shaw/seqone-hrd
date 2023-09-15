@@ -103,6 +103,10 @@ source("scripts/hrd_samples.R")
 seqone_vs_myriad <- collated_edit %>%
   inner_join(sample_info, by = "specimen_number")
 
+##################################################
+# Plots
+##################################################
+
 comparison_plot <- ggplot(seqone_vs_myriad, aes(x = gis_score, y = hrd_score)) +
   geom_point(size = 2, alpha = 0.5) +
   theme_bw() +
@@ -125,5 +129,10 @@ ggsave(plot = comparison_plot,
        units = "cm",
        width = 15,
        height = 15)
+
+seqone_vs_myriad %>%
+  ggplot(aes(x = lpc, y = lga, colour = status)) +
+  geom_point()
+
 
 ##################################################
