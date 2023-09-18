@@ -15,20 +15,56 @@ library(janitor)
 # Load Sample Information
 ##################################################
 
-homepath <- "~/homologous_recombination_deficiency/"
+hrd_project_path <- "~/homologous_recombination_deficiency/"
 
-sample_volumes <- read_csv(paste0(homepath, "data/hrd_sample_volumes.csv")) %>%
-  janitor::clean_names()
+hrd_data_path <- "~/homologous_recombination_deficiency/data/"
 
-seqone_run1 <- read_csv(paste0(homepath, "data/seqone_run1.csv")) %>%
-  filter(!base::duplicated(specimen_number))
+#############################
+# DNA Volumes
+#############################
+
+hrd_sample_volumes <- read_csv(paste0(hrd_data_path, "hrd_sample_volumes.csv")) %>%
+  janitor::clean_names() %>%
+  dplyr::rename(dlms_dna_number = specimen_number)
+
+#############################
+# Genomic Instability Scores
+#############################
 
 # Sample spreadsheet sent by Eleanor Baker
-sample_info <- read_excel(paste0(homepath, 
-                                 "data/HRD Trial samples - QCs added(AutoRecovered).xlsx"),
-                          sheet = "Sheet1") %>%
+sample_info <- read_excel(paste0(hrd_data_path, 
+                         "HRD Trial samples - QCs added(AutoRecovered).xlsx"),
+                  sheet = "Sheet1") %>%
   janitor::clean_names() %>%
-  mutate(specimen_number = as.numeric(lab_no))
+  mutate(dlms_dna_number = as.numeric(lab_no)) %>%
+  dplyr::rename(gi_score = gis_score)
+
+sample_info_additional_samples <- read_excel(paste0(hrd_data_path, 
+                          "HRD Trial samples - QCs added(AutoRecovered).xlsx"),
+                   sheet = "Additional samples") %>%
+  janitor::clean_names() %>%
+  mutate(dlms_dna_number = as.numeric(lab_no)) %>%
+  filter(!is.na(lab_no) & lab_no != "Not found" & !is.na(gis)) %>%
+  dplyr::rename(gi_score = gis)
+
+# Samples from .txt document sent by Katie Sadler
+new_samples_katie <- read_csv(paste0(hrd_data_path, 
+                                     "samples_from_katie_sadler.csv")) %>%
+  mutate(gis_numeric = as.numeric(gsub("\\D", "", gis_score))) %>%
+  filter(!is.na(gis_numeric)) %>%
+  dplyr::rename(gi_score = gis_numeric,
+                dlms_dna_number = specimen_number)
+
+hrd_sample_gi_scores <- rbind(sample_info %>%
+                              select(dlms_dna_number, gi_score),
+                             sample_info_additional_samples %>%
+                               select(dlms_dna_number, gi_score),
+                             new_samples_katie %>%
+                               select(dlms_dna_number, gi_score))
+
+#############################
+# Neoplastic Cell Content
+#############################
 
 # Tumour cell content can be input as "NCC" or "TCC"
 # and as a single value with an operator (example ">30%")
@@ -38,9 +74,9 @@ comment_regex_single <- ".+(\\W{1}\\d{2}%).+"
 comment_regex_range <- ".+(\\d{2}\\W{1}\\d{2}%).+"
 
 # Sample information exported from DLMS with disease code 204
-dlms_info <- read_csv(paste0(homepath, "data/DDBK_Samples_204.csv")) %>%
+dlms_info <- read_csv(paste0(hrd_data_path, "DDBK_Samples_204.csv")) %>%
   janitor::clean_names() %>%
-  dplyr::rename(specimen_number = labno) %>%
+  dplyr::rename(dlms_dna_number = labno) %>%
   # Extract neoplastic cell content using regex
   mutate(ncc_single = sub(x = comments,
                           pattern = comment_regex_single,
@@ -48,45 +84,65 @@ dlms_info <- read_csv(paste0(homepath, "data/DDBK_Samples_204.csv")) %>%
          ncc_range = sub(x = comments,
                          pattern = comment_regex_range,
                          replacement = "\\1"),
-         ncc_final = ifelse(str_length(ncc_single) == 4 & ncc_range > 6,
+         ncc = ifelse(str_length(ncc_single) == 4 & ncc_range > 6,
                             ncc_single, ifelse(str_length(ncc_range) == 6, 
                                                ncc_range, NA))) %>%
   filter(!base::duplicated(i_gene_r_no))
 
+hrd_sample_ncc <- rbind(dlms_info %>%
+                          select(dlms_dna_number, ncc),
+                        sample_info_additional_samples %>%
+                          select(dlms_dna_number, ncc)) %>%
+  filter(!base::duplicated(dlms_dna_number)) %>%
+  mutate(dlms_dna_number = as.numeric(dlms_dna_number))
+
+#############################
+# DNA concentrations
+#############################
+
 # Sample concentrations sent by Rebecca Hall, collated from sequencing spreadsheets
-sample_concentrations <- read_csv(paste0(homepath, 
-                                         "data/hrd_sample_concentrations.csv")) %>%
+hrd_sample_concentrations <- read_csv(paste0(hrd_data_path, 
+                                         "hrd_sample_concentrations.csv")) %>%
   janitor::clean_names() %>%
-  select(specimen_number, qubit_ng_u_l) %>%
+  dplyr::rename(dlms_dna_number = specimen_number) %>%
+  select(dlms_dna_number, qubit_ng_u_l) %>%
   mutate(qubit_ng_u_l = as.numeric(qubit_ng_u_l))
 
-# Sample spreadsheet sent by Katie Sadler
+#############################
+# Spreadsheet from Katie Sadler
+#############################
+
 sample_brca_spreadsheet <- read_excel(paste0(homepath, 
         "data/HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"),
                                       skip  = 1) %>%
   janitor::clean_names() %>%
   dplyr::rename(i_gene_r_no = lab_number_id) %>%
-  filter(!base::duplicated(i_gene_r_no))
+  mutate(gis_numeric = as.numeric(gis_score_numerical_value_or_fail_not_tested))
+
+samples_to_add <- dlms_info %>%
+  left_join(sample_brca_spreadsheet, by = "i_gene_r_no") %>%
+  filter(!is.na(gis_numeric) & !specimen_number %in% annotated_hrd_sample_list$specimen_number)
+
+#############################
+# Previous SeqOne Runs
+#############################
+
+seqone_run1 <- read_csv(paste0(hrd_data_path, "seqone_run1.csv")) %>%
+  filter(!base::duplicated(specimen_number))
 
 ##################################################
 # Join Sample Information
 ##################################################
 
-collated_hrd_sample_info <- sample_volumes %>%
-  dplyr::rename(volume_ul_12_09_2023 = volume_ul) %>%
-  mutate(seqone_run1 = ifelse(specimen_number %in% seqone_run1$specimen_number, 
+collated_hrd_sample_info <- hrd_sample_volumes %>%
+  left_join(hrd_sample_gi_scores, by = "dlms_dna_number") %>%
+  left_join(hrd_sample_concentrations, by = "dlms_dna_number") %>%
+  left_join(hrd_sample_ncc, by = "dlms_dna_number") %>%
+  mutate(seqone_run1 = ifelse(dlms_dna_number %in% seqone_run1$specimen_number, 
          "Yes", "No")) %>%
-  left_join(dlms_info, by = "specimen_number") %>%
-  left_join(sample_concentrations, by = "specimen_number") %>%
-  select(-concentration) %>%
-  mutate(tests_remaining = round((volume_ul_12_09_2023 * qubit_ng_u_l) / 50)) %>%
-  left_join(sample_info %>%
-              select(specimen_number, gis_score), by = "specimen_number") %>%
-  select(i_gene_r_no, specimen_number, volume_ul_12_09_2023, qubit_ng_u_l, tests_remaining,
-         seqone_run1, gis_score, ncc_final) %>%
   mutate(myriad_hrd_result = case_when(
-    gis_score >= 42 ~"Positive",
-    gis_score < 42 ~"Negative"))
+    gi_score >= 42 ~"Positive",
+    gi_score < 42 ~"Negative"))
 
 ##################################################
 # Selecting samples for run 2
@@ -107,12 +163,12 @@ collated_hrd_sample_info <- sample_volumes %>%
 
 lower_quality_samples <- collated_hrd_sample_info %>%
   filter(seqone_run1 == "No") %>%
-  filter(!is.na(gis_score)) %>%
+  filter(!is.na(gi_score)) %>%
   filter(qubit_ng_u_l < 3.3)
 
 random_samples <- collated_hrd_sample_info %>%
   filter(seqone_run1 == "No") %>%
-  filter(!is.na(gis_score)) %>%
+  filter(!is.na(gi_score)) %>%
   filter(qubit_ng_u_l > 3.3)
 
 run_one_samples <- collated_hrd_sample_info %>%
@@ -140,22 +196,20 @@ run_two_samples <- c(low_quality_samples, new_samples, repeat_samples)
 
 annotated_hrd_sample_list <- collated_hrd_sample_info %>%
   mutate(
-    seqone_run2 = ifelse(specimen_number %in% run_two_samples, "Yes", "No"),
+    seqone_run2 = ifelse(dlms_dna_number %in% run_two_samples, "Yes", "No"),
     
     reason = case_when(
-      specimen_number %in% low_quality_samples ~"New sample: poor quality",
-      specimen_number %in% repeat_samples ~"Repeat from run one",
-      specimen_number %in% new_samples ~"New sample: better quality")) %>%
-  arrange(reason) %>%
-  select(-c(i_gene_r_no, tests_remaining)) %>%
-  dplyr::rename(volume_ul = volume_ul_12_09_2023,
-                ncc = ncc_final)
+      dlms_dna_number %in% low_quality_samples ~"New sample: poor quality",
+      dlms_dna_number %in% repeat_samples ~"Repeat from run one",
+      dlms_dna_number %in% new_samples ~"New sample: better quality")) %>%
+  arrange(reason)
 
 # Draw a plot
 annotated_hrd_sample_list %>%
   filter(specimen_number %in% low_quality_samples |
-           specimen_number %in% new_samples |
-           specimen_number %in% repeat_samples) %>%
+           specimen_number %in% new_samples 
+         #| specimen_number %in% repeat_samples
+         ) %>%
   select(specimen_number, qubit_ng_u_l, gis_score) %>%
   pivot_longer(cols = -specimen_number,
                names_to = "category",
@@ -172,11 +226,45 @@ annotated_hrd_sample_list %>%
 # Export
 ##################################################
 
-write.csv(annotated_hrd_sample_list, 
-          file = paste0(homepath, "outputs/annotated_hrd_sample_list_", 
+write.csv(annotated_hrd_sample_list %>%
+            filter(seqone_run2 == "Yes"), 
+          file = paste0(homepath, "outputs/seqone_run2_samples_", 
                                          format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
                                          ".csv"),
           row.names = FALSE)
+
+##################################################
+# Selecting samples for run 3
+##################################################
+
+# We need 22 samples
+# 4 from Katie's spreadsheet
+# 12 from the annotated spreadsheet
+# 6
+
+##################################################
+# Spread of Genomic Instability Scores
+##################################################
+
+samples_to_test <- annotated_hrd_sample_list %>%
+  filter((seqone_run1 == "Yes" | seqone_run2 == "Yes") &
+           !is.na(gis_score)) 
+
+ggplot(samples_to_test, aes(x = reorder(specimen_number, gis_score), y = gis_score)) +
+  geom_point(size = 2) +
+  ylim(0, 100) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "Myriad Genomic Instability Score")
+
+check_gis <- annotated_hrd_sample_list %>%
+  filter((seqone_run1 == "Yes" | seqone_run2 == "Yes") &
+           !is.na(gis_score))  %>%
+  select(specimen_number, gis_score)
+
+max(samples_to_test$gis_score)
+min(samples_to_test$gis_score)
 
 ##################################################
 # Sample Concentrations
@@ -188,7 +276,7 @@ write.csv(annotated_hrd_sample_list,
 dlms_info %>%
   filter(concentration < 500) %>%
   ggplot(aes(x = disease, y = concentration)) +
-  geom_jitter() +
+  geom_boxplot() +
   theme_bw() +
   theme(panel.grid = element_blank())
 

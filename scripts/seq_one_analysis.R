@@ -134,5 +134,15 @@ seqone_vs_myriad %>%
   ggplot(aes(x = lpc, y = lga, colour = status)) +
   geom_point()
 
+##################################################
+# Compare to Sharepoint Results
+##################################################
+
+sharepoint_hrd_results <- read_excel(path = paste0(homepath, "data/hrd_comparisons_sharepoint.xlsx"))
+
+sharepoint_hrd_results_cleaned <- sharepoint_hrd_results %>%
+  janitor::clean_names() %>%
+  filter(!sample %in% c(NA, "Downsampling by half", "Corrected TCC")) %>%
+  mutate(sample_cleaned = as.numeric(gsub("\\D", "", sample)))
 
 ##################################################
