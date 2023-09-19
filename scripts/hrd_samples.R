@@ -156,10 +156,12 @@ collated_hrd_sample_info <- hrd_sample_volumes %>%
               select(dlms_dna_number, firstname, surname), 
             by = "dlms_dna_number") %>%
   mutate(seqone_run1 = ifelse(dlms_dna_number %in% seqone_run1$specimen_number, 
-         "Yes", "No")) %>%
-  mutate(myriad_hrd_result = case_when(
-    gi_score >= 42 ~"Positive",
-    gi_score < 42 ~"Negative"))
+         "Yes", "No"),
+         gi_score = as.numeric(gi_score),
+         
+         myriad_hrd_result = case_when(
+              gi_score >= 42 ~"Positive",
+              gi_score < 42 ~"Negative"))
 
 ##################################################
 # Selecting samples for run 2 and run 3
@@ -224,7 +226,7 @@ annotated_hrd_sample_list <- collated_hrd_sample_info %>%
          ncc, gi_score, 
          myriad_hrd_result, seqone_run1, seqone_run2, seqone_run3) %>%
   arrange(desc(seqone_run1), desc(seqone_run2), desc(seqone_run3)) %>%
-  mutate(gi_score = as.numeric(gi_score))
+  mutate()
 
 #############################
 # Spreadsheet from Katie Sadler
@@ -257,21 +259,16 @@ samples_to_test <- annotated_hrd_sample_list %>%
            !is.na(gi_score)) 
 
 ggplot(samples_to_test, aes(x = reorder(dlms_dna_number, gi_score), 
-                            y = gi_score)) +
+                            y = gi_score,
+                            colour = myriad_hrd_result)) +
   geom_point(size = 2) +
   ylim(0, 100) +
   theme_bw() +
   theme(panel.grid = element_blank(),
         axis.text.x = element_text(angle = 90)) +
-  labs(x = "", y = "Myriad Genomic Instability Score")
-
-check_gis <- annotated_hrd_sample_list %>%
-  filter((seqone_run1 == "Yes" | seqone_run2 == "Yes") &
-           !is.na(gis_score))  %>%
-  select(specimen_number, gis_score)
-
-max(samples_to_test$gis_score)
-min(samples_to_test$gis_score)
+  labs(x = "", y = "Myriad Genomic Instability Score",
+       title = "Variation in Myriad Genomic Instability Scores") +
+  geom_hline(yintercept = 42, linetype = "dashed")
 
 ##################################################
 # Sample Concentrations
