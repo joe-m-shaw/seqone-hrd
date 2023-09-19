@@ -3,28 +3,28 @@
 # joseph.shaw3@nhs.net
 ################################################################################
 
-rm(list=ls())
-
 ##################################################
-# Packages
+# Packages and Filepaths
 ##################################################
 
 library(pdftools)
 library(tidyverse)
 
+source("scripts/hrd_filepaths.R")
+
 ##################################################
-# Read PDFs
+# Read SeqOne PDFs
 ##################################################
 
-location <- "~/homologous_recombination_deficiency/data/seqone_new_downloads/"
+seqone_report_location <- paste0(hrd_data_path, "seqone_reports/")
 
-seqone_reports <- list.files(location)
+seqone_reports <- list.files(seqone_report_location)
 
 collated_info <- data.frame()
 
 for (i in seqone_reports) {
   
-  report_data <- pdftools::pdf_data(pdf = paste0(location, i))
+  report_data <- pdftools::pdf_data(pdf = paste0(seqone_report_location, i))
   
   # Page 1, list 6 for text
   page1_text <- report_data[[1]][[6]]
@@ -83,9 +83,9 @@ for (i in seqone_reports) {
   rm(report_data)
 }
 
-##################################################
+#############################
 # Modify collated information
-##################################################
+#############################
 
 collated_edit <- collated_info %>%
   filter(sample != "performed") %>%
@@ -93,6 +93,41 @@ collated_edit <- collated_info %>%
                                pattern = "WS\\d{6}_(\\d{8})\\D{0,1}",
                                replacement = "\\1"))) %>%
   filter(specimen_number != 21012359)
+
+
+##################################################
+# Read Myriad PDFs
+##################################################
+
+myriad_report_location <- paste0(hrd_data_path, "myriad_reports/")
+
+myriad_reports <- list.files(myriad_report_location)
+
+collated_info <- data.frame()
+
+for (i in myriad_reports) {
+  
+  report_data <- pdftools::pdf_data(pdf = paste0(myriad_report_location, i))
+  
+  # Myriad report is on page 2
+  page2_text <- report_data[[2]][[6]]
+  
+  gi_score <- page2_text[[141]]
+  
+  igene_r_number <- page2_text[[76]]
+  
+  pathology_block <- paste0(page2_text[[82]], " ", page2_text[[83]])
+  
+  tmp_output <- data.frame("igene_r_number" = igene_r_number,
+                           "gi_score" = gi_score,
+                           "pathology_block" = pathology_block,
+                           "filename" = i)
+  
+  collated_info <- rbind(collated_info, tmp_output)
+  
+  rm(tmp_output)
+  rm(report_data)
+}
 
 ##################################################
 # Compare to Myriad results
