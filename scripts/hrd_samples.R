@@ -15,9 +15,7 @@ library(janitor)
 # Load Sample Information
 ##################################################
 
-hrd_project_path <- "~/homologous_recombination_deficiency/"
-
-hrd_data_path <- "~/homologous_recombination_deficiency/data/"
+source("scripts/hrd_filepaths.R")
 
 #############################
 # DNA Volumes
