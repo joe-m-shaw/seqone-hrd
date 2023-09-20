@@ -94,41 +94,6 @@ collated_edit <- collated_info %>%
                                replacement = "\\1"))) %>%
   filter(specimen_number != 21012359)
 
-
-##################################################
-# Read Myriad PDFs
-##################################################
-
-myriad_report_location <- paste0(hrd_data_path, "myriad_reports/")
-
-myriad_reports <- list.files(myriad_report_location)
-
-collated_info <- data.frame()
-
-for (i in myriad_reports) {
-  
-  report_data <- pdftools::pdf_data(pdf = paste0(myriad_report_location, i))
-  
-  # Myriad report is on page 2
-  page2_text <- report_data[[2]][[6]]
-  
-  gi_score <- page2_text[[141]]
-  
-  igene_r_number <- page2_text[[76]]
-  
-  pathology_block <- paste0(page2_text[[82]], " ", page2_text[[83]])
-  
-  tmp_output <- data.frame("igene_r_number" = igene_r_number,
-                           "gi_score" = gi_score,
-                           "pathology_block" = pathology_block,
-                           "filename" = i)
-  
-  collated_info <- rbind(collated_info, tmp_output)
-  
-  rm(tmp_output)
-  rm(report_data)
-}
-
 ##################################################
 # Compare to Myriad results
 ##################################################

@@ -153,7 +153,7 @@ collated_hrd_sample_info <- hrd_sample_volumes %>%
   left_join(hrd_sample_concentrations, by = "dlms_dna_number") %>%
   left_join(hrd_sample_ncc, by = "dlms_dna_number") %>%
   left_join(dlms_joined %>%
-              select(dlms_dna_number, firstname, surname), 
+              select(dlms_dna_number, i_gene_r_no, firstname, surname), 
             by = "dlms_dna_number") %>%
   mutate(seqone_run1 = ifelse(dlms_dna_number %in% seqone_run1$specimen_number, 
          "Yes", "No"),
@@ -222,7 +222,7 @@ annotated_hrd_sample_list <- collated_hrd_sample_info %>%
       dlms_dna_number %in% low_quality_samples ~"New sample: poor quality",
       dlms_dna_number %in% repeat_samples ~"Repeat from run one",
       dlms_dna_number %in% new_samples ~"New sample: better quality")) %>%
-  select(dlms_dna_number, firstname, surname, volume_ul, qubit_ng_u_l, 
+  select(dlms_dna_number, i_gene_r_no, firstname, surname, volume_ul, qubit_ng_u_l, 
          ncc, gi_score, 
          myriad_hrd_result, seqone_run1, seqone_run2, seqone_run3) %>%
   arrange(desc(seqone_run1), desc(seqone_run2), desc(seqone_run3)) %>%
@@ -253,10 +253,17 @@ new_samples_for_volume_check <- rbind(samples_to_add %>%
 # Spread of Genomic Instability Scores
 ##################################################
 
+samples_for_run4 <- c(20112141, 
+                      23016815, 
+                      23016917, 
+                      20104105,
+                      23016919,
+                      21022554,
+                      21014781)
+
+
 samples_to_test <- annotated_hrd_sample_list %>%
-  filter((seqone_run1 == "Yes" | seqone_run2 == "Yes" |
-            seqone_run3 == "Yes") &
-           !is.na(gi_score)) 
+  filter(dlms_dna_number %in% samples_for_run4) 
 
 ggplot(samples_to_test, aes(x = reorder(dlms_dna_number, gi_score), 
                             y = gi_score,
