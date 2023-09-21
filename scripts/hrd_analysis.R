@@ -83,6 +83,44 @@ for (i in seqone_reports) {
   rm(report_data)
 }
 
+##################################################
+# Comparison with Simplified Model
+##################################################
+
+seq_one_results <- collated_info %>%
+  filter(!is.na(hrd_score) & sample != "performed") %>%
+  mutate(result_model = case_when(
+    lga >= 18 ~"Positive",
+    lga <= 14 ~"Negative",
+    lga < 18 & lga > 14 & lpc > 10 ~"Positive",
+    lga < 18 & lga > 14 & lpc <= 10 ~"Negative")) %>%
+  filter(!base::duplicated(sample))
+
+positive_colour <- "#FF3333"
+negative_colour <- "#3300FF"
+
+ggplot(seq_one_results, aes(x = reorder(filename, hrd_score),
+                            y = hrd_score)) +
+  geom_point(size = 2, aes(colour = result_model)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "SeqOne HRD Score",
+       title = "Explaining the SeqOne HRD Model")
+
+ggplot(seq_one_results, aes(x = lga,
+                            y = lpc,
+                            colour = status)) +
+  geom_point(size = 3) +
+  theme_bw() +
+  labs(x = "Large Genomic Alterations", 
+       y = "Loss of Parental Copy") +
+  geom_vline(xintercept = 18, linetype = "dashed") +
+  geom_vline(xintercept = 14, linetype = "dashed") +
+  geom_hline(yintercept = 10, linetype = "dashed")
+
 #############################
 # Modify collated information
 #############################
