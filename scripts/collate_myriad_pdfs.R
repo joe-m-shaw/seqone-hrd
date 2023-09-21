@@ -61,11 +61,14 @@ read_myriad_report_format_1 <- function(file) {
   
   pg2_gi_score <- myriad_page2_text[[141]]
   
+  pg2_brca_status <- myriad_page2_text[[159]]
+  
   # Collate information together
   
   output <- data.frame("igene_r_number" = pg2_igene_r_number,
                        "gi_score" = pg2_gi_score,
                        "pathology_block" = pg2_pathology_block,
+                       "brca_status" = pg2_brca_status,
                        "filename" = file)
   
   return(output)
@@ -87,9 +90,12 @@ read_myriad_report_format_2 <- function(file) {
   
   pg3_gi_score <- myriad_page3_text[[77]]
   
+  pg2_brca_status <- myriad_page2_text[[120]]
+  
   output <- data.frame("igene_r_number" = pg2_igene_r_number,
                        "gi_score" = pg3_gi_score,
                        "pathology_block" = pg2_pathology_block,
+                       "brca_status" = pg2_brca_status,
                        "filename" = file)
   
   return(output)
@@ -111,11 +117,14 @@ read_myriad_report_format_3 <- function(file) {
   
   pg2_gi_score <- myriad_page2_text[[142]]
   
+  pg2_brca_status <- myriad_page2_text[[161]]
+  
   # Collate information together
   
   output <- data.frame("igene_r_number" = pg2_igene_r_number,
                        "gi_score" = pg2_gi_score,
                        "pathology_block" = pg2_pathology_block,
+                       "brca_status" = pg2_brca_status,
                        "filename" = file)
   
   return(output)
