@@ -19,55 +19,39 @@ library(tidyverse)
 source("scripts/hrd_filepaths.R")
 
 ##################################################
-# Locations and Files
-##################################################
-
-myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
-
-myriad_report_files <- list.files(myriad_reports_location)
-
-##################################################
 # Functions
 ##################################################
 
-read_myriad_pdf <- function(filepath, filename) {
+read_myriad_report <- function(filepath, file) {
   
   # Use pdf_text to read PDF as a single string per page
   
-  output <- pdftools::pdf_text(pdf = paste0(filepath, filename))
+  myriad_report_text <- pdftools::pdf_text(pdf = paste0(filepath, file))
   
-  return(output)
+  page1 <- myriad_report_text[[1]]
   
-}
-
-read_myriad_report <- function(filepath, file) {
+  page2 <- myriad_report_text[[2]]
   
-  myriad_report_text <- read_myriad_pdf(filepath, file)
+  page3 <- myriad_report_text[[3]]
   
   # iGene R Number
   
-  r_number_regex <- ".+Patient ID:.{6}(R\\d{2}-\\w{4}).+"
-  
-  r_number <- sub(x = myriad_report_text[[2]],
-                  pattern = r_number_regex,
+  r_number <- sub(x = page2,
+                  pattern = ".+Patient ID:.{6}(R\\d{2}-\\w{4}).+",
                   replacement = "\\1")
   
   # NHS Number
   # Note: size of whitespace between "No:" and number can vary
   
-  nhs_number_regex <- ".+NHS No:.{10,20}(\\d{3}.{1}\\d{3}.{1}\\d{4}).+"
-  
-  nhs_number <- sub(x = myriad_report_text[[1]],
-                    pattern = nhs_number_regex,
+  nhs_number <- sub(x = page1,
+                    pattern = ".+NHS No:.{10,20}(\\d{3}.{1}\\d{3}.{1}\\d{4}).+",
                     replacement = "\\1")
   
   # Pathology Block
   # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
-  block_regex <- ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+"
-  
-  pathology_block <- sub(x = myriad_report_text[[2]],
-                         pattern = block_regex,
+  pathology_block <- sub(x = page2,
+                         pattern = ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+",
                          replacement = "\\2")
   
   # Genomic Instability Score
@@ -75,13 +59,13 @@ read_myriad_report <- function(filepath, file) {
   
   gi_score_regex <- ".+Patient Genomic Instability Score: (\\d{1,2}).+"
   
-  gi_score_pg2 <- sub(x = myriad_report_text[[2]],
+  gi_score_pg2 <- sub(x = page2,
                   pattern = gi_score_regex,
                   replacement = "\\1")
   
   # Some reports have GI score on the third page
   
-  gi_score_pg3 <- sub(x = myriad_report_text[[3]],
+  gi_score_pg3 <- sub(x = page3,
                       pattern = gi_score_regex,
                       replacement = "\\1")
   
@@ -100,6 +84,14 @@ read_myriad_report <- function(filepath, file) {
   return(output)
   
 }
+
+##################################################
+# Locations and Files
+##################################################
+
+myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
+
+myriad_report_files <- list.files(myriad_reports_location)
 
 ##################################################
 # Collate Report Information
