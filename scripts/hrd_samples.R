@@ -144,6 +144,12 @@ hrd_sample_concentrations <- read_csv(paste0(hrd_data_path,
 seqone_run1 <- read_csv(paste0(hrd_data_path, "seqone_run1.csv")) %>%
   filter(!base::duplicated(specimen_number))
 
+#############################
+# Pathology Block IDs
+#############################
+
+pathology_block_ids <- read_csv(paste0(hrd_data_path, "pathology_block_ids.csv"))
+
 ##################################################
 # Join Sample Information
 ##################################################
@@ -253,17 +259,24 @@ new_samples_for_volume_check <- rbind(samples_to_add %>%
 # Spread of Genomic Instability Scores
 ##################################################
 
-samples_for_run4 <- c(20112141, 
-                      23016815, 
-                      23016917, 
-                      20104105,
-                      23016919,
-                      21022554,
-                      21014781)
+samples_for_run4_from_run_3 <- c(20112141, 
+                                  23016815, 
+                                  23016917, 
+                                  20104105,
+                                  23016919,
+                                  21022554,
+                                  21014781)
 
+samples_for_run4_from_run_2 <- c(20112141,
+                                 21012359,
+                                 21013520,
+                                 21006928,
+                                 21009404,
+                                 21008398,
+                                 21009934)
 
 samples_to_test <- annotated_hrd_sample_list %>%
-  filter(dlms_dna_number %in% samples_for_run4) 
+  filter(dlms_dna_number %in% samples_for_run4_from_run_2) 
 
 ggplot(samples_to_test, aes(x = reorder(dlms_dna_number, gi_score), 
                             y = gi_score,
@@ -276,6 +289,22 @@ ggplot(samples_to_test, aes(x = reorder(dlms_dna_number, gi_score),
   labs(x = "", y = "Myriad Genomic Instability Score",
        title = "Variation in Myriad Genomic Instability Scores") +
   geom_hline(yintercept = 42, linetype = "dashed")
+
+
+write.csv(samples_to_test %>%
+            select(dlms_dna_number, i_gene_r_no,
+                   firstname, surname),
+          paste0(hrd_project_path, "outputs/7_samples_fo-next_run.csv"),
+          row.names = FALSE)
+
+
+WS134687 <- annotated_hrd_sample_list %>%
+  filter(seqone_run2 == "Yes") %>%
+  select(dlms_dna_number, firstname, surname,
+         ncc)
+
+write.csv(WS134687,paste0(hrd_project_path, "outputs/WS134687_ncc.csv"),
+          row.names = FALSE)
 
 ##################################################
 # Sample Concentrations
@@ -325,6 +354,22 @@ write.csv(annotated_hrd_sample_list,
           file = paste0(hrd_project_path, "outputs/annotated_hrd_sample_list_", 
                         format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
                         ".csv"),
+          row.names = FALSE)
+
+##################################################
+# Samples with BRCA variants for PanSolid Run
+##################################################
+
+samples_for_pansolid <- c(23016917, 23016516, 23016815,
+                          21001739, 21006858)
+
+
+samples_for_pansolid_details <- annotated_hrd_sample_list %>%
+  filter(dlms_dna_number %in% samples_for_pansolid) %>%
+  select(dlms_dna_number, i_gene_r_no, firstname, surname)
+
+write.csv(samples_for_pansolid_details, 
+          paste0(hrd_project_path, "outputs/samples_for_pansolid_details.csv"),
           row.names = FALSE)
 
 ##################################################

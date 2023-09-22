@@ -22,17 +22,9 @@ source("scripts/hrd_filepaths.R")
 # Locations and Files
 ##################################################
 
-myriad_location_format_1 <- paste0(hrd_data_path, "myriad_reports_format_1/")
+myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
 
-myriad_location_format_2 <- paste0(hrd_data_path, "myriad_reports_format_2/")
-
-myriad_location_format_3 <- paste0(hrd_data_path, "myriad_reports_format_3/")
-
-myriad_reports_format_1 <- list.files(myriad_location_format_1)
-
-myriad_reports_format_2 <- list.files(myriad_location_format_2)
-
-myriad_reports_format_3 <- list.files(myriad_location_format_3)
+myriad_report_files <- list.files(myriad_reports_location)
 
 ##################################################
 # Functions
@@ -40,92 +32,70 @@ myriad_reports_format_3 <- list.files(myriad_location_format_3)
 
 read_myriad_pdf <- function(filepath, filename) {
   
-  output <- pdftools::pdf_data(pdf = paste0(filepath, filename))
+  # Use pdf_text to read PDF as a single string per page
+  
+  output <- pdftools::pdf_text(pdf = paste0(filepath, filename))
   
   return(output)
   
 }
 
-read_myriad_report_format_1 <- function(file) {
+read_myriad_report <- function(filepath, file) {
   
-  myriad_report_data <- read_myriad_pdf(myriad_location_format_1, file)
+  myriad_report_text <- read_myriad_pdf(filepath, file)
   
-  # Page 2: original Myriad report
+  # iGene R Number
   
-  myriad_page2_text <- myriad_report_data[[2]][[6]]
+  r_number_regex <- ".+Patient ID:.{6}(R\\d{2}-\\w{4}).+"
   
-  pg2_pathology_block <- paste0(myriad_page2_text[[82]], " ",
-                                myriad_page2_text[[83]])
+  r_number <- sub(x = myriad_report_text[[2]],
+                  pattern = r_number_regex,
+                  replacement = "\\1")
   
-  pg2_igene_r_number <- myriad_page2_text[[76]]
+  # NHS Number
+  # Note: size of whitespace between "No:" and number can vary
   
-  pg2_gi_score <- myriad_page2_text[[141]]
+  nhs_number_regex <- ".+NHS No:.{10,20}(\\d{3}.{1}\\d{3}.{1}\\d{4}).+"
   
-  pg2_brca_status <- myriad_page2_text[[159]]
+  nhs_number <- sub(x = myriad_report_text[[1]],
+                    pattern = nhs_number_regex,
+                    replacement = "\\1")
   
-  # Collate information together
+  # Pathology Block
+  # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
-  output <- data.frame("igene_r_number" = pg2_igene_r_number,
-                       "gi_score" = pg2_gi_score,
-                       "pathology_block" = pg2_pathology_block,
-                       "brca_status" = pg2_brca_status,
-                       "filename" = file)
+  block_regex <- ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+"
   
-  return(output)
+  pathology_block <- sub(x = myriad_report_text[[2]],
+                         pattern = block_regex,
+                         replacement = "\\2")
   
-}
-
-read_myriad_report_format_2 <- function(file) {
+  # Genomic Instability Score
+  # Note: score can be 1 digit (i.e. "7") or 2 ("73")
   
-  myriad_report_data <- read_myriad_pdf(myriad_location_format_2, file)
+  gi_score_regex <- ".+Patient Genomic Instability Score: (\\d{1,2}).+"
   
-  myriad_page2_text <- myriad_report_data[[2]][[6]]
+  gi_score_pg2 <- sub(x = myriad_report_text[[2]],
+                  pattern = gi_score_regex,
+                  replacement = "\\1")
   
-  myriad_page3_text <- myriad_report_data[[3]][[6]]
+  # Some reports have GI score on the third page
   
-  pg2_igene_r_number <- myriad_page2_text[[75]]
+  gi_score_pg3 <- sub(x = myriad_report_text[[3]],
+                      pattern = gi_score_regex,
+                      replacement = "\\1")
   
-  pg2_pathology_block <- paste0(myriad_page2_text[[81]], " ",
-                                myriad_page2_text[[82]])
+  # Pick correct GI score
   
-  pg3_gi_score <- myriad_page3_text[[77]]
+  gi_score <- ifelse(str_length(gi_score_pg2) %in% c(1,2),
+                     gi_score_pg2,
+                     ifelse(str_length(gi_score_pg3) %in% c(1,2),
+                            gi_score_pg3, "NULL"))
   
-  pg2_brca_status <- myriad_page2_text[[120]]
-  
-  output <- data.frame("igene_r_number" = pg2_igene_r_number,
-                       "gi_score" = pg3_gi_score,
-                       "pathology_block" = pg2_pathology_block,
-                       "brca_status" = pg2_brca_status,
-                       "filename" = file)
-  
-  return(output)
-  
-}
-
-read_myriad_report_format_3 <- function(file) {
-  
-  myriad_report_data <- read_myriad_pdf(myriad_location_format_3, file)
-  
-  # Page 2: original Myriad report
-  
-  myriad_page2_text <- myriad_report_data[[2]][[6]]
-  
-  pg2_pathology_block <- paste0(myriad_page2_text[[83]], " ",
-                                myriad_page2_text[[84]])
-  
-  pg2_igene_r_number <- myriad_page2_text[[77]]
-  
-  pg2_gi_score <- myriad_page2_text[[142]]
-  
-  pg2_brca_status <- myriad_page2_text[[161]]
-  
-  # Collate information together
-  
-  output <- data.frame("igene_r_number" = pg2_igene_r_number,
-                       "gi_score" = pg2_gi_score,
-                       "pathology_block" = pg2_pathology_block,
-                       "brca_status" = pg2_brca_status,
-                       "filename" = file)
+  output <- data.frame("r_number" = r_number,
+                       "nhs_number" = nhs_number,
+                       "pathology_block" = pathology_block,
+                       "gi_score" = gi_score)
   
   return(output)
   
@@ -135,41 +105,15 @@ read_myriad_report_format_3 <- function(file) {
 # Collate Report Information
 ##################################################
 
-collated_info_format_1 <- data.frame()
+collated_myriad_info <- data.frame()
 
-for (i in myriad_reports_format_1) {
+for (i in myriad_report_files) {
   
-  tmp_output <- read_myriad_report_format_1(i)
+  tmp_output <- read_myriad_report(myriad_reports_location, i)
   
-  collated_info_format_1 <- rbind(collated_info_format_1, tmp_output)
+  collated_myriad_info <- rbind(collated_myriad_info, tmp_output)
   
   rm(tmp_output)
 }
-
-
-collated_info_format_2 <- data.frame()
-
-for (i in myriad_reports_format_2) {
-  
-  tmp_output <- read_myriad_report_format_2(i)
-  
-  collated_info_format_2 <- rbind(collated_info_format_2, tmp_output)
-  
-  rm(tmp_output)
-}
-
-collated_info_format_3 <- data.frame()
-
-for (i in myriad_reports_format_3) {
-  
-  tmp_output <- read_myriad_report_format_3(i)
-  
-  collated_info_format_3 <- rbind(collated_info_format_3, tmp_output)
-  
-  rm(tmp_output)
-}
-
-collated_myriad_results <- rbind(collated_info_format_1, collated_info_format_2,
-                                 collated_info_format_3)
 
 ##################################################
