@@ -47,6 +47,9 @@ read_myriad_report <- function(filepath, file) {
                     pattern = ".+NHS No:.{10,20}(\\d{3}.{1}\\d{3}.{1}\\d{4}).+",
                     replacement = "\\1")
   
+  nhs_number_mod <- as.numeric(gsub(pattern = "(\\D)", "",
+                                    nhs_number))
+  
   # Pathology Block
   # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
@@ -59,15 +62,15 @@ read_myriad_report <- function(filepath, file) {
   
   gi_score_regex <- ".+Patient Genomic Instability Score: (\\d{1,2}).+"
   
-  gi_score_pg2 <- sub(x = page2,
+  gi_score_pg2 <- as.numeric(sub(x = page2,
                   pattern = gi_score_regex,
-                  replacement = "\\1")
+                  replacement = "\\1"))
   
   # Some reports have GI score on the third page
   
-  gi_score_pg3 <- sub(x = page3,
+  gi_score_pg3 <- as.numeric(sub(x = page3,
                       pattern = gi_score_regex,
-                      replacement = "\\1")
+                      replacement = "\\1"))
   
   # Pick correct GI score
   
@@ -77,7 +80,7 @@ read_myriad_report <- function(filepath, file) {
                             gi_score_pg3, "NULL"))
   
   output <- data.frame("r_number" = r_number,
-                       "nhs_number" = nhs_number,
+                       "nhs_number" = nhs_number_mod,
                        "pathology_block" = pathology_block,
                        "gi_score" = gi_score)
   

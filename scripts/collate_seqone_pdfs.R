@@ -32,30 +32,36 @@ read_seqone_report <- function(filepath, file) {
   
   page_1 <- seqone_report_text[[1]]
   
-  hrd_score <- grep_seqone_text(".+CLASS\n.{78,83}((0.\\d{2})|(\\d{1})).+", page_1)
+  hrd_score <- as.numeric(grep_seqone_text(".+CLASS\n.{78,83}((0.\\d{2})|(\\d{1})).+", page_1))
   
   hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
   
-  lga <- grep_seqone_text(".+LGA Status.{38}(\\d{1,2}).+", page_1)
+  lga <- as.numeric(grep_seqone_text(".+LGA Status.{38}(\\d{1,2}).+", page_1))
   
-  lpc <- grep_seqone_text(".+LPC Status.{38}(\\d{1,2}).+", page_1)
+  lpc <- as.numeric(grep_seqone_text(".+LPC Status.{38}(\\d{1,2}).+", page_1))
   
-  ccne1 <- grep_seqone_text(".+CCNE1 Amplification.{29}((\\d{1}.\\d{2})|\\d{1}).+", page_1)
+  ccne1 <- as.numeric(grep_seqone_text(".+CCNE1 Amplification.{29}((\\d{1}.\\d{2})|\\d{1}).+", page_1))
   
-  rad51b <- grep_seqone_text(".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}).+", page_1)
+  rad51b <- as.numeric(grep_seqone_text(".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}).+", page_1))
   
-  ncc <- grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1)
+  ncc <- as.numeric(grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1))
   
-  coverage <- grep_seqone_text(".+Coverage.{33}(.{3,4})X.+", page_1)
+  coverage <- as.numeric(grep_seqone_text(".+Coverage.{33}(.{3,4})X.+", page_1))
   
-  percent_mapping <- grep_seqone_text(".+% correct mapping.{24,25}(.{2,4})%.+", page_1)
+  percent_mapping <- as.numeric(grep_seqone_text(".+% correct mapping.{24,25}(\\d{2}.\\d{1})%.+", page_1))
   
   sample_id <- grep_seqone_text(".+Shallow sample ID.{15,18}\\D{2}\\d{6}_(.{8,26}).+", page_1)
+  
+  dlms_dna_number <- as.numeric(sub(pattern = "^(\\d{8}).+",
+                                   replacement = "\\1",
+                                   x = sample_id))
   
   date <- grep_seqone_text(".+Date.{32}(\\D{3,9}.\\d{1,2}..\\d{4}).+", page_1)
   
   output <- data.frame(
     
+    "dlms_dna_number" = dlms_dna_number,
+    "sample_id" = sample_id,
     "hrd_score" = hrd_score,
     "hrd_status" = hrd_status,
     "lga" = lga,
@@ -65,7 +71,6 @@ read_seqone_report <- function(filepath, file) {
     "ncc" = ncc,
     "coverage" = coverage,
     "percent_mapping" = percent_mapping,
-    "sample_id" = sample_id,
     "date" = date,
     "filename" = i)
   
