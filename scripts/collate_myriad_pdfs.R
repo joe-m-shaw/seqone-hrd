@@ -79,10 +79,16 @@ read_myriad_report <- function(filepath, file) {
                      ifelse(str_length(gi_score_pg3) %in% c(1,2),
                             gi_score_pg3, "NULL"))
   
+  myriad_hrd_status <- sub(x = page2,
+                           pattern = ".+Myriad HRD Status:.(\\D{8}).+",
+                           replacement = "\\1")
+  
+  
   output <- data.frame("r_number" = r_number,
                        "nhs_number" = nhs_number_mod,
                        "pathology_block" = pathology_block,
-                       "gi_score" = gi_score)
+                       "gi_score" = gi_score,
+                       "myriad_hrd_status" = myriad_hrd_status)
   
   return(output)
   

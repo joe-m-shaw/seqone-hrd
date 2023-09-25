@@ -34,7 +34,7 @@ read_seqone_report <- function(filepath, file) {
   
   hrd_score <- as.numeric(grep_seqone_text(".+CLASS\n.{78,83}((0.\\d{2})|(\\d{1})).+", page_1))
   
-  hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
+  seqone_hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
   
   lga <- as.numeric(grep_seqone_text(".+LGA Status.{38}(\\d{1,2}).+", page_1))
   
@@ -63,7 +63,7 @@ read_seqone_report <- function(filepath, file) {
     "dlms_dna_number" = dlms_dna_number,
     "sample_id" = sample_id,
     "hrd_score" = hrd_score,
-    "hrd_status" = hrd_status,
+    "seqone_hrd_status" = seqone_hrd_status,
     "lga" = lga,
     "lpc" = lpc,
     "ccne1" = ccne1,
