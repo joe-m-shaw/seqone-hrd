@@ -16,6 +16,7 @@ library(janitor)
 ##################################################
 
 source("scripts/hrd_filepaths.R")
+source("scripts/dlms_connection.R")
 
 #############################
 # DNA Volumes
@@ -238,6 +239,9 @@ annotated_hrd_sample_list <- collated_hrd_sample_info %>%
          myriad_hrd_result, seqone_run1, seqone_run2, seqone_run3) %>%
   arrange(desc(seqone_run1), desc(seqone_run2), desc(seqone_run3)) %>%
   mutate()
+
+
+test2 <- get_sample_data(annotated_hrd_sample_list$dlms_dna_number)
 
 #############################
 # Spreadsheet from Katie Sadler
