@@ -154,12 +154,15 @@ pathology_block_ids <- read_csv(paste0(hrd_data_path, "pathology_block_ids.csv")
 # Join Sample Information
 ##################################################
 
+colnames(dlms_joined)
+
 collated_hrd_sample_info <- hrd_sample_volumes %>%
   left_join(hrd_sample_gi_scores, by = "dlms_dna_number") %>%
   left_join(hrd_sample_concentrations, by = "dlms_dna_number") %>%
   left_join(hrd_sample_ncc, by = "dlms_dna_number") %>%
   left_join(dlms_joined %>%
-              select(dlms_dna_number, i_gene_r_no, firstname, surname), 
+              select(dlms_dna_number, i_gene_r_no, firstname, surname,
+                     nhsno), 
             by = "dlms_dna_number") %>%
   mutate(seqone_run1 = ifelse(dlms_dna_number %in% seqone_run1$specimen_number, 
          "Yes", "No"),
@@ -167,7 +170,8 @@ collated_hrd_sample_info <- hrd_sample_volumes %>%
          
          myriad_hrd_result = case_when(
               gi_score >= 42 ~"Positive",
-              gi_score < 42 ~"Negative"))
+              gi_score < 42 ~"Negative")) %>%
+  dplyr::rename(nhs_number = nhsno)
 
 ##################################################
 # Selecting samples for run 2 and run 3
@@ -228,7 +232,8 @@ annotated_hrd_sample_list <- collated_hrd_sample_info %>%
       dlms_dna_number %in% low_quality_samples ~"New sample: poor quality",
       dlms_dna_number %in% repeat_samples ~"Repeat from run one",
       dlms_dna_number %in% new_samples ~"New sample: better quality")) %>%
-  select(dlms_dna_number, i_gene_r_no, firstname, surname, volume_ul, qubit_ng_u_l, 
+  select(dlms_dna_number, i_gene_r_no, firstname, surname, nhs_number, 
+         volume_ul, qubit_ng_u_l, 
          ncc, gi_score, 
          myriad_hrd_result, seqone_run1, seqone_run2, seqone_run3) %>%
   arrange(desc(seqone_run1), desc(seqone_run2), desc(seqone_run3)) %>%
