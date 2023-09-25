@@ -74,7 +74,7 @@ read_myriad_report <- function(filepath, file) {
   
   # Pick correct GI score
   
-  gi_score <- ifelse(str_length(gi_score_pg2) %in% c(1,2),
+  myriad_gi_score <- ifelse(str_length(gi_score_pg2) %in% c(1,2),
                      gi_score_pg2,
                      ifelse(str_length(gi_score_pg3) %in% c(1,2),
                             gi_score_pg3, "NULL"))
@@ -87,7 +87,7 @@ read_myriad_report <- function(filepath, file) {
   output <- data.frame("r_number" = r_number,
                        "nhs_number" = nhs_number_mod,
                        "pathology_block" = pathology_block,
-                       "gi_score" = gi_score,
+                       "myriad_gi_score" = myriad_gi_score,
                        "myriad_hrd_status" = myriad_hrd_status)
   
   return(output)
