@@ -36,7 +36,7 @@ read_myriad_report <- function(filepath, file) {
   
   # iGene R Number
   
-  r_number <- sub(x = page2,
+  myriad_r_number <- sub(x = page2,
                   pattern = ".+Patient ID:.{6}(R\\d{2}-\\w{4}).+",
                   replacement = "\\1")
   
@@ -64,7 +64,7 @@ read_myriad_report <- function(filepath, file) {
   # Pathology Block
   # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
-  pathology_block <- sub(x = page2,
+  myriad_pathology_block <- sub(x = page2,
                          pattern = ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+",
                          replacement = "\\2")
   
@@ -99,11 +99,11 @@ read_myriad_report <- function(filepath, file) {
                           replacement = "\\1")
   
   
-  output <- data.frame("r_number" = r_number,
+  output <- data.frame("myriad_r_number" = myriad_r_number,
                        "myriad_patient_name" = myriad_patient_name,
                        "myriad_dob" = myriad_dob,
                        "nhs_number" = nhs_number_mod,
-                       "pathology_block" = pathology_block,
+                       "myriad_pathology_block" = myriad_pathology_block,
                        "myriad_gi_score" = myriad_gi_score,
                        "myriad_hrd_status" = myriad_hrd_status,
                        "myriad_brca_status" = myriad_brca_status)
