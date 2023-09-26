@@ -155,8 +155,6 @@ pathology_block_ids <- read_csv(paste0(hrd_data_path, "pathology_block_ids.csv")
 # Join Sample Information
 ##################################################
 
-colnames(dlms_joined)
-
 collated_hrd_sample_info <- hrd_sample_volumes %>%
   left_join(hrd_sample_gi_scores, by = "dlms_dna_number") %>%
   left_join(hrd_sample_concentrations, by = "dlms_dna_number") %>%

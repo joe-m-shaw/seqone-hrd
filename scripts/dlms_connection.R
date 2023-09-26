@@ -17,6 +17,10 @@ library(janitor)
 # Connection setup for PC38698
 moldb_connection <- RODBC::odbcConnect(dsn = "moldb")
 
+db_tables <- sqlTables(channel = moldb_connection,
+          catalog = "MolecularDB",
+          schema = "dbo")
+
 ##################################################
 # Function for selecting samples
 ##################################################
