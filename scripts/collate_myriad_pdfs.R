@@ -50,6 +50,17 @@ read_myriad_report <- function(filepath, file) {
   nhs_number_mod <- as.numeric(gsub(pattern = "(\\D)", "",
                                     nhs_number))
   
+  
+  # Patient name
+  myriad_patient_name <- sub(x = page1,
+                              pattern = ".+Patient Name:\\s{10,15}(\\D{5,25})\n.+",
+                              replacement = "\\1")
+  
+  # Patient date of birth
+  myriad_dob <- sub(x = page1,
+                    pattern = ".+Date of Birth:\\s{10,15}(\\d{2}/\\d{2}/\\d{4})\n.+",
+                    replacement = "\\1")
+  
   # Pathology Block
   # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
@@ -83,12 +94,19 @@ read_myriad_report <- function(filepath, file) {
                            pattern = ".+Myriad HRD Status:.(\\D{8}).+",
                            replacement = "\\1")
   
+  myriad_brca_status <- sub(x = page2,
+                          pattern = ".+Tumor Mutation BRCA1/BRCA2 Status:.(\\D{8}).+",
+                          replacement = "\\1")
+  
   
   output <- data.frame("r_number" = r_number,
+                       "myriad_patient_name" = myriad_patient_name,
+                       "myriad_dob" = myriad_dob,
                        "nhs_number" = nhs_number_mod,
                        "pathology_block" = pathology_block,
                        "myriad_gi_score" = myriad_gi_score,
-                       "myriad_hrd_status" = myriad_hrd_status)
+                       "myriad_hrd_status" = myriad_hrd_status,
+                       "myriad_brca_status" = myriad_brca_status)
   
   return(output)
   
