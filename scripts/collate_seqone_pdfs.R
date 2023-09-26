@@ -53,15 +53,20 @@ read_seqone_report <- function(filepath, file) {
   
   sample_id <- grep_seqone_text(".+Shallow sample ID.{15,18}\\D{2}\\d{6}_(.{8,26}).+", page_1)
   
+  worksheet <- grep_seqone_text(".+Shallow sample ID\\s{15,18}(\\D{2}\\d{6})_.+", page_1)
+  
   dlms_dna_number <- as.numeric(sub(pattern = "^(\\d{8}).+",
                                    replacement = "\\1",
                                    x = sample_id))
   
   date <- grep_seqone_text(".+Date.{32}(\\D{3,9}.\\d{1,2}..\\d{4}).+", page_1)
   
+  user <- grep_seqone_text(".+User\\s{30,32}(.{10,26})\\s+.+", page_1)
+  
   output <- data.frame(
     
     "dlms_dna_number" = dlms_dna_number,
+    "worksheet" = worksheet,
     "sample_id" = sample_id,
     "seqone_hrd_score" = seqone_hrd_score,
     "seqone_hrd_status" = seqone_hrd_status,
@@ -73,6 +78,7 @@ read_seqone_report <- function(filepath, file) {
     "coverage" = coverage,
     "percent_mapping" = percent_mapping,
     "date" = date,
+    "user" = user,
     "filename" = i)
   
   return(output)
