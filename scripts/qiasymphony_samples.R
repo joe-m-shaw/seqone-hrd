@@ -25,8 +25,12 @@ input_samples <- read_csv(paste0(hrd_data_path, "louise_samples.csv"))
 ##################################################
 
 sample_info <- get_sample_data(input_samples$lab_no) %>%
-  select(labno, disease, disease_2, disease_3, disease_4, pathno,
-         comments, concentration, nanodrop_ratio, nanodrop230ratio)
+  select(labno, dob, firstname, surname, i_gene_r_no, i_gene_s_no, 
+         nhsno, disease, pathno, comments, concentration, nanodrop_ratio, 
+         nanodrop230ratio) %>%
+  mutate(dob_mod = sub(pattern = "^(\\d{4}-\\d{2}-\\d{2}).+",
+                       replacement = "\\1",
+                       x =dob))
   
 extraction_batch_info <- sqlQuery(channel = moldb_connection,
                           query = paste0("SELECT * FROM MolecularDB.dbo.MOL_Extractions WHERE LABNO IN (",
@@ -70,8 +74,8 @@ output <- sample_info %>%
   left_join(exon_table, by = "labno", relationship = "many-to-many") %>%
   arrange(labno) %>%
   filter(extraction_method_fk == 25) %>%
-  select(-c(status, macro, version.x, version.y, disease_2, disease_3, 
-            disease_4, extraction_id, extraction_method_fk, locked))
+  select(-c(status, macro, version.x, version.y, 
+            extraction_id, extraction_method_fk, locked, dob))
 
 ##################################################
 # Export
