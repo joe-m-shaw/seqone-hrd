@@ -17,6 +17,7 @@ library(janitor)
 
 source("scripts/hrd_filepaths.R")
 source("scripts/dlms_connection.R")
+source("scripts/collate_myriad_pdfs.R")
 
 #############################
 # DNA Volumes
@@ -212,9 +213,9 @@ run_two_samples <- c(low_quality_samples, new_samples, repeat_samples)
 run_three_samples_non_repeat <- c(23016922, 23016919, 23016917, 23016815,
                                    23016526, 23016524, 23016520, 23016518,
                                    23016516, 21022554, 21014781, 21006236,
-                                   21002698, 21000693, 20119814,
-                                   20119049, 20113426, 20110258, 23017428,
-                                   23025928, 23033359)
+                                   21002698, 23025928, 20119814,
+                                  23034142, 20116043, 21011999, 23017428,
+                                   23033359, 20119049)
 
 run_three_samples <- c(run_three_samples_non_repeat, repeat_samples,
                        # Accidentally repeated this sample on run 2, so will
@@ -238,8 +239,10 @@ annotated_hrd_sample_list <- collated_hrd_sample_info %>%
   arrange(desc(seqone_run1), desc(seqone_run2), desc(seqone_run3)) %>%
   mutate()
 
-
-test2 <- get_sample_data(annotated_hrd_sample_list$dlms_dna_number)
+run3_samples <- annotated_hrd_sample_list %>%
+  filter(seqone_run3 == "Yes") %>%
+  select(dlms_dna_number, firstname, surname, volume_ul, qubit_ng_u_l) %>%
+  arrange(dlms_dna_number)
 
 #############################
 # Spreadsheet from Katie Sadler
@@ -362,6 +365,13 @@ write.csv(annotated_hrd_sample_list,
                         format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
                         ".csv"),
           row.names = FALSE)
+
+write.csv(run3_samples, 
+          file = paste0(hrd_project_path, "outputs/run3_samples", 
+                        format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
+                        ".csv"),
+          row.names = FALSE)
+
 
 ##################################################
 # Samples with BRCA variants for PanSolid Run
