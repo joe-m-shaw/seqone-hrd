@@ -12,6 +12,8 @@ rm(list=ls())
 source("scripts/hrd_filepaths.R")
 source("scripts/dlms_connection.R")
 
+library(tidyverse)
+
 ##################################################
 # Input
 ##################################################
@@ -43,21 +45,47 @@ extraction_batch_dates <- sqlQuery(channel = moldb_connection,
                         ")")) %>%
   janitor::clean_names()
 
-# Currently doesn't work
-# gene_info <- sqlQuery(channel = moldb_connection,
-                      #query = "SELECT * FROM MolecularDB.dbo.ResultsAccess WHERE LABNO IN (23039903)")
+# Workaround - selecting by LABNO doesn't work due to lack of data consistency
+# in LABNO column. Instead, pull out everything via plate position, then filter.
+input_numbers <- seq(1, 96, 1)
+
+results_access <- sqlQuery(channel = moldb_connection,
+                      query = paste0("SELECT LABNO, DISCODE, Exon, Genotype FROM MolecularDB.dbo.ResultsAccess WHERE POSITION IN (", 
+                 paste(input_numbers, collapse = ", "),
+                 ")")) %>%
+  janitor::clean_names()
+
+exon_table <- results_access %>%
+  filter(labno %in% input_samples$lab_no) %>%
+  # Change data type to allow join in next step
+  mutate(labno = as.numeric(labno))
 
 ##################################################
-# Join and export
+# Join
 ##################################################
 
 output <- sample_info %>%
   left_join(extraction_batch_info, by = "labno") %>%
   left_join(extraction_batch_dates, by = "extraction_batch_id") %>%
+  left_join(exon_table, by = "labno", relationship = "many-to-many") %>%
   arrange(labno) %>%
-  filter(extraction_method_fk == 25)
-  
-write.csv(output, paste0(hrd_project_path, "outputs/qia_symphony_extraction_batch_info.csv"),
+  filter(extraction_method_fk == 25) %>%
+  select(-c(status, macro, version.x, version.y, disease_2, disease_3, 
+            disease_4, extraction_id, extraction_method_fk, locked))
+
+##################################################
+# Export
+##################################################
+
+louise_folder <- "S:/central shared/Genetics/Mol_Shared/Louise.Kung/"
+
+write.csv(output, paste0(louise_folder, "qia_symphony_extraction_batch_info",
+                         format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
+                         ".csv"),
           row.names = FALSE)
 
 ##################################################
+
+
+
+
