@@ -23,7 +23,7 @@ source("scripts/dlms_connection.R")
 downsampled_samples <- grep(pattern = "downsampl", x = collated_seqone_info$sample_id, value = TRUE)
 
 ##################################################
-# Additional data
+# Collate and edit Myriad Information
 ##################################################
 
 # pdf_text doesn't work on these reports as resolution is too low.
@@ -34,13 +34,39 @@ low_res_myriad_results <- read_excel(path = paste0(hrd_data_path,
 
 collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results)
 
-# Manual pathology ID check
-path_block_check <- read_csv(paste0(hrd_project_path, "outputs/for_manual_check.csv")) %>%
-  select(dlms_dna_number, pathology_block_check)
+##################################################
+# Pathology Block ID Check
+##################################################
 
 # Extract data from DLMS via ODBC
 seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) %>%
-  dplyr::rename(dlms_dna_number = labno)
+  dplyr::rename(dlms_dna_number = labno,
+                nhs_number = nhsno) 
+
+export_for_check <- collated_seqone_info %>%
+  filter(!base::duplicated(dlms_dna_number)) %>%
+  select(dlms_dna_number) %>%
+  left_join(seqone_dlms_info %>%
+              select(dlms_dna_number, firstname, surname, pathno, nhs_number), 
+            by = "dlms_dna_number") %>%
+  left_join(collated_myriad_info_mod %>%
+              select(nhs_number, myriad_pathology_block), by = "nhs_number") %>%
+  select(dlms_dna_number, firstname, surname, nhs_number, 
+         pathno, myriad_pathology_block) %>%
+  arrange(nhs_number) %>%
+  mutate(path_block_automated_check = ifelse(pathno == myriad_pathology_block,
+                                             "match", "NOT match"),
+         path_block_manual_check = "")
+
+# Writing of pathology block IDs is inconsistent, so a manual check is
+# required
+
+write.csv(export_for_check, paste0(hrd_data_path, "manual_path_block_check.csv"),
+          row.names = FALSE)
+
+
+path_block_check <- read_csv(paste0(hrd_data_path, "manual_path_block_check.csv")) %>%
+  select(dlms_dna_number, path_block_manual_check)
 
 ##################################################
 # Compare SeqOne and Myriad Results
@@ -50,10 +76,9 @@ seqone_mod <- collated_seqone_info %>%
   filter(!date %in% c("September 1, 2023", "August 31, 2023",
                       "August 24, 2023", "August 25, 2023")) %>%
   left_join(seqone_dlms_info %>%
-              select(dlms_dna_number, nhsno, firstname, surname, i_gene_r_no,
+              select(dlms_dna_number, nhs_number, firstname, surname, i_gene_r_no,
                      pathno),
             by = "dlms_dna_number") %>%
-  dplyr::rename(nhs_number = nhsno) %>%
   mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No"))
 
 control_variants <- c("Biobank", "Seraseq")
@@ -84,9 +109,6 @@ compare_results <- seqone_mod %>%
          myriad_hrd_status, hrd_status_check,
          pathno, myriad_pathology_block, pathology_block_check)
 
-
-
-
 # filter(!identity == "Control" & dlms_dna_number != 21006723)
 
 ##################################################
@@ -98,9 +120,8 @@ compare_results <- seqone_mod %>%
 # 30 samples with Myriad results overall, 45 samples overall
 
 ggplot(compare_results %>%
-         filter(!is.na(pathology_block_check)), aes(x = myriad_gi_score, y = seqone_hrd_score)) +
-  geom_point(size = 2, aes(colour = pathology_block_check,
-                           shape = hrd_status_check)) +
+         filter(!is.na(path_block_manual_check)), aes(x = myriad_gi_score, y = seqone_hrd_score)) +
+  geom_point(size = 2, aes(shape = hrd_status_check)) +
   theme_bw() +
   theme(panel.grid = element_blank()) +
   scale_x_continuous(limits = c(0,100),
@@ -114,7 +135,7 @@ ggplot(compare_results %>%
   #geom_vline(xintercept = 42, linetype = "dashed") +
   #geom_hline(yintercept = 0.5, linetype = "dashed") + 
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
-  facet_wrap(~pathology_block_check)
+  facet_wrap(~path_block_manual_check)
 
 comparison_summary <- compare_results %>%
   filter(!is.na(myriad_gi_score)) %>%
@@ -193,20 +214,20 @@ ggplot(seq_one_results, aes(x = reorder(filename, seqone_hrd_score),
                                  positive_colour)) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
+  theme(axis.text.x = element_blank()) +
   labs(x = "", y = "SeqOne HRD Score",
        title = "Explaining the SeqOne HRD Model")
 
 ggplot(seq_one_results, aes(x = lga,
                             y = lpc,
-                            colour = hrd_status)) +
+                            colour = seqone_hrd_status)) +
   geom_point(size = 3) +
   theme_bw() +
   labs(x = "Large Genomic Alterations", 
        y = "Loss of Parental Copy") +
   geom_vline(xintercept = 18, linetype = "dashed") +
-  geom_vline(xintercept = 14, linetype = "dashed") +
-  geom_hline(yintercept = 10, linetype = "dashed")
+  geom_vline(xintercept = 14, linetype = "dashed")
+  # geom_hline(yintercept = 10, linetype = "dashed")
 
 ##################################################
 # Save plots
@@ -250,7 +271,32 @@ collated_seqone_info %>%
 check <- collated_seqone_info %>%
   filter(date %in% c("September 6, 2023"))
 
+##################################################
+# Seraseq Controls
+##################################################
 
+seraseq_gi_scores <- read_excel(paste0(hrd_data_path, "seraseq_gi_scores.xlsx"))
+
+seraseq_control_data <- seqone_mod %>%
+  left_join(seraseq_gi_scores, by = "dlms_dna_number") %>%
+  filter(!is.na(myriad_gi_score)) %>%
+  mutate(firstname_factor = factor(firstname, levels = c(
+    "FFPE HRD Negative",
+    "Low-Positive FFPE HRD",
+    "High-Positive FFPE HRD")))
+
+ggplot(seraseq_control_data, aes(x = myriad_gi_score, y = seqone_hrd_score)) +
+  geom_point(size = 3, aes(shape = seqone_hrd_status)) +
+  ylim(0, 1) +
+  xlim(0, 100) +
+  facet_wrap(~firstname_factor) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(x = "Myriad GI Score", y = "SeqOne HRD Score")
+
+ggplot(seraseq_control_data, aes(x = lga, y = percent_mapping)) +
+  geom_point(size = 3, aes(shape = seqone_hrd_status)) +
+  facet_wrap(~firstname_factor)
 
 
 ##################################################
