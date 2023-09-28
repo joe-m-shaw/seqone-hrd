@@ -62,8 +62,7 @@ export_for_check <- collated_seqone_info %>%
 # Writing of pathology block IDs is inconsistent, so a manual check is
 # required
 
-write.csv(export_for_check, paste0(hrd_data_path, "manual_path_block_check.csv"),
-          row.names = FALSE)
+export_timestamp(hrd_data_path, export_for_check)
 
 path_block_check <- read_csv(paste0(hrd_data_path, "manual_path_block_check_edit.csv")) %>%
   select(dlms_dna_number, path_block_manual_check)
@@ -235,10 +234,7 @@ inconsistent_summary <- compare_results %>%
          path_block_manual_check, lga, lpc, ccne1, rad51b, coverage, percent_mapping) %>%
   arrange(sample_id, worksheet)
 
-
-write.csv(inconsistent_summary,
-          paste0(hrd_project_path, "outputs/inconsistent_summary.csv"),
-          row.names = FALSE)
+export_timestamp(hrd_output_path, inconsistent_summary)
 
 unusual_samples <- c(21013520, 23032088, 20127786)
 
@@ -247,9 +243,7 @@ unusual_repeat_sample_info <- seqone_mod %>%
   select(-c(sample_id, filename, date, pathno, downsampled, user)) %>%
   arrange(dlms_dna_number)
 
-write.csv(unusual_repeat_sample_info,
-          paste0(hrd_project_path, "outputs/unusual_repeat_sample_info.csv"),
-          row.names = FALSE)
+export_timestamp(hrd_output_path, unusual_repeat_sample_info)
 
 # Entire table of results
 write.csv(compare_results, "S:/central shared/Genetics/Mol_Shared/Development.Team/SeqOne Homologous Recombination Deficiency Validation/2023_09_27 HRD validation update/result_comparison.csv",
