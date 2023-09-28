@@ -47,9 +47,9 @@ read_seqone_report <- function(filepath, file) {
   
   ncc <- as.numeric(grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1))
   
-  coverage <- as.numeric(grep_seqone_text(".+Coverage.{33}(.{3,4})X.+", page_1))
+  coverage <- as.numeric(grep_seqone_text(".+Coverage\\s{33,34}(.{1,4})X.+", page_1))
   
-  percent_mapping <- as.numeric(grep_seqone_text(".+% correct mapping.{24,25}(\\d{2}.\\d{1})%.+", page_1))
+  percent_mapping <- as.numeric(grep_seqone_text(".+% correct mapping.{24,25}((\\d{2}.\\d{1})|(\\d{2}))%.+", page_1))
   
   sample_id <- grep_seqone_text(".+Shallow sample ID.{15,18}\\D{2}\\d{6}_(.{8,26}).+", page_1)
   
