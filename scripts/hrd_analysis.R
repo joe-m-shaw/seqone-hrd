@@ -72,6 +72,15 @@ path_block_check <- read_csv(paste0(hrd_data_path, "manual_path_block_check_edit
 # Compare SeqOne and Myriad Results
 ##################################################
 
+# Add QC data for SeqOne samples
+
+seqone_qc_data <- read_excel(paste0(hrd_data_path, "seqone_qc_metrics_2023_09_28.xlsx")) %>%
+  janitor::clean_names() %>%
+  dplyr::rename(shallow_sample_id = sample,
+                read_length = read_len,
+                insert_size = ins_size,
+                million_reads = m_reads)
+
 seqone_mod <- collated_seqone_info %>%
   filter(!date %in% c("September 1, 2023", "August 31, 2023",
                       "August 24, 2023", "August 25, 2023")) %>%
@@ -79,7 +88,8 @@ seqone_mod <- collated_seqone_info %>%
               select(dlms_dna_number, nhs_number, firstname, surname, i_gene_r_no,
                      pathno),
             by = "dlms_dna_number") %>%
-  mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No"))
+  mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No")) %>%
+  left_join(seqone_qc_data, by = "shallow_sample_id")
 
 control_variants <- c("Biobank", "Seraseq")
 
@@ -87,7 +97,6 @@ control_names <- unique(grep(paste(control_variants,collapse="|"), seqone_mod$su
             value = TRUE, ignore.case = TRUE))
 
 compare_results <- seqone_mod %>%
-  #filter(!base::duplicated(dlms_dna_number)) %>%
   left_join(collated_myriad_info_mod, by = "nhs_number") %>%
   left_join(path_block_check, by = "dlms_dna_number") %>%
   filter(!is.na(myriad_gi_score)) %>%
@@ -307,5 +316,127 @@ data_table <- as.table(matrix(c(true_positives, false_positives,
                               nrow = 2, byrow = TRUE))
 
 data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
+
+##################################################
+# QC metrics
+##################################################
+
+colnames(seqone_qc_data)
+
+# Million reads
+compare_results %>%
+    filter(path_block_manual_check == "pathology blocks match") %>%
+    ggplot(aes(x = reorder(shallow_sample_id, million_reads),
+               y = million_reads)) +
+    geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+    labs(x = "", y = "million_reads") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Read length
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, read_length),
+             y = read_length)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "read_length") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Insert size
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, insert_size),
+             y = insert_size)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "insert_size") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Percent Q30
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, percent_q30),
+             y = percent_q30)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "percent_q30") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Percent aligned
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, percent_aligned),
+             y = percent_aligned)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "percent_aligned") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Percent dups
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, percent_dups),
+             y = percent_dups)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "percent_dups") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+# Coverage
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, coverage.y),
+             y = coverage.y)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "", y = "coverage.y") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
+
+compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match") %>%
+  ggplot(aes(x = insert_size,
+             y = read_length)) +
+  geom_point(size = 3, aes(colour = hrd_status_check)) +
+  scale_colour_manual(values = c(negative_colour,
+                                 positive_colour)) +
+  labs(x = "insert_size", y = "read_length") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom",
+        legend.title = element_blank())
 
 ##################################################
