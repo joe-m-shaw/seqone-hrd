@@ -232,8 +232,9 @@ inconsistent_summary <- compare_results %>%
   filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad") %>%
   select(sample_id, worksheet, myriad_patient_name, seqone_hrd_score, myriad_gi_score,
          seqone_hrd_status, myriad_hrd_status, pathno, myriad_pathology_block, 
-         path_block_manual_check) %>%
+         path_block_manual_check, lga, lpc, ccne1, rad51b, coverage, percent_mapping) %>%
   arrange(sample_id, worksheet)
+
 
 write.csv(inconsistent_summary,
           paste0(hrd_project_path, "outputs/inconsistent_summary.csv"),
