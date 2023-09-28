@@ -34,7 +34,18 @@ low_res_myriad_results <- read_excel(path = paste0(hrd_data_path,
                                                    "myriad_reports_low_res/myriad_low_res_report_data.xlsx")) %>%
   mutate(nhs_number = as.numeric(gsub(pattern = "(\\D)", "", nhs_number))) 
 
-collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results)
+seraseq_gi_scores <- read_excel(paste0(hrd_data_path, "seraseq_gi_scores.xlsx")) %>%
+  mutate(myriad_r_number = "",
+         myriad_patient_name = "",
+         myriad_dob = "",
+         myriad_pathology_block = "",
+         myriad_brca_status = "") %>%
+  select(myriad_r_number, myriad_patient_name, myriad_dob, nhs_number,
+         myriad_pathology_block, myriad_gi_score, myriad_hrd_status, 
+         myriad_brca_status)
+
+collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results,
+                                  seraseq_gi_scores)
 
 ##################################################
 # Pathology Block ID Check
@@ -44,6 +55,13 @@ collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results)
 seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) %>%
   dplyr::rename(dlms_dna_number = labno,
                 nhs_number = nhsno) 
+
+# Enter a fake NHS number for the Seraseq controls, to allow Myriad scores
+# to be joined later.
+
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032086, "nhs_number"] <- 1
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032088, "nhs_number"] <- 2
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23031639, "nhs_number"] <- 3
 
 export_for_check <- collated_seqone_info %>%
   filter(!base::duplicated(dlms_dna_number)) %>%
@@ -91,10 +109,11 @@ seqone_mod <- collated_seqone_info %>%
   mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No")) %>%
   left_join(seqone_qc_data, by = "shallow_sample_id")
 
-control_variants <- c("Biobank", "Seraseq")
+biobank_names <- unique(grep("Biobank", seqone_mod$surname,
+                             value = TRUE, ignore.case = TRUE))
 
-control_names <- unique(grep(paste(control_variants,collapse="|"), seqone_mod$surname,
-            value = TRUE, ignore.case = TRUE))
+seraseq_names <- unique(grep("Seraseq", seqone_mod$surname,
+                             value = TRUE, ignore.case = TRUE))
 
 compare_results <- seqone_mod %>%
   left_join(collated_myriad_info_mod, by = "nhs_number") %>%
@@ -108,12 +127,23 @@ compare_results <- seqone_mod %>%
     myriad_hrd_status == "POSITIVE" & seqone_hrd_status == "NEGATIVE" ~"Seqone HRD status NOT consistent with Myriad",
     TRUE ~"other"),
     
-    identity = ifelse(surname %in% control_names, "Control", "Patient")) %>%
+    identity = ifelse(surname %in% c(biobank_names, seraseq_names), "Control", "Patient"),
+    control_type = case_when(
+      surname %in% biobank_names ~"Biobank control",
+      surname %in% seraseq_names ~"Seraseq control",
+      TRUE ~"patient")) %>%
   filter(downsampled == "No")
+
+compare_results[compare_results$dlms_dna_number == 23032086, "path_block_manual_check"] <- "pathology blocks match"
+compare_results[compare_results$dlms_dna_number == 23032088, "path_block_manual_check"] <- "pathology blocks match"
+compare_results[compare_results$dlms_dna_number == 23031639, "path_block_manual_check"] <- "pathology blocks match"
 
 ##################################################
 # HRD Status Comparison
 ##################################################
+
+positive_colour <- "#FF3333"
+negative_colour <- "#3300FF"
 
 comparison_summary <- compare_results %>%
   filter(!is.na(myriad_gi_score)) %>%
@@ -144,7 +174,7 @@ ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_scor
        y = "SeqOne HRD Score",
        title = "Comparison of Myriad vs SeqOne HRD Testing For Patient Samples",
        subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs"),
-       caption = "Repeat data included. Seraseq control data not included.") +
+       caption = "Repeat data included.") +
   #geom_vline(xintercept = 42, linetype = "dashed") +
   #geom_hline(yintercept = 0.5, linetype = "dashed") + 
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
@@ -161,62 +191,68 @@ seqone_mod %>%
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
   filter(downsampled == "No") %>%
-  ggplot(aes(x = worksheet, y = seqone_hrd_score)) +
+  ggplot(aes(x = worksheet, y = read_length)) +
   geom_point(size = 3, pch = 21) +
   facet_wrap(~dlms_dna_number) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "SeqOne results for repeated samples",
        x = "Worksheet",
-       y = "SeqOne HRD score") +
+       y = "Read length") +
   geom_hline(yintercept = 0.50, linetype = "dashed")
+
+##################################################
+# Impact of read length
+##################################################
+
+seqone_mod %>%
+  filter(downsampled == "No") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, read_length), y = read_length)) +
+  geom_point(size = 3) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "SeqOne Read Length",
+       x = "",
+       y = "Read length")
 
 ##################################################
 # Comparison with Simplified Model
 ##################################################
 
-seq_one_results <- seqone_mod %>%
-  mutate(result_model = case_when(
-    lga >= 18 ~"Positive",
-    lga <= 14 ~"Negative",
-    lga < 18 & lga > 14 & lpc > 10 ~"Positive",
-    lga < 18 & lga > 14 & lpc <= 10 ~"Negative")) %>%
-  filter(!base::duplicated(dlms_dna_number))
+simplified_model <- compare_results %>%
+  filter(myriad_brca_status == "NEGATIVE") %>%
+  mutate(model_approximation = case_when(
+    lga >= 18 ~"POSITIVE",
+    lga <= 14 ~"NEGATIVE",
+    lga < 18 & lga > 14 & lpc > 10 ~"POSITIVE",
+    lga < 18 & lga > 14 & lpc <= 10 ~"NEGATIVE")) %>%
+  mutate(approximation_consistent = ifelse(model_approximation == seqone_hrd_status,
+                                        "Yes",
+                                        "No"))
 
-positive_colour <- "#FF3333"
-negative_colour <- "#3300FF"
+simplified_model_summary <- simplified_model %>%
+  group_by(approximation_consistent) %>%
+  summarise(total = n())
 
-ggplot(seq_one_results, aes(x = reorder(filename, seqone_hrd_score),
-                            y = seqone_hrd_score)) +
-  geom_point(size = 2, aes(colour = result_model)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  theme_bw() +
-  theme(axis.text.x = element_blank()) +
-  labs(x = "", y = "SeqOne HRD Score",
-       title = "Explaining the SeqOne HRD Model")
-
-ggplot(seq_one_results, aes(x = lga,
+ggplot(simplified_model, aes(x = lga,
                             y = lpc,
-                            colour = seqone_hrd_status)) +
-  geom_point(size = 3) +
+                            fill = seqone_hrd_status)) +
+  scale_fill_manual(values = c(negative_colour,
+                               positive_colour)) +
+  geom_point(size = 3, alpha = 0.6, aes(shape = approximation_consistent)) +
+  scale_shape_manual(values = c(24, 21)) +
   theme_bw() +
   labs(x = "Large Genomic Alterations", 
-       y = "Loss of Parental Copy") +
-  geom_vline(xintercept = 18, linetype = "dashed") +
-  geom_vline(xintercept = 14, linetype = "dashed")
-  # geom_hline(yintercept = 10, linetype = "dashed")
+       y = "Loss of Parental Copy",
+       title = "Comparison of Seqone model approximation to pipeline output",
+       subtitle = paste0("Data for ", nrow(simplified_model), " BRCA-negative DNA inputs")) 
 
 ##################################################
 # Seraseq Controls
 ##################################################
 
-seraseq_gi_scores <- read_excel(paste0(hrd_data_path, "seraseq_gi_scores.xlsx"))
-
-seraseq_control_data <- seqone_mod %>%
-  left_join(seraseq_gi_scores, by = "dlms_dna_number") %>%
-  filter(!is.na(myriad_gi_score)) %>%
+seraseq_control_data <- compare_results %>%
+  filter(control_type == "Seraseq control") %>%
   mutate(firstname_factor = factor(firstname, levels = c(
     "FFPE HRD Negative",
     "Low-Positive FFPE HRD",
@@ -320,8 +356,6 @@ data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 ##################################################
 # QC metrics
 ##################################################
-
-colnames(seqone_qc_data)
 
 # Million reads
 compare_results %>%
