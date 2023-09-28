@@ -51,10 +51,17 @@ read_seqone_report <- function(filepath, file) {
   
   percent_mapping <- as.numeric(grep_seqone_text(".+% correct mapping.{24,25}((\\d{2}.\\d{1})|(\\d{2}))%.+", page_1))
   
-  sample_id <- grep_seqone_text(".+Shallow sample ID.{15,18}\\D{2}\\d{6}_(.{8,26}).+", page_1)
+  shallow_sample_id <- trimws(grep_seqone_text(".+Shallow sample ID\\s{15,18}(WS\\d{6}_.{8,26}).+", page_1),
+                              which = "right")
   
-  worksheet <- grep_seqone_text(".+Shallow sample ID\\s{15,18}(\\D{2}\\d{6})_.+", page_1)
+  sample_id <- sub(pattern = "WS\\d{6}_(.{8,26})",
+                    x = shallow_sample_id,
+                    replacement = "\\1")
   
+  worksheet <- sub(pattern = "^(WS\\d{6}).+",
+                   x = shallow_sample_id,
+                   replacement = "\\1")
+    
   dlms_dna_number <- as.numeric(sub(pattern = "^(\\d{8}).+",
                                    replacement = "\\1",
                                    x = sample_id))
@@ -64,10 +71,11 @@ read_seqone_report <- function(filepath, file) {
   user <- grep_seqone_text(".+User\\s{30,32}(.{10,26})\\s+.+", page_1)
   
   output <- data.frame(
-    
-    "dlms_dna_number" = dlms_dna_number,
+  
+    "shallow_sample_id" = shallow_sample_id,
     "worksheet" = worksheet,
     "sample_id" = sample_id,
+    "dlms_dna_number" = dlms_dna_number,
     "seqone_hrd_score" = seqone_hrd_score,
     "seqone_hrd_status" = seqone_hrd_status,
     "lga" = lga,
