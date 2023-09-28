@@ -11,6 +11,7 @@ rm(list=ls())
 
 library("ggpubr")
 library("readxl")
+library("epiR")
 
 ##################################################
 # Source scripts
@@ -152,10 +153,10 @@ seqone_mod %>%
            base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
   filter(downsampled == "No") %>%
   ggplot(aes(x = worksheet, y = seqone_hrd_score)) +
-  geom_jitter(size = 3, alpha = 0.5) +
+  geom_point(size = 3, pch = 21) +
   facet_wrap(~dlms_dna_number) +
   theme_bw() +
-  #theme(axis.text.x = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "SeqOne results for repeated samples",
        x = "Worksheet",
        y = "SeqOne HRD score") +
@@ -262,5 +263,49 @@ ggsave(plot = comparison_plot,
        units = "cm",
        width = 15,
        height = 15)
+
+##################################################
+# Mid Output Run
+##################################################
+
+mid_output_run <- seqone_mod %>%
+  filter(worksheet == "WS134928")
+
+seqone_mod %>%
+  filter(dlms_dna_number %in% mid_output_run$dlms_dna_number) %>%
+  ggplot(aes(x = worksheet, y = lga)) +
+  geom_point() +
+  facet_wrap(~dlms_dna_number) 
+
+##################################################
+# Sensitivity and Specificity
+##################################################
+
+data_for_sensitivity_calc <- compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match")
+
+true_positives <- nrow(data_for_sensitivity_calc %>%
+                         filter(seqone_hrd_status == "POSITIVE" &
+                                  hrd_status_check == "Seqone HRD status consistent with Myriad"))
+
+
+true_negatives <- nrow(data_for_sensitivity_calc %>%
+                         filter(seqone_hrd_status == "NEGATIVE" &
+                                  hrd_status_check == "Seqone HRD status consistent with Myriad"))
+
+false_positives <- nrow(data_for_sensitivity_calc %>%
+                         filter(seqone_hrd_status == "POSITIVE" &
+                                  hrd_status_check == "Seqone HRD status NOT consistent with Myriad"))
+
+false_negatives <- nrow(data_for_sensitivity_calc %>%
+                          filter(seqone_hrd_status == "NEGATIVE" &
+                                   hrd_status_check == "Seqone HRD status NOT consistent with Myriad"))
+
+
+data_table <- as.table(matrix(c(true_positives, false_positives, 
+                                false_negatives, true_negatives), 
+                              nrow = 2, byrow = TRUE))
+
+data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 
 ##################################################
