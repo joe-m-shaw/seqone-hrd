@@ -73,9 +73,14 @@ output <- sample_info %>%
   left_join(extraction_batch_dates, by = "extraction_batch_id") %>%
   left_join(exon_table, by = "labno", relationship = "many-to-many") %>%
   arrange(labno) %>%
-  filter(extraction_method_fk == 25) %>%
   select(-c(status, macro, version.x, version.y, 
-            extraction_id, extraction_method_fk, locked, dob))
+            extraction_id, locked, dob))
+
+##################################################
+# Check
+##################################################
+
+stopifnot(setdiff(input_samples$lab_no, output$labno) == 0)
 
 ##################################################
 # Export
@@ -89,7 +94,3 @@ write.csv(output, paste0(louise_folder, "qia_symphony_extraction_batch_info",
           row.names = FALSE)
 
 ##################################################
-
-
-
-
