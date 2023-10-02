@@ -106,7 +106,8 @@ read_myriad_report <- function(filepath, file) {
                        "myriad_pathology_block" = myriad_pathology_block,
                        "myriad_gi_score" = myriad_gi_score,
                        "myriad_hrd_status" = myriad_hrd_status,
-                       "myriad_brca_status" = myriad_brca_status)
+                       "myriad_brca_status" = myriad_brca_status,
+                       "myriad_filename" = file)
   
   return(output)
   
@@ -134,5 +135,13 @@ for (i in myriad_report_files) {
   
   rm(tmp_output)
 }
+
+##################################################
+# Checks
+##################################################
+
+stopifnot(collated_myriad_info[is.na(collated_myriad_info)] == 0)
+
+stopifnot(setdiff(myriad_report_files, collated_myriad_info$myriad_filename) == 0)
 
 ##################################################
