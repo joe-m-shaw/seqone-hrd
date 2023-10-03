@@ -140,8 +140,23 @@ for (i in myriad_report_files) {
 # Checks
 ##################################################
 
+# Check for NA values
 stopifnot(collated_myriad_info[is.na(collated_myriad_info)] == 0)
 
+# Check all files included
 stopifnot(setdiff(myriad_report_files, collated_myriad_info$myriad_filename) == 0)
+
+# Check GI score range is as expected
+stopifnot(
+  
+  max(collated_myriad_info$myriad_gi_score) <= 100,
+  
+  min(collated_myriad_info$myriad_gi_score) >= 0
+  
+)
+
+# Check HRD status is dichotomous
+stopifnot(setdiff(unique(collated_myriad_info$myriad_hrd_status),
+                  c("POSITIVE", "NEGATIVE")) == 0)
 
 ##################################################
