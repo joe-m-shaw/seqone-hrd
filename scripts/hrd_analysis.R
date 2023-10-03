@@ -474,3 +474,55 @@ compare_results %>%
         legend.title = element_blank())
 
 ##################################################
+# Sample Extraction Information
+##################################################
+
+# Get tissues
+seqone_tissue_types <- unique(seqone_dlms_info$tissue)
+
+tissue_query <- sqlQuery(channel = moldb_connection,
+                         query = paste0("SELECT * FROM MolecularDB.dbo.TissueTypes WHERE TissueTypeId IN (",
+                                        paste(seqone_tissue_types, collapse = ", "),
+                                        ")")) %>%
+  janitor::clean_names()
+
+# Get extraction batch IDs
+extraction_batch_id_table <- sqlQuery(channel = moldb_connection,
+                                  query = paste0("SELECT * FROM MolecularDB.dbo.MOL_Extractions WHERE LABNO IN (",
+                                                 paste(seqone_dlms_info$dlms_dna_number, collapse = ", "),
+                                                 ")")) %>%
+  arrange(LabNo) %>%
+  janitor::clean_names() %>%
+  dplyr::rename(dlms_dna_number = lab_no,
+                extraction_batch_id = extraction_batch_fk)
+
+
+extraction_batches <- unique(extraction_batch_id_table$extraction_batch_id)
+
+# Get extraction batch dates
+extraction_batch_date_table <- sqlQuery(channel = moldb_connection,
+                                   query = paste0("SELECT * FROM MolecularDB.dbo.MOL_ExtractionBatches WHERE ExtractionBatchId IN (",
+                                                  paste(extraction_batches, collapse = ", "),
+                                                  ")")) %>%
+  janitor::clean_names()
+
+extraction_batch_info <- extraction_batch_id_table %>%
+  left_join(extraction_batch_date_table, by = "extraction_batch_id") %>%
+  # Get only extraction batch IDs used for Cobas extractions
+  filter(extraction_method_fk == 25)
+
+# 1 DNA number (23033279) is on 2 extraction batches
+
+seqone_dlms_extractions <- seqone_dlms_info %>%
+  left_join(tissue_query %>%
+              dplyr::rename(tissue = tissue_type_id), by = "tissue") %>%
+  left_join(extraction_batch_info, by = "dlms_dna_number")
+
+# Plot of tissue types
+ggplot(seqone_dlms_extractions, aes(x = tissue_type, y = )) +
+  geom_bar()
+
+ggplot(seqone_dlms_extractions, aes(x = run_date, y = concentration)) +
+  geom_point()
+
+##################################################
