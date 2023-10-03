@@ -121,7 +121,7 @@ for (i in seqone_reports) {
 # Checks
 ##################################################
 
-stopifnot(collated_seqone_info[is.na(collated_seqone_info)])
+stopifnot(collated_seqone_info[is.na(collated_seqone_info)] == 0)
 
 stopifnot(setdiff(seqone_reports, collated_seqone_info$filename) == 0)
 
