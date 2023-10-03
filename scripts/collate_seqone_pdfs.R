@@ -45,7 +45,7 @@ read_seqone_report <- function(filepath, file) {
   
   rad51b <- as.numeric(grep_seqone_text(".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}|\\d{1}).+", page_1))
   
-  ncc <- as.numeric(grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1))
+  seqone_ncc <- as.numeric(grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1))
   
   coverage <- as.numeric(grep_seqone_text(".+Coverage\\s{33,34}(.{1,4})X.+", page_1))
   
@@ -82,7 +82,7 @@ read_seqone_report <- function(filepath, file) {
     "lpc" = lpc,
     "ccne1" = ccne1,
     "rad51b" =rad51b,
-    "ncc" = ncc,
+    "seqone_ncc" = seqone_ncc,
     "coverage" = coverage,
     "percent_mapping" = percent_mapping,
     "date" = date,
@@ -152,8 +152,8 @@ stopifnot(
 )
 
 stopifnot(
-  max(collated_seqone_info$ncc) <= 100,
-  min(collated_seqone_info$ncc) >= 20
+  max(collated_seqone_info$seqone_ncc) <= 100,
+  min(collated_seqone_info$seqone_ncc) >= 20
 )
 
 ##################################################

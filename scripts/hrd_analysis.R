@@ -32,17 +32,20 @@ downsampled_samples <- grep(pattern = "downsampl",
 # I had to collate data manually in an Excel
 low_res_myriad_results <- read_excel(path = paste0(hrd_data_path,
                                                    "myriad_reports_low_res/myriad_low_res_report_data.xlsx")) %>%
-  mutate(nhs_number = as.numeric(gsub(pattern = "(\\D)", "", nhs_number))) 
+  mutate(nhs_number = as.numeric(gsub(pattern = "(\\D)", "", nhs_number)))
 
 seraseq_gi_scores <- read_excel(paste0(hrd_data_path, "seraseq_gi_scores.xlsx")) %>%
   mutate(myriad_r_number = "",
          myriad_patient_name = "",
          myriad_dob = "",
-         myriad_pathology_block = "",
-         myriad_brca_status = "") %>%
+         myriad_pathology_block_pg1 = "",
+         myriad_pathology_block_pg2 = "",
+         myriad_brca_status = "",
+         myriad_filename = "") %>%
   select(myriad_r_number, myriad_patient_name, myriad_dob, nhs_number,
-         myriad_pathology_block, myriad_gi_score, myriad_hrd_status, 
-         myriad_brca_status)
+         myriad_pathology_block_pg1, myriad_pathology_block_pg2,
+         myriad_gi_score, myriad_hrd_status, 
+         myriad_brca_status, myriad_filename)
 
 collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results,
                                   seraseq_gi_scores)
@@ -51,10 +54,23 @@ collated_myriad_info_mod <- rbind(collated_myriad_info, low_res_myriad_results,
 # Pathology Block ID Check
 ##################################################
 
+comment_regex_single <- ".+(\\W{1}\\d{2}%).+"
+
+comment_regex_range <- ".+(\\d{2}\\W{1}\\d{2}%).+"
+
 # Extract data from DLMS via ODBC
 seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) %>%
   dplyr::rename(dlms_dna_number = labno,
-                nhs_number = nhsno) 
+                nhs_number = nhsno) %>%
+  mutate(ncc_single = sub(x = comments,
+                          pattern = comment_regex_single,
+                          replacement = "\\1"),
+         ncc_range = sub(x = comments,
+                         pattern = comment_regex_range,
+                         replacement = "\\1"),
+         ncc = ifelse(str_length(ncc_single) == 4 & ncc_range > 6,
+                      ncc_single, ifelse(str_length(ncc_range) == 6, 
+                                         ncc_range, NA)))
 
 # Enter a fake NHS number for the Seraseq controls, to allow Myriad scores
 # to be joined later.
@@ -70,11 +86,12 @@ export_for_check <- collated_seqone_info %>%
               select(dlms_dna_number, firstname, surname, pathno, nhs_number), 
             by = "dlms_dna_number") %>%
   left_join(collated_myriad_info_mod %>%
-              select(nhs_number, myriad_pathology_block), by = "nhs_number") %>%
+              select(nhs_number, myriad_pathology_block_pg1, 
+                     myriad_pathology_block_pg2), by = "nhs_number") %>%
   select(dlms_dna_number, firstname, surname, nhs_number, 
-         pathno, myriad_pathology_block) %>%
+         pathno, myriad_pathology_block_pg1, myriad_pathology_block_pg2) %>%
   arrange(nhs_number) %>%
-  mutate(path_block_automated_check = ifelse(pathno == myriad_pathology_block,
+  mutate(path_block_automated_check = ifelse(pathno == myriad_pathology_block_pg2,
                                              "match", "NOT match"),
          path_block_manual_check = "")
 
@@ -83,7 +100,7 @@ export_for_check <- collated_seqone_info %>%
 
 export_timestamp(hrd_data_path, export_for_check)
 
-path_block_check <- read_csv(paste0(hrd_data_path, "manual_path_block_check_edit.csv")) %>%
+path_block_check <- read_excel(paste0(hrd_data_path, "manual_path_block_check_edit.xlsx")) %>%
   select(dlms_dna_number, path_block_manual_check)
 
 ##################################################
@@ -92,7 +109,7 @@ path_block_check <- read_csv(paste0(hrd_data_path, "manual_path_block_check_edit
 
 # Add QC data for SeqOne samples
 
-seqone_qc_data <- read_excel(paste0(hrd_data_path, "seqone_qc_metrics_2023_09_28.xlsx")) %>%
+seqone_qc_data <- read_excel(paste0(hrd_data_path, "seqone_qc_metrics/seqone_qc_metrics_2023_10_03.xlsx")) %>%
   janitor::clean_names() %>%
   dplyr::rename(shallow_sample_id = sample,
                 read_length = read_len,
@@ -104,7 +121,7 @@ seqone_mod <- collated_seqone_info %>%
                       "August 24, 2023", "August 25, 2023")) %>%
   left_join(seqone_dlms_info %>%
               select(dlms_dna_number, nhs_number, firstname, surname, i_gene_r_no,
-                     pathno),
+                     pathno, ncc),
             by = "dlms_dna_number") %>%
   mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No")) %>%
   left_join(seqone_qc_data, by = "shallow_sample_id")
@@ -162,6 +179,7 @@ ggplot(comparison_summary, aes(x = hrd_status_check, y = total)) +
 
 results_for_path_block_plot <- compare_results %>%
   filter(!is.na(path_block_manual_check))
+  filter(worksheet == "WS135001")
 
 ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
@@ -187,28 +205,28 @@ ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_scor
 # Repeat Testing
 ##################################################
 
-seqone_mod %>%
+compare_results %>%
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
   filter(downsampled == "No") %>%
-  ggplot(aes(x = worksheet, y = read_length)) +
-  geom_point(size = 3, pch = 21) +
+  ggplot(aes(x = worksheet, y = seqone_hrd_score)) +
+  geom_point(size = 3, aes(shape = seqone_hrd_status)) +
   facet_wrap(~dlms_dna_number) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "SeqOne results for repeated samples",
        x = "Worksheet",
-       y = "Read length") +
+       y = "SeqOne HRD score") +
   geom_hline(yintercept = 0.50, linetype = "dashed")
 
 ##################################################
 # Impact of read length
 ##################################################
 
-seqone_mod %>%
+compare_results %>%
   filter(downsampled == "No") %>%
   ggplot(aes(x = reorder(shallow_sample_id, read_length), y = read_length)) +
-  geom_point(size = 3) +
+  geom_point(size = 3, alpha = 0.5, aes(shape = hrd_status_check)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "SeqOne Read Length",
@@ -270,19 +288,45 @@ ggplot(seraseq_control_data, aes(x = myriad_gi_score, y = seqone_hrd_score)) +
        title = "Seraseq Controls: repeat SeqOne data")
 
 ##################################################
+# Biobank Controls
+##################################################
+
+seqone_mod %>%
+  filter(surname %in% biobank_names) %>%
+  ggplot(aes(x = surname, y = seqone_hrd_score)) +
+  geom_point(size = 3) +
+  ylim(0, 1) +
+  labs(x = "", y = "SeqOne HRD score") +
+  theme_bw()
+
+##################################################
+# Myriad results
+##################################################
+
+collated_myriad_info_mod %>%
+  ggplot(aes(x = reorder(nhs_number, myriad_gi_score),
+             y = myriad_gi_score)) +
+  geom_point(size = 3, aes(shape = myriad_hrd_status)) +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  geom_hline(yintercept = 42, linetype = "dashed")
+
+##################################################
 # Export tables
 ##################################################
 
 inconsistent_summary <- compare_results %>%
-  filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad") %>%
+  filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad" &
+           path_block_manual_check == "pathology blocks match") %>%
   select(sample_id, worksheet, myriad_patient_name, seqone_hrd_score, myriad_gi_score,
-         seqone_hrd_status, myriad_hrd_status, pathno, myriad_pathology_block, 
-         path_block_manual_check, lga, lpc, ccne1, rad51b, coverage, percent_mapping) %>%
+         seqone_hrd_status, myriad_hrd_status, pathno, myriad_pathology_block_pg2, 
+         path_block_manual_check, lga, lpc, ccne1, rad51b, coverage.x, percent_mapping,
+         myriad_r_number, ncc) %>%
   arrange(sample_id, worksheet)
 
 export_timestamp(hrd_output_path, inconsistent_summary)
 
-unusual_samples <- c(21013520, 23032088, 20127786)
+unusual_samples <- c(21013520, 23032088, 20127786, 21011999)
 
 unusual_repeat_sample_info <- seqone_mod %>%
   filter(dlms_dna_number %in% unusual_samples) %>%
@@ -357,10 +401,14 @@ data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 # QC metrics
 ##################################################
 
+unique(compare_results$hrd_status_check)
+
+qc_check <- compare_results %>%
+  filter(path_block_manual_check == "pathology blocks match" &
+           ccne1 < 3)
+
 # Million reads
-compare_results %>%
-    filter(path_block_manual_check == "pathology blocks match") %>%
-    ggplot(aes(x = reorder(shallow_sample_id, million_reads),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, million_reads),
                y = million_reads)) +
     geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -372,9 +420,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Read length
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, read_length),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, read_length),
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -386,10 +432,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Insert size
-
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, insert_size),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, insert_size),
              y = insert_size)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -401,10 +444,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Percent Q30
-
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, percent_q30),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_q30),
              y = percent_q30)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -416,10 +456,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Percent aligned
-
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, percent_aligned),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_aligned),
              y = percent_aligned)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -431,10 +468,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Percent dups
-
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, percent_dups),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_dups),
              y = percent_dups)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -446,10 +480,7 @@ compare_results %>%
         legend.title = element_blank())
 
 # Coverage
-
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = reorder(shallow_sample_id, coverage.y),
+ggplot(qc_check, aes(x = reorder(shallow_sample_id, coverage.y),
              y = coverage.y)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -460,14 +491,13 @@ compare_results %>%
         legend.position = "bottom",
         legend.title = element_blank())
 
-compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match") %>%
-  ggplot(aes(x = insert_size,
+
+ggplot(qc_check, aes(x = coverage.x,
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
                                  positive_colour)) +
-  labs(x = "insert_size", y = "read_length") +
+  labs(x = "coverage", y = "read_length") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
