@@ -121,8 +121,39 @@ for (i in seqone_reports) {
 # Checks
 ##################################################
 
+# Check for NA values
 stopifnot(collated_seqone_info[is.na(collated_seqone_info)] == 0)
 
+# Check all files collated
 stopifnot(setdiff(seqone_reports, collated_seqone_info$filename) == 0)
+
+# Check HRD score range is as expected
+stopifnot(
+  max(collated_seqone_info$seqone_hrd_score) <= 1,
+  min(collated_seqone_info$seqone_hrd_score) >= 0
+)
+
+# Check HRD status is dichotomous
+stopifnot(setdiff(unique(collated_seqone_info$seqone_hrd_status),
+                  c("POSITIVE", "NEGATIVE")) == 0)
+
+# Check percentage mapping
+stopifnot(max(collated_seqone_info$percent_mapping) <= 100,
+          min(collated_seqone_info$percent_mapping) >= 0)
+
+stopifnot(
+  # Check CCNE1
+  max(collated_seqone_info$ccne1) <= 10,
+  min(collated_seqone_info$ccne1) >= 0,
+  
+  # Check RAD51B
+  max(collated_seqone_info$rad51b) <= 10,
+  min(collated_seqone_info$rad51b) >= 0
+)
+
+stopifnot(
+  max(collated_seqone_info$ncc) <= 100,
+  min(collated_seqone_info$ncc) >= 20
+)
 
 ##################################################
