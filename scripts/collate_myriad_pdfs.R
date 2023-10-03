@@ -64,9 +64,13 @@ read_myriad_report <- function(filepath, file) {
   # Pathology Block
   # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
   
-  myriad_pathology_block <- sub(x = page2,
+  myriad_pathology_block_pg2 <- sub(x = page2,
                          pattern = ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+",
                          replacement = "\\2")
+  
+  myriad_pathology_block_pg1 <- sub(x = page1,
+                                    pattern = ".+Pathology No:\\s{10,30}(.{5,25})(\\n\\n\\n\\n\\n|\\n).+",
+                                    replacement = "\\1")
   
   # Genomic Instability Score
   # Note: score can be 1 digit (i.e. "7") or 2 ("73")
@@ -103,7 +107,8 @@ read_myriad_report <- function(filepath, file) {
                        "myriad_patient_name" = myriad_patient_name,
                        "myriad_dob" = myriad_dob,
                        "nhs_number" = nhs_number_mod,
-                       "myriad_pathology_block" = myriad_pathology_block,
+                       "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
+                       "myriad_pathology_block_pg2" = myriad_pathology_block_pg2,
                        "myriad_gi_score" = myriad_gi_score,
                        "myriad_hrd_status" = myriad_hrd_status,
                        "myriad_brca_status" = myriad_brca_status,
