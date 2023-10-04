@@ -72,12 +72,16 @@ seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) %>%
                       ncc_single, ifelse(str_length(ncc_range) == 6, 
                                          ncc_range, NA)))
 
-# Enter a fake NHS number for the Seraseq controls, to allow Myriad scores
-# to be joined later.
+# Enter a fake NHS number for the Seraseq and Biobank controls, to allow
+# Myriad scores to be joined later, and to keep Biobank controls within the 
+# dataset
 
 seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032086, "nhs_number"] <- 1
 seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032088, "nhs_number"] <- 2
 seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23031639, "nhs_number"] <- 3
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033285, "nhs_number"] <- 4
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033279, "nhs_number"] <- 5
+seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033288, "nhs_number"] <- 6
 
 export_for_check <- collated_seqone_info %>%
   filter(!base::duplicated(dlms_dna_number)) %>%
@@ -120,8 +124,8 @@ seqone_mod <- collated_seqone_info %>%
   filter(!date %in% c("September 1, 2023", "August 31, 2023",
                       "August 24, 2023", "August 25, 2023")) %>%
   left_join(seqone_dlms_info %>%
-              select(dlms_dna_number, nhs_number, firstname, surname, i_gene_r_no,
-                     pathno, ncc),
+              select(dlms_dna_number, nhs_number, firstname, surname,
+                     i_gene_r_no, pathno, ncc),
             by = "dlms_dna_number") %>%
   mutate(downsampled = ifelse(sample_id %in% downsampled_samples, "Yes", "No")) %>%
   left_join(seqone_qc_data, by = "shallow_sample_id")
@@ -135,7 +139,6 @@ seraseq_names <- unique(grep("Seraseq", seqone_mod$surname,
 compare_results <- seqone_mod %>%
   left_join(collated_myriad_info_mod, by = "nhs_number") %>%
   left_join(path_block_check, by = "dlms_dna_number") %>%
-  filter(!is.na(myriad_gi_score)) %>%
   mutate(hrd_status_check = case_when(
     
     myriad_hrd_status == "POSITIVE" & seqone_hrd_status == "POSITIVE" ~"Seqone HRD status consistent with Myriad",
@@ -151,37 +154,153 @@ compare_results <- seqone_mod %>%
       TRUE ~"patient")) %>%
   filter(downsampled == "No")
 
+# Classify Seraseq controls as "pathology blocks match"
 compare_results[compare_results$dlms_dna_number == 23032086, "path_block_manual_check"] <- "pathology blocks match"
 compare_results[compare_results$dlms_dna_number == 23032088, "path_block_manual_check"] <- "pathology blocks match"
 compare_results[compare_results$dlms_dna_number == 23031639, "path_block_manual_check"] <- "pathology blocks match"
 
 ##################################################
-# HRD Status Comparison
+# Repeat Testing Plots
 ##################################################
 
-positive_colour <- "#FF3333"
-negative_colour <- "#3300FF"
+repeat_results <- compare_results %>%
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
+  filter(downsampled == "No")
+
+
+repeat_facet_plot <- ggplot(repeat_results, aes(x = worksheet, 
+                                                y = seqone_hrd_score)) +
+                      geom_point(size = 3, alpha = 0.5, 
+                                 aes(shape = seqone_hrd_status)) +
+                      facet_wrap(~dlms_dna_number) +
+                      theme_bw() +
+                      theme(axis.text.x = element_text(angle = 90)) +
+                      labs(title = "SeqOne results for repeated samples",
+                           x = "",
+                           y = "SeqOne HRD score",
+                           caption = "Plot name: repeat_facet_plot") +
+                      geom_hline(yintercept = 0.50, linetype = "dashed")
+
+
+make_individual_repeat_plot <- function(input_sample) {
+  
+  output_plot <- ggplot(repeat_results %>%
+           filter(dlms_dna_number == input_sample), aes(x = worksheet, 
+                             y = seqone_hrd_score)) +
+    geom_point(size = 4, alpha = 0.5, 
+               aes(shape = seqone_hrd_status)) +
+    facet_wrap(~dlms_dna_number) +
+    theme_bw() +
+    labs(title = "",
+         x = "",
+         y = "SeqOne HRD score") +
+    geom_hline(yintercept = 0.50, linetype = "dashed") +
+    ylim(0, 1)
+  
+  return(output_plot)
+  
+}
+
+sample_20127786_plot <- make_individual_repeat_plot(20127786)
+
+sample_21011999_plot <- make_individual_repeat_plot(21011999)
+
+sample_23032088_plot <- make_individual_repeat_plot(23032088)
+
+sample_21013520_plot <- make_individual_repeat_plot(21013520)
+
+##################################################
+# Repeat Testing
+##################################################
+
+get_sample_summary_info <- function(input_dna_no) {
+  
+  output <- compare_results %>%
+    filter(dlms_dna_number == input_dna_no) %>%
+    select(worksheet, dlms_dna_number, seqone_hrd_score,
+           seqone_hrd_status, lga, lpc, ccne1, rad51b, 
+           coverage.x, percent_mapping, million_reads, read_length, 
+           insert_size, percent_q30, percent_aligned, percent_dups,
+           myriad_gi_score, myriad_hrd_status)
+  
+  return(output)
+  
+}
+
+summary_21013520 <- get_sample_summary_info(21013520)
+
+export_timestamp(hrd_output_path, summary_21013520)
+
+summary_23032088 <- get_sample_summary_info(23032088)
+
+export_timestamp(hrd_output_path, summary_23032088)
+
+summary_20127786 <- get_sample_summary_info(20127786)
+
+export_timestamp(hrd_output_path, summary_20127786)
+
+summary_21011999 <- get_sample_summary_info(21011999)
+
+export_timestamp(hrd_output_path, summary_21011999)
+
+##################################################
+# Compare Results of Mid Output Run - WS134928
+##################################################
+
+mid_output_run <- seqone_mod %>%
+  filter(worksheet == "WS134928")
+
+WS134928_repeated_samples <- mid_output_run$dlms_dna_number
+
+WS134928_WS134687_data <- compare_results %>%
+  filter(dlms_dna_number %in% WS134928_repeated_samples &
+           worksheet %in% c("WS134687", "WS134928"))
+
+WS134928_WS134687_plot <- ggplot(WS134928_WS134687_data, 
+                                 aes(x = coverage.x, y = seqone_hrd_score)) +
+  geom_point(size = 3, aes(shape = seqone_hrd_status,
+                           colour = worksheet)) +
+  facet_wrap(~dlms_dna_number) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  labs(x = "Coverage", y = "SeqOne HRD Score",
+       title = "Sample libraries repeated on mid-output run (WS134928)",
+       caption = "Plot name: WS134928_WS134687_plot") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  xlim(0.8, 1.8)
+
+##################################################
+# HRD Status Comparison with Myriad
+##################################################
 
 comparison_summary <- compare_results %>%
-  filter(!is.na(myriad_gi_score)) %>%
-  group_by(hrd_status_check) %>%
+  filter(!is.na(myriad_gi_score) & myriad_gi_score != "NA") %>%
+  filter(path_block_manual_check != "NA") %>%
+  group_by(hrd_status_check, path_block_manual_check) %>%
   summarise(total = n())
 
-ggplot(comparison_summary, aes(x = hrd_status_check, y = total)) +
+myriad_comparison_plot <- ggplot(comparison_summary, aes(x = hrd_status_check, 
+                                                         y = total)) +
   geom_col() +
   geom_text(aes(label = total), vjust = -0.5) +
   theme_bw() +
-  labs(y = "Total DNA Inputs", x = "", title = "Consistency of Myriad and Seqone Testing")
+  labs(y = "Total DNA Inputs", x = "", 
+       title = "Consistency of Myriad and Seqone Testing",
+       subtitle = paste0("Data for ", sum(comparison_summary$total), " DNA inputs"),
+       caption = "Plot name: myriad_comparison_plot") +
+  facet_wrap(~path_block_manual_check) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ##################################################
 # Impact of Pathology Blocks
 ##################################################
 
 results_for_path_block_plot <- compare_results %>%
-  filter(!is.na(path_block_manual_check))
-  filter(worksheet == "WS135001")
+  filter(path_block_manual_check != "NA" & !is.na(myriad_gi_score))
 
-ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_score)) +
+path_block_plot <- ggplot(results_for_path_block_plot, 
+                          aes(x = myriad_gi_score, y = seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
   theme_bw() +
   theme(panel.grid = element_blank()) +
@@ -192,9 +311,7 @@ ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_scor
        y = "SeqOne HRD Score",
        title = "Comparison of Myriad vs SeqOne HRD Testing For Patient Samples",
        subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs"),
-       caption = "Repeat data included.") +
-  #geom_vline(xintercept = 42, linetype = "dashed") +
-  #geom_hline(yintercept = 0.5, linetype = "dashed") + 
+       caption = "Plot name: path_block_plot") +
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
   facet_wrap(~path_block_manual_check) +
   theme_bw() +
@@ -202,36 +319,44 @@ ggplot(results_for_path_block_plot, aes(x = myriad_gi_score, y = seqone_hrd_scor
         legend.title = element_blank())
 
 ##################################################
-# Repeat Testing
+# Export tables
 ##################################################
 
-compare_results %>%
-  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-           base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
-  filter(downsampled == "No") %>%
-  ggplot(aes(x = worksheet, y = seqone_hrd_score)) +
-  geom_point(size = 3, aes(shape = seqone_hrd_status)) +
-  facet_wrap(~dlms_dna_number) +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
-  labs(title = "SeqOne results for repeated samples",
-       x = "Worksheet",
-       y = "SeqOne HRD score") +
-  geom_hline(yintercept = 0.50, linetype = "dashed")
+inconsistent_summary <- compare_results %>%
+  filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad") %>%
+  select(sample_id, worksheet, seqone_hrd_score, myriad_gi_score,
+         seqone_hrd_status, myriad_hrd_status,
+         path_block_manual_check, lga, lpc, ccne1, rad51b, coverage.x, percent_mapping,
+         myriad_r_number) %>%
+  arrange(path_block_manual_check, sample_id)
+
+export_timestamp(hrd_output_path, inconsistent_summary)
+
+# Entire table of results
+export_timestamp(hrd_output_path, compare_results)
+
+# Remove patient identifiable information
+
+results_patient_ids_removed <- compare_results %>%
+  select(-c(nhs_number, firstname, surname, myriad_patient_name, 
+            myriad_dob, myriad_filename))
+
+export_timestamp(hrd_output_path, results_patient_ids_removed)
 
 ##################################################
 # Impact of read length
 ##################################################
 
 compare_results %>%
-  filter(downsampled == "No") %>%
+  filter(downsampled == "No" & path_block_manual_check != "NA") %>%
   ggplot(aes(x = reorder(shallow_sample_id, read_length), y = read_length)) +
   geom_point(size = 3, alpha = 0.5, aes(shape = hrd_status_check)) +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(title = "SeqOne Read Length",
        x = "",
-       y = "Read length")
+       y = "Read length") +
+  facet_wrap(~path_block_manual_check)
 
 ##################################################
 # Comparison with Simplified Model
@@ -291,7 +416,7 @@ ggplot(seraseq_control_data, aes(x = myriad_gi_score, y = seqone_hrd_score)) +
 # Biobank Controls
 ##################################################
 
-seqone_mod %>%
+compare_results %>%
   filter(surname %in% biobank_names) %>%
   ggplot(aes(x = surname, y = seqone_hrd_score)) +
   geom_point(size = 3) +
@@ -310,61 +435,6 @@ collated_myriad_info_mod %>%
   theme_bw() +
   theme(axis.text.x = element_blank()) +
   geom_hline(yintercept = 42, linetype = "dashed")
-
-##################################################
-# Export tables
-##################################################
-
-inconsistent_summary <- compare_results %>%
-  filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad" &
-           path_block_manual_check == "pathology blocks match") %>%
-  select(sample_id, worksheet, myriad_patient_name, seqone_hrd_score, myriad_gi_score,
-         seqone_hrd_status, myriad_hrd_status, pathno, myriad_pathology_block_pg2, 
-         path_block_manual_check, lga, lpc, ccne1, rad51b, coverage.x, percent_mapping,
-         myriad_r_number, ncc) %>%
-  arrange(sample_id, worksheet)
-
-export_timestamp(hrd_output_path, inconsistent_summary)
-
-unusual_samples <- c(21013520, 23032088, 20127786, 21011999)
-
-unusual_repeat_sample_info <- seqone_mod %>%
-  filter(dlms_dna_number %in% unusual_samples) %>%
-  select(-c(sample_id, filename, date, pathno, downsampled, user)) %>%
-  arrange(dlms_dna_number)
-
-export_timestamp(hrd_output_path, unusual_repeat_sample_info)
-
-# Entire table of results
-write.csv(compare_results, "S:/central shared/Genetics/Mol_Shared/Development.Team/SeqOne Homologous Recombination Deficiency Validation/2023_09_27 HRD validation update/result_comparison.csv",
-          row.names = FALSE)
-
-##################################################
-# Save plots
-##################################################
-
-ggsave(plot = comparison_plot, 
-       filename = paste0("comparison_plot_",
-                         format(Sys.time(), "%Y%m%d_%H%M%S"),
-                         ".jpg"),
-       path = paste0(hrd_project_path, "plots/"), 
-       device='jpeg',
-       units = "cm",
-       width = 15,
-       height = 15)
-
-##################################################
-# Mid Output Run
-##################################################
-
-mid_output_run <- seqone_mod %>%
-  filter(worksheet == "WS134928")
-
-seqone_mod %>%
-  filter(dlms_dna_number %in% mid_output_run$dlms_dna_number) %>%
-  ggplot(aes(x = worksheet, y = lga)) +
-  geom_point() +
-  facet_wrap(~dlms_dna_number) 
 
 ##################################################
 # Sensitivity and Specificity
@@ -401,11 +471,7 @@ data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 # QC metrics
 ##################################################
 
-unique(compare_results$hrd_status_check)
-
-qc_check <- compare_results %>%
-  filter(path_block_manual_check == "pathology blocks match" &
-           ccne1 < 3)
+qc_check <- compare_results 
 
 # Million reads
 ggplot(qc_check, aes(x = reorder(shallow_sample_id, million_reads),
@@ -423,13 +489,14 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, million_reads),
 ggplot(qc_check, aes(x = reorder(shallow_sample_id, read_length),
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
+  #scale_colour_manual(values = c(negative_colour,
+                                 #positive_colour)) +
   labs(x = "", y = "read_length") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
-        legend.title = element_blank())
+        legend.title = element_blank()) +
+  facet_wrap(~worksheet)
 
 # Insert size
 ggplot(qc_check, aes(x = reorder(shallow_sample_id, insert_size),
@@ -495,13 +562,18 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, coverage.y),
 ggplot(qc_check, aes(x = coverage.x,
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
+  #scale_colour_manual(values = c(negative_colour,
+                                # positive_colour)) +
   labs(x = "coverage", y = "read_length") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
         legend.title = element_blank())
+
+ggplot(check, aes(x = dlms_dna_number, y = coverage.x)) +
+  geom_point(size = 3, aes(shape = seqone_hrd_status,
+                           colour = hrd_status_check)) +
+  facet_wrap(~dlms_dna_number)
 
 ##################################################
 # Sample Extraction Information
