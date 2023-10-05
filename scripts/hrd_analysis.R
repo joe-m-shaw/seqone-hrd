@@ -20,6 +20,7 @@ library("epiR")
 source("scripts/collate_seqone_pdfs.R")
 source("scripts/collate_myriad_pdfs.R")
 source("scripts/dlms_connection.R")
+source("functions/hrd_functions.R")
 
 downsampled_samples <- grep(pattern = "downsampl", 
                             x = collated_seqone_info$sample_id, value = TRUE)
@@ -182,26 +183,6 @@ repeat_facet_plot <- ggplot(repeat_results, aes(x = worksheet,
                            caption = "Plot name: repeat_facet_plot") +
                       geom_hline(yintercept = 0.50, linetype = "dashed")
 
-
-make_individual_plot <- function(input_sample) {
-  
-  output_plot <- ggplot(compare_results %>%
-           filter(dlms_dna_number == input_sample), aes(x = worksheet, 
-                             y = seqone_hrd_score)) +
-    geom_point(size = 4, alpha = 0.5, 
-               aes(shape = seqone_hrd_status)) +
-    facet_wrap(~dlms_dna_number) +
-    theme_bw() +
-    labs(title = "",
-         x = "",
-         y = "SeqOne HRD score") +
-    geom_hline(yintercept = 0.50, linetype = "dashed") +
-    ylim(0, 1)
-  
-  return(output_plot)
-  
-}
-
 sample_20127786_plot <- make_individual_plot(20127786)
 
 sample_21011999_plot <- make_individual_plot(21011999)
@@ -213,20 +194,6 @@ sample_21013520_plot <- make_individual_plot(21013520)
 ##################################################
 # Repeat Testing
 ##################################################
-
-get_sample_summary_info <- function(input_dna_no) {
-  
-  output <- compare_results %>%
-    filter(dlms_dna_number == input_dna_no) %>%
-    select(worksheet, dlms_dna_number, seqone_hrd_score,
-           seqone_hrd_status, lga, lpc, ccne1, rad51b, 
-           coverage.x, percent_mapping, million_reads, read_length, 
-           insert_size, percent_q30, percent_aligned, percent_dups,
-           myriad_gi_score, myriad_hrd_status)
-  
-  return(output)
-  
-}
 
 summary_21013520 <- get_sample_summary_info(21013520)
 
@@ -309,29 +276,18 @@ path_block_plot <- ggplot(results_for_path_block_plot,
   ylim(0, 1) +
   labs(x = "Myriad Genome Instability Score",
        y = "SeqOne HRD Score",
-       title = "Comparison of Myriad vs SeqOne HRD Testing For Patient Samples",
+       title = "Comparison of Myriad vs SeqOne HRD Testing",
        subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs")) +
-  ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
+  #ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
   facet_wrap(~path_block_manual_check) +
   theme_bw() +
   theme(panel.grid = element_blank(), legend.position = "bottom",
-        legend.title = element_blank())
+        legend.title = element_blank()) +
+  guides(shape=guide_legend(ncol=1))
 
 ##################################################
 # Individual discrepant samples
 ##################################################
-
-circle_individual_point <- function(dna_input) {
-  
-  output_plot <- path_block_plot +
-    geom_point(data=results_for_path_block_plot[results_for_path_block_plot$dlms_dna_number == dna_input,], 
-                            aes(myriad_gi_score, seqone_hrd_score),
-                            pch=21, fill=NA, size=5, colour="red", stroke=3)
-  
-  return(output_plot)
-  
-
-}
 
 # Sample 23034142
 red_circle_23034142 <- circle_individual_point(23034142)
