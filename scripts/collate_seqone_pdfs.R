@@ -156,4 +156,13 @@ stopifnot(
   min(collated_seqone_info$seqone_ncc) >= 20
 )
 
+# Check to make sure a report wasn't saved twice
+collated_seqone_check <- collated_seqone_info  %>%
+  # Combination of sample ID and run date should be unique
+  mutate(sample_date = paste0(shallow_sample_id, " ", date))
+
+stopifnot(!duplicated(collated_seqone_check$sample_date))
+
+rm(collated_seqone_check)
+
 ##################################################
