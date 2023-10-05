@@ -505,10 +505,8 @@ data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 # QC metrics
 ##################################################
 
-qc_check <- compare_results 
-
 # Million reads
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, million_reads),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, million_reads),
                y = million_reads)) +
     geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -520,7 +518,7 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, million_reads),
         legend.title = element_blank())
 
 # Read length
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, read_length),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, read_length),
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   #scale_colour_manual(values = c(negative_colour,
@@ -533,7 +531,7 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, read_length),
   facet_wrap(~worksheet)
 
 # Insert size
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, insert_size),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, insert_size),
              y = insert_size)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -545,19 +543,20 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, insert_size),
         legend.title = element_blank())
 
 # Percent Q30
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_q30),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_q30),
              y = percent_q30)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
+  #cale_colour_manual(values = c(negative_colour,
+                                # positive_colour)) +
   labs(x = "", y = "percent_q30") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
-        legend.title = element_blank())
+        legend.title = element_blank()) +
+  ylim(0, 100)
 
 # Percent aligned
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_aligned),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_aligned),
              y = percent_aligned)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -569,7 +568,7 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_aligned),
         legend.title = element_blank())
 
 # Percent dups
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_dups),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_dups),
              y = percent_dups)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -581,7 +580,7 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, percent_dups),
         legend.title = element_blank())
 
 # Coverage
-ggplot(qc_check, aes(x = reorder(shallow_sample_id, coverage.y),
+ggplot(compare_results, aes(x = reorder(shallow_sample_id, coverage.y),
              y = coverage.y)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   scale_colour_manual(values = c(negative_colour,
@@ -593,7 +592,7 @@ ggplot(qc_check, aes(x = reorder(shallow_sample_id, coverage.y),
         legend.title = element_blank())
 
 
-ggplot(qc_check, aes(x = coverage.x,
+ggplot(compare_results, aes(x = coverage.x,
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
   #scale_colour_manual(values = c(negative_colour,
