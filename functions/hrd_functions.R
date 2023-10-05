@@ -22,7 +22,7 @@ export_timestamp <- function(filepath, input) {
 # Plot Functions
 ##################################################
 
-save_hrd_plot <- function(input_plot, width = 15, height = 12, dpi = 300) {
+save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi = 300) {
   
   # Default inputs allow for presenting a plot as half an A4 page
   
@@ -33,8 +33,8 @@ save_hrd_plot <- function(input_plot, width = 15, height = 12, dpi = 300) {
          device = "png",
          path = hrd_plot_path,
          units = "cm",
-         width = 15,
-         height = 12,
+         width = input_width,
+         height = input_height,
          dpi = 300)
   
 }

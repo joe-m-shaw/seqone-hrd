@@ -161,7 +161,7 @@ compare_results[compare_results$dlms_dna_number == 23032088, "path_block_manual_
 compare_results[compare_results$dlms_dna_number == 23031639, "path_block_manual_check"] <- "pathology blocks match"
 
 ##################################################
-# Repeat Testing Plots
+# Repeat Testing Plots - Inter Run Variation
 ##################################################
 
 repeat_results <- compare_results %>%
@@ -176,12 +176,15 @@ repeat_facet_plot <- ggplot(repeat_results, aes(x = worksheet,
                                  aes(shape = seqone_hrd_status)) +
                       facet_wrap(~dlms_dna_number) +
                       theme_bw() +
-                      theme(axis.text.x = element_text(angle = 90)) +
+                      theme(axis.text.x = element_text(angle = 90),
+                            legend.position = "bottom") +
                       labs(title = "SeqOne results for repeated samples",
                            x = "",
                            y = "SeqOne HRD score",
                            caption = "Plot name: repeat_facet_plot") +
                       geom_hline(yintercept = 0.50, linetype = "dashed")
+
+save_hrd_plot(repeat_facet_plot, input_width = 15, input_height = 15)
 
 sample_20127786_plot <- make_individual_plot(20127786)
 
@@ -190,6 +193,25 @@ sample_21011999_plot <- make_individual_plot(21011999)
 sample_23032088_plot <- make_individual_plot(23032088)
 
 sample_21013520_plot <- make_individual_plot(21013520)
+
+##################################################
+# Intra Run Variation
+##################################################
+
+intra_run_plot <- compare_results %>%
+  filter(worksheet == "WS133557") %>%
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
+  ggplot(aes(x = sample_id,
+             y = seqone_hrd_score)) +
+           geom_point(size = 3) +
+  labs(x = "", y = "SeqOne HRD Score",
+       title = "Repeated Sample Results",
+       subtitle = "Worksheet WS133557") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90))
+
+save_hrd_plot(intra_run_plot, input_width = 10, input_height = 10)
 
 ##################################################
 # Repeat Testing
@@ -390,11 +412,11 @@ simplified_model_summary <- simplified_model %>%
   summarise(total = n())
 
 ggplot(simplified_model, aes(x = lga,
-                            y = lpc,
-                            fill = seqone_hrd_status)) +
-  scale_fill_manual(values = c(negative_colour,
-                               positive_colour)) +
-  geom_point(size = 3, alpha = 0.6, aes(shape = approximation_consistent)) +
+                            y = lpc)) +
+  #scale_fill_manual(values = c(negative_colour,
+                               #positive_colour)) +
+  geom_point(size = 3, alpha = 0.6,
+             aes(colour = seqone_hrd_status)) +
   scale_shape_manual(values = c(24, 21)) +
   theme_bw() +
   labs(x = "Large Genomic Alterations", 
