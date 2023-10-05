@@ -183,9 +183,9 @@ repeat_facet_plot <- ggplot(repeat_results, aes(x = worksheet,
                       geom_hline(yintercept = 0.50, linetype = "dashed")
 
 
-make_individual_repeat_plot <- function(input_sample) {
+make_individual_plot <- function(input_sample) {
   
-  output_plot <- ggplot(repeat_results %>%
+  output_plot <- ggplot(compare_results %>%
            filter(dlms_dna_number == input_sample), aes(x = worksheet, 
                              y = seqone_hrd_score)) +
     geom_point(size = 4, alpha = 0.5, 
@@ -202,13 +202,13 @@ make_individual_repeat_plot <- function(input_sample) {
   
 }
 
-sample_20127786_plot <- make_individual_repeat_plot(20127786)
+sample_20127786_plot <- make_individual_plot(20127786)
 
-sample_21011999_plot <- make_individual_repeat_plot(21011999)
+sample_21011999_plot <- make_individual_plot(21011999)
 
-sample_23032088_plot <- make_individual_repeat_plot(23032088)
+sample_23032088_plot <- make_individual_plot(23032088)
 
-sample_21013520_plot <- make_individual_repeat_plot(21013520)
+sample_21013520_plot <- make_individual_plot(21013520)
 
 ##################################################
 # Repeat Testing
@@ -310,13 +310,69 @@ path_block_plot <- ggplot(results_for_path_block_plot,
   labs(x = "Myriad Genome Instability Score",
        y = "SeqOne HRD Score",
        title = "Comparison of Myriad vs SeqOne HRD Testing For Patient Samples",
-       subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs"),
-       caption = "Plot name: path_block_plot") +
+       subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs")) +
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
   facet_wrap(~path_block_manual_check) +
   theme_bw() +
   theme(panel.grid = element_blank(), legend.position = "bottom",
         legend.title = element_blank())
+
+##################################################
+# Individual discrepant samples
+##################################################
+
+circle_individual_point <- function(dna_input) {
+  
+  output_plot <- path_block_plot +
+    geom_point(data=results_for_path_block_plot[results_for_path_block_plot$dlms_dna_number == dna_input,], 
+                            aes(myriad_gi_score, seqone_hrd_score),
+                            pch=21, fill=NA, size=5, colour="red", stroke=3)
+  
+  return(output_plot)
+  
+
+}
+
+# Sample 23034142
+red_circle_23034142 <- circle_individual_point(23034142)
+
+summary_23034142 <- get_sample_summary_info(23034142)
+
+export_timestamp(hrd_output_path, summary_23034142)
+
+# Sample 23016518
+red_circle_23016518 <- circle_individual_point(23016518)
+
+summary_23016518 <- get_sample_summary_info(23016518)
+
+export_timestamp(hrd_output_path, summary_23016518)
+
+# Sample 23016516
+red_circle_23016516 <- circle_individual_point(23016516)
+
+summary_23016516 <- get_sample_summary_info(23016516)
+
+export_timestamp(hrd_output_path, summary_23016516)
+
+# Sample 23016526
+red_circle_23016526 <- circle_individual_point(23016526)
+
+summary_23016526 <- get_sample_summary_info(23016526)
+
+export_timestamp(hrd_output_path, summary_23016526)
+
+coverage_plot <- compare_results %>%
+  filter(path_block_manual_check != "NA") %>%
+  ggplot(aes(x = reorder(shallow_sample_id, coverage.x), y = coverage.x)) +
+  geom_point(size = 3, aes(shape = hrd_status_check,
+                           colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        panel.grid = element_blank()) +
+  labs(x = "Sample", y = "Coverage",
+       caption = "Plot name: coverage_plot") +
+  facet_wrap(~path_block_manual_check)
 
 ##################################################
 # Export tables
