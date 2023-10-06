@@ -109,6 +109,83 @@ path_block_check <- read_excel(paste0(hrd_data_path, "manual_path_block_check_ed
   select(dlms_dna_number, path_block_manual_check)
 
 ##################################################
+# Initial DNA Concentrations
+##################################################
+
+dna_concentrations <- read_excel(path = paste0(hrd_data_path, "HS2_sample_prep_export.xlsx"),
+                                 col_types = c("date", "numeric","text", "text",
+                                               "date", "numeric", "numeric", 
+                                               "numeric", "numeric", "numeric",
+                                               "date", "text", "numeric",
+                                               "numeric", "text", "text")) %>%
+  janitor::clean_names() %>%
+  dplyr::rename(dlms_dna_number = sample_id,
+                forename = name,
+                surname = x4,
+                nanodrop_ng_ul = nanodrop,
+                nd_260_280 = x7,
+                nd_260_230 = x8,
+                stock_volume_ul = qubit,
+                qubit_dna_ul = x10,
+                dilution_date = dilution,
+                dilution_worksheet = x12,
+                dilution_dna_volume = x13,
+                dilution_water_volume = x14) %>%
+  filter(!is.na(dlms_dna_number))
+
+neat_variants <- unique(grep(pattern = "neat", 
+                             dna_concentrations$comments, value = TRUE))
+
+dna_concentrations_mod <- dna_concentrations %>%
+
+  mutate(dilution_concentration = ifelse(
+    
+    comments %in% neat_variants,
+    
+    qubit_dna_ul,
+    
+    round((dilution_dna_volume * qubit_dna_ul) / (dilution_water_volume + dilution_dna_volume), 2)),
+    
+    # 15ul of diluted or neat (undiluted) DNA used in fragmentation reaction
+    input_ng = dilution_concentration * 15,
+    # 1 haploid genome = 3.3 picograms
+    input_genomes = (input_ng*1000)/3.3) %>%
+  # Some samples used on previous runs. Filtering by comments isolates
+  # the dilutions for the HRD runs
+  filter(!is.na(comments)) %>%
+  # Checked: repeat rows of the same DNA number have the same DNA concentration
+  # and dilution volumes
+  filter(!base::duplicated(dlms_dna_number))
+
+##################################################
+# qPCR Library QC
+##################################################
+
+hs2_library_prep <- read_excel(path = "S:/central shared/Genetics/Repository/Technical Teams/NGS/SureSelect XT HS2/SSXT HS2 Library Prep 2023.xlsx",
+                               sheet = "Sheet1",
+                               col_types = c("text", "guess", "text", "text",
+                                             "text", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric", 
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "text",
+                                             "guess", "guess", "guess", "guess",
+                                             "guess", "guess", "guess", "guess")) %>%
+  janitor::clean_names() %>%
+  filter(!plate_position %in% c("Plate Position", NA))
+
+kapa_data_WS133557 <- extract_kapa_data("133557", 20)
+
+kapa_data_WS134687 <- extract_kapa_data("134687", 31)
+
+kapa_data_WS134928 <- extract_kapa_data("134928", 7)
+
+kapa_data_WS135001 <- extract_kapa_data("135001", 31)
+
+kapa_data_collated <- rbind(kapa_data_WS133557, kapa_data_WS134687,
+                            kapa_data_WS134928, kapa_data_WS135001)
+
+##################################################
 # Compare SeqOne and Myriad Results
 ##################################################
 
@@ -153,7 +230,13 @@ compare_results <- seqone_mod %>%
       surname %in% biobank_names ~"Biobank control",
       surname %in% seraseq_names ~"Seraseq control",
       TRUE ~"patient")) %>%
-  filter(downsampled == "No")
+  filter(downsampled == "No") %>%
+  left_join(dna_concentrations_mod %>%
+              select(dlms_dna_number, qubit_dna_ul, input_ng,
+                     input_genomes), by = "dlms_dna_number") %>%
+  left_join(kapa_data_collated %>%
+              select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
+            by = "shallow_sample_id")
 
 # Classify Seraseq controls as "pathology blocks match"
 compare_results[compare_results$dlms_dna_number == 23032086, "path_block_manual_check"] <- "pathology blocks match"
@@ -307,6 +390,41 @@ path_block_plot <- ggplot(results_for_path_block_plot,
         legend.title = element_blank()) +
   guides(shape=guide_legend(ncol=1))
 
+high_quality_results <- compare_results %>%
+  filter(path_block_manual_check != "NA" & !is.na(myriad_gi_score)) %>%
+  filter(input_ng >= 49 & coverage.x >= 1 &
+           path_block_manual_check == "pathology blocks match")
+
+ggplot(high_quality_results, 
+       aes(x = myriad_gi_score, y = seqone_hrd_score)) +
+  geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  scale_x_continuous(limits = c(0,100),
+                     breaks = c(0, 25, 42, 50, 75, 100)) +
+  ylim(0, 1) +
+  labs(x = "Myriad Genome Instability Score",
+       y = "SeqOne HRD Score",
+       title = "Comparison of Myriad vs SeqOne HRD Testing",
+       subtitle = paste0("Data for ", nrow(high_quality_results), " DNA inputs: path blocks match, >=49ng input, >=1x coverage")) +
+  ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom",
+        legend.title = element_blank()) +
+  guides(shape=guide_legend(ncol=1))
+
+ggplot(compare_results %>%
+         filter(path_block_manual_check == "pathology blocks match"), 
+       aes(x = input_ng, y = coverage.x)) +
+  geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check,
+                                        colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom",
+        legend.title = element_blank()) +
+  guides(shape=guide_legend(ncol=1)) +
+  ylim(0, 2)
+
 ##################################################
 # Individual discrepant samples
 ##################################################
@@ -361,7 +479,7 @@ inconsistent_summary <- compare_results %>%
   select(sample_id, worksheet, seqone_hrd_score, myriad_gi_score,
          seqone_hrd_status, myriad_hrd_status,
          path_block_manual_check, lga, lpc, ccne1, rad51b, coverage.x, percent_mapping,
-         myriad_r_number) %>%
+         myriad_r_number, input_ng) %>%
   arrange(path_block_manual_check, sample_id)
 
 export_timestamp(hrd_output_path, inconsistent_summary)
@@ -386,7 +504,7 @@ compare_results %>%
   ggplot(aes(x = reorder(shallow_sample_id, read_length), y = read_length)) +
   geom_point(size = 3, alpha = 0.5, aes(shape = hrd_status_check)) +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
+  theme(axis.text.x = element_blank()) +
   labs(title = "SeqOne Read Length",
        x = "",
        y = "Read length") +
@@ -509,8 +627,6 @@ data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, million_reads),
                y = million_reads)) +
     geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
     labs(x = "", y = "million_reads") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
@@ -534,8 +650,6 @@ ggplot(compare_results, aes(x = reorder(shallow_sample_id, read_length),
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, insert_size),
              y = insert_size)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
   labs(x = "", y = "insert_size") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
@@ -546,8 +660,6 @@ ggplot(compare_results, aes(x = reorder(shallow_sample_id, insert_size),
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_q30),
              y = percent_q30)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  #cale_colour_manual(values = c(negative_colour,
-                                # positive_colour)) +
   labs(x = "", y = "percent_q30") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
@@ -559,8 +671,6 @@ ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_q30),
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_aligned),
              y = percent_aligned)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
   labs(x = "", y = "percent_aligned") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
@@ -571,8 +681,6 @@ ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_aligned),
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_dups),
              y = percent_dups)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
   labs(x = "", y = "percent_dups") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
@@ -583,30 +691,20 @@ ggplot(compare_results, aes(x = reorder(shallow_sample_id, percent_dups),
 ggplot(compare_results, aes(x = reorder(shallow_sample_id, coverage.y),
              y = coverage.y)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  scale_colour_manual(values = c(negative_colour,
-                                 positive_colour)) +
   labs(x = "", y = "coverage.y") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
         legend.title = element_blank())
 
-
 ggplot(compare_results, aes(x = coverage.x,
              y = read_length)) +
   geom_point(size = 3, aes(colour = hrd_status_check)) +
-  #scale_colour_manual(values = c(negative_colour,
-                                # positive_colour)) +
   labs(x = "coverage", y = "read_length") +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90),
         legend.position = "bottom",
         legend.title = element_blank())
-
-ggplot(check, aes(x = dlms_dna_number, y = coverage.x)) +
-  geom_point(size = 3, aes(shape = seqone_hrd_status,
-                           colour = hrd_status_check)) +
-  facet_wrap(~dlms_dna_number)
 
 ##################################################
 # Sample Extraction Information
@@ -659,5 +757,43 @@ ggplot(seqone_dlms_extractions, aes(x = tissue_type, y = )) +
 
 ggplot(seqone_dlms_extractions, aes(x = run_date, y = concentration)) +
   geom_point()
+
+##################################################
+# Impact of DNA Concentration
+##################################################
+
+ggplot(compare_results %>%
+         filter(!is.na(path_block_manual_check)), aes(x = input_ng, y = coverage.x)) +
+  geom_point(size = 3, aes(shape = hrd_status_check,
+                 colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  ylim(0,2) +
+  facet_wrap(~path_block_manual_check) +
+  geom_point(data=compare_results[compare_results$dlms_dna_number == 23034142,], 
+             aes(input_ng, coverage.x),
+             pch=21, fill=NA, size=5, colour="red", stroke=2)
+
+ggplot(compare_results %>%
+         filter(path_block_manual_check == "pathology blocks match"), 
+       aes(x = input_genomes, y = lga)) +
+  geom_point(size = 3, aes(shape = hrd_status_check,
+                           colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  facet_wrap(~path_block_manual_check)
+
+ggplot(compare_results %>%
+         filter(path_block_manual_check == "pathology blocks match"), 
+       aes(x = reorder(dlms_dna_number, qubit_dna_ul),
+                               y = qubit_dna_ul)) +
+  geom_point(size = 3, aes(shape = hrd_status_check)) +
+  geom_hline(yintercept = 3.3, linetype = "dashed") +
+  scale_y_continuous(trans='log10') +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "") 
 
 ##################################################

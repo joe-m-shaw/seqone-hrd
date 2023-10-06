@@ -88,4 +88,23 @@ get_sample_summary_info <- function(input_dna_no) {
   
 }
 
+extract_kapa_data <- function(worksheet_number, worksheet_length) {
+  
+  description <- grep(pattern = worksheet_number,
+                      x = hs2_library_prep$plate_position,
+                      value = TRUE)
+  
+  row_start <- match(description, hs2_library_prep$plate_position) +1 
+  
+  row_end <- (row_start + worksheet_length) - 1
+  
+  output <- hs2_library_prep[row_start:row_end,] %>%
+    select(-c(x20, x21, x22, x23, x24, x25, x26, x27)) %>%
+    mutate(worksheet = paste0("WS", worksheet_number),
+           shallow_sample_id = paste0(worksheet, "_", lab_number))
+  
+  return(output)
+  
+}
+
 ##################################################
