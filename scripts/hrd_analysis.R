@@ -250,13 +250,17 @@ compare_results[compare_results$dlms_dna_number == 23031639, "path_block_manual_
 repeat_results <- compare_results %>%
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) %>%
-  filter(downsampled == "No")
+  filter(downsampled == "No") %>%
+  mutate(input_category = case_when(
+    input_ng >= 48 ~"50ng input",
+    input_ng < 48 ~"lower than 50ng input"))
 
 
 repeat_facet_plot <- ggplot(repeat_results, aes(x = worksheet, 
                                                 y = seqone_hrd_score)) +
-                      geom_point(size = 3, alpha = 0.5, 
-                                 aes(shape = seqone_hrd_status)) +
+                      geom_point(alpha = 0.5, 
+                                 aes(shape = seqone_hrd_status,
+                                     size = coverage.x)) +
                       facet_wrap(~dlms_dna_number) +
                       theme_bw() +
                       theme(axis.text.x = element_text(angle = 90),
@@ -795,5 +799,41 @@ ggplot(compare_results %>%
   theme_bw() +
   theme(axis.text.x = element_blank()) +
   labs(x = "") 
+
+##################################################
+# Tumour BRCA Referral DNA Concentrations
+##################################################
+
+brca_query <- "SELECT * FROM MolecularDB.dbo.Samples WHERE DISEASE IN (204)"
+
+tbrca_data <- sqlQuery(channel = moldb_connection,
+                        query = brca_query) %>%
+  janitor::clean_names()
+
+dna_qc_threshold <- 3.3
+
+tbrca_data_mod <- tbrca_data %>%
+  filter(!is.na(concentration)) %>%
+  mutate(pass_qc = ifelse(concentration >=dna_qc_threshold, "Yes", "No"))
+
+samples_passing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "Yes",])
+
+samples_failing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "No",])
+
+fail_rate <- round((samples_failing_qc / (samples_passing_qc + samples_failing_qc)) * 100, 1)
+
+ggplot(tbrca_data_mod, aes(x = disease, y = concentration)) +
+  geom_boxplot() +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(y = "DNA concentration (ng/ul)",
+       x = "Tumour BRCA referrals",
+       title = paste0("DNA concentrations for ", nrow(tbrca_data_mod), " tumour BRCA referrals"),
+       subtitle = paste0("Samples below ", dna_qc_threshold, " ng/ul: ", samples_failing_qc,
+                         " (", fail_rate, "%)"),
+       caption = paste0("Median DNA concentration: ", median(tbrca_data_mod$concentration), 
+                        " ng/ul")) +
+  ylim(0, 700) +
+  geom_hline(yintercept = 3.3, linetype = "dashed")
 
 ##################################################
