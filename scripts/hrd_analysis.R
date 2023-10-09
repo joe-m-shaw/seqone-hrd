@@ -387,18 +387,21 @@ path_block_plot <- ggplot(results_for_path_block_plot,
        y = "SeqOne HRD Score",
        title = "Comparison of Myriad vs SeqOne HRD Testing",
        subtitle = paste0("Data for ", nrow(results_for_path_block_plot), " DNA inputs")) +
-  #ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
-  facet_wrap(~path_block_manual_check) +
+  ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
+  #facet_wrap(~path_block_manual_check) +
   theme_bw() +
   theme(panel.grid = element_blank(), legend.position = "bottom",
         legend.title = element_blank()) +
-  guides(shape=guide_legend(ncol=1))
+  guides(shape=guide_legend(ncol=1)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 42, linetype = "dashed")
 
 high_quality_results <- compare_results %>%
   filter(path_block_manual_check != "NA" & !is.na(myriad_gi_score)) %>%
   filter(input_ng >= 49 & coverage.x >= 1 &
            path_block_manual_check == "pathology blocks match")
 
+# Results with quality control added
 ggplot(high_quality_results, 
        aes(x = myriad_gi_score, y = seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
@@ -415,8 +418,11 @@ ggplot(high_quality_results,
   theme_bw() +
   theme(panel.grid = element_blank(), legend.position = "bottom",
         legend.title = element_blank()) +
-  guides(shape=guide_legend(ncol=1))
+  guides(shape=guide_legend(ncol=1)) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 42, linetype = "dashed")
 
+# Coverage vs DNA input
 ggplot(compare_results %>%
          filter(path_block_manual_check == "pathology blocks match"), 
        aes(x = input_ng, y = coverage.x)) +
@@ -428,6 +434,32 @@ ggplot(compare_results %>%
         legend.title = element_blank()) +
   guides(shape=guide_legend(ncol=1)) +
   ylim(0, 2)
+
+# Total yield vs DNA input
+ggplot(compare_results %>%
+         filter(path_block_manual_check == "pathology blocks match"), 
+       aes(x = input_ng, y = total_yield)) +
+  geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check,
+                                        colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom",
+        legend.title = element_blank())
+
+# DNA samples with lower than 50ng input
+ggplot(compare_results %>%
+         filter(input_ng < 49 & !is.na(myriad_gi_score)), 
+       aes(x = myriad_gi_score, y = seqone_hrd_score)) +
+  geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check,
+                                        colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), legend.position = "bottom",
+        legend.title = element_blank()) +
+  xlim(0, 100) +
+  ylim(0, 1) +
+  ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
+  labs(title = "DNA samples with lower than 50ng input")
 
 ##################################################
 # Individual discrepant samples
@@ -544,7 +576,9 @@ ggplot(simplified_model, aes(x = lga,
   labs(x = "Large Genomic Alterations", 
        y = "Loss of Parental Copy",
        title = "Comparison of Seqone model approximation to pipeline output",
-       subtitle = paste0("Data for ", nrow(simplified_model), " BRCA-negative DNA inputs")) 
+       subtitle = paste0("Data for ", nrow(simplified_model), " BRCA-negative DNA inputs")) +
+  geom_hline(yintercept = 10, linetype= "dashed") +
+  geom_vline(xintercept = 20, linetype = "dashed")
 
 ##################################################
 # Seraseq Controls
@@ -767,17 +801,19 @@ ggplot(seqone_dlms_extractions, aes(x = run_date, y = concentration)) +
 ##################################################
 
 ggplot(compare_results %>%
-         filter(!is.na(path_block_manual_check)), aes(x = input_ng, y = coverage.x)) +
+         filter(path_block_manual_check == "pathology blocks match"), 
+       aes(x = input_ng, y = coverage.x)) +
   geom_point(size = 3, aes(shape = hrd_status_check,
                  colour = hrd_status_check)) +
   scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
   theme_bw() +
   theme(panel.grid = element_blank()) +
   ylim(0,2) +
-  facet_wrap(~path_block_manual_check) +
-  geom_point(data=compare_results[compare_results$dlms_dna_number == 23034142,], 
-             aes(input_ng, coverage.x),
-             pch=21, fill=NA, size=5, colour="red", stroke=2)
+  xlim(0, 55) +
+  facet_wrap(~path_block_manual_check) 
+  #geom_point(data=compare_results[compare_results$dlms_dna_number == 23034142,], 
+             #aes(input_ng, coverage.x),
+             #=21, fill=NA, size=5, colour="red", stroke=2)
 
 ggplot(compare_results %>%
          filter(path_block_manual_check == "pathology blocks match"), 
@@ -793,7 +829,9 @@ ggplot(compare_results %>%
          filter(path_block_manual_check == "pathology blocks match"), 
        aes(x = reorder(dlms_dna_number, qubit_dna_ul),
                                y = qubit_dna_ul)) +
-  geom_point(size = 3, aes(shape = hrd_status_check)) +
+  geom_point(size = 3, aes(shape = hrd_status_check,
+                           colour = hrd_status_check)) +
+  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
   geom_hline(yintercept = 3.3, linetype = "dashed") +
   scale_y_continuous(trans='log10') +
   theme_bw() +
@@ -810,7 +848,7 @@ tbrca_data <- sqlQuery(channel = moldb_connection,
                         query = brca_query) %>%
   janitor::clean_names()
 
-dna_qc_threshold <- 3.3
+dna_qc_threshold <- round(100/15, 0)
 
 tbrca_data_mod <- tbrca_data %>%
   filter(!is.na(concentration)) %>%
@@ -835,5 +873,51 @@ ggplot(tbrca_data_mod, aes(x = disease, y = concentration)) +
                         " ng/ul")) +
   ylim(0, 700) +
   geom_hline(yintercept = 3.3, linetype = "dashed")
+
+##################################################
+# Spread of Myriad GI Scores
+##################################################
+
+tbrca_data_collection <- read_excel(paste0(hrd_data_path, 
+                                           "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"),
+                                    skip = 1) %>%
+  janitor::clean_names()
+
+tbrca_data_collection_clean <- tbrca_data_collection %>%
+  filter(!gis_score_numerical_value_or_fail_not_tested %in% c("Fail", "Inconclusive",
+                                                              "Not tested", NA)) %>%
+  filter(t_brca_mutation_status != "Fail") %>%
+  mutate(gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested),
+         brca_mutation_clean = case_when(
+           
+           t_brca_mutation_status %in% c("Pathogenic BRCA1", "Pathogenic BRCA2") ~"BRCA positive",
+           t_brca_mutation_status %in% c("No mutation detected", "no mutation detected") ~"BRCA negative"))
+
+tbrca_data_collection_clean %>%
+         group_by(gi_score, gis_pos_neg) %>%
+         summarise(total = n()) %>%
+  ggplot(aes(x = gi_score, y = total)) +
+  #geom_col(aes(fill = gis_pos_neg), width = 1) +
+  geom_smooth() +
+  scale_fill_manual(values = c("#CCCCCC", "#FF6666")) +
+  xlim(0, 100) +
+  theme_bw() +
+  theme(panel.grid = element_blank()) +
+  #geom_vline(xintercept = 42, linetype = "dashed") +
+  labs(title = paste0("Myriad GI score results for ", nrow(tbrca_data_collection_clean), 
+                      " samples from the North West GLH"),
+       y = "Number of samples",
+       x = "Myriad GI score") 
+
+compare_results %>%
+  filter(!is.na(seqone_hrd_score)) %>%
+  group_by(seqone_hrd_score) %>%
+  summarise(total = n()) %>%
+  ggplot(aes(x = seqone_hrd_score, y =total)) +
+  geom_col(width = 0.01) +
+  geom_smooth() +
+  xlim(0, 1) +
+  theme_bw() +
+  theme(panel.grid = element_blank())
 
 ##################################################
