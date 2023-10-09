@@ -13,11 +13,12 @@ sample_columns <- sqlColumns(channel = moldb_connection,
 
 # Add sample IDs as an input csv to avoid committing identifiers.
 
-sample_query <- paste0("SELECT * FROM MolecularDB.dbo.Samples WHERE NGIS IN (",
+sample_query <- paste0("SELECT * FROM MolecularDB.dbo.Samples WHERE NGISReferralNo IN (",
                        paste(chris_cases, collapse = ", "),
                        ")")
 
 sqlQuery(channel = moldb_connection,
-                        query = sample_query)
+         query = sample_query,
+         as.is = NGISReferralNo)
 
 ################################################################################
