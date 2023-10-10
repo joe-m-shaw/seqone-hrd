@@ -105,7 +105,7 @@ export_for_check <- collated_seqone_info %>%
 
 export_timestamp(hrd_data_path, export_for_check)
 
-path_block_check <- read_excel(paste0(hrd_data_path, "manual_path_block_check_edit.xlsx")) %>%
+path_block_check <- read_excel(paste0(hrd_data_path, "2023_10_10_14_27_46_export_for_check_edit.xlsx")) %>%
   select(dlms_dna_number, path_block_manual_check)
 
 ##################################################
@@ -404,7 +404,8 @@ high_quality_results <- compare_results %>%
 # Results with quality control added
 ggplot(high_quality_results, 
        aes(x = myriad_gi_score, y = seqone_hrd_score)) +
-  geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
+  geom_point(alpha = 0.6, aes(shape = hrd_status_check,
+                              size = ccne1)) +
   theme_bw() +
   theme(panel.grid = element_blank()) +
   scale_x_continuous(limits = c(0,100),
@@ -551,34 +552,50 @@ compare_results %>%
 ##################################################
 
 simplified_model <- compare_results %>%
-  filter(myriad_brca_status == "NEGATIVE") %>%
-  mutate(model_approximation = case_when(
-    lga >= 18 ~"POSITIVE",
-    lga <= 14 ~"NEGATIVE",
-    lga < 18 & lga > 14 & lpc > 10 ~"POSITIVE",
-    lga < 18 & lga > 14 & lpc <= 10 ~"NEGATIVE")) %>%
-  mutate(approximation_consistent = ifelse(model_approximation == seqone_hrd_status,
+  filter(!is.na(myriad_brca_status)) %>%
+  mutate(brca_status = case_when(
+    
+    myriad_brca_status == "POSITIVE" ~"POSITIVE",
+    myriad_brca_status == "NEGATIVE" ~"NEGATIVE",
+    # Seraseq controls and Biobank controls are BRCA negative
+    myriad_brca_status == "" ~"NEGATIVE"),
+    
+    model_approximation = case_when(
+      lga >= 18 ~"POSITIVE",
+      lga <= 14 ~"NEGATIVE",
+      lga < 18 & lga > 14 & lpc > 10 ~"POSITIVE",
+      lga < 18 & lga > 14 & lpc <= 10 ~"NEGATIVE"),
+    
+    approximation_consistent = ifelse(model_approximation == seqone_hrd_status,
                                         "Yes",
-                                        "No"))
+                                        "No")) %>%
+  filter(brca_status == "NEGATIVE") %>%
+  mutate(ccne1_rounded = round(ccne1, 0))
 
 simplified_model_summary <- simplified_model %>%
   group_by(approximation_consistent) %>%
   summarise(total = n())
 
-ggplot(simplified_model, aes(x = lga,
+lga_vs_lpc_plot <- ggplot(simplified_model, aes(x = lga,
                             y = lpc)) +
-  #scale_fill_manual(values = c(negative_colour,
-                               #positive_colour)) +
-  geom_point(size = 3, alpha = 0.6,
-             aes(colour = seqone_hrd_status)) +
-  scale_shape_manual(values = c(24, 21)) +
+  geom_point(aes(colour = seqone_hrd_status, size = ccne1_rounded),
+             alpha = 0.6) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  ylim(0, 40) +
   theme_bw() +
+  theme(legend.position = "bottom") +
   labs(x = "Large Genomic Alterations", 
        y = "Loss of Parental Copy",
-       title = "Comparison of Seqone model approximation to pipeline output",
-       subtitle = paste0("Data for ", nrow(simplified_model), " BRCA-negative DNA inputs")) +
-  geom_hline(yintercept = 10, linetype= "dashed") +
-  geom_vline(xintercept = 20, linetype = "dashed")
+       #title = "Comparison of Seqone model approximation to pipeline output",
+       #subtitle = paste0("Data for ", nrow(simplified_model), " BRCA negative DNA inputs"),
+       colour = "SeqOne pipeline status",
+       size = "CCNE1") +
+  geom_segment(aes(x = 18, y = 0, xend = 18, yend = 10), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 15, yend = 40), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 18, yend = 10), linetype = "dashed") +
+  scale_size_binned(breaks = c(1,2,3,4,5,10))
+
+save_hrd_plot(lga_vs_lpc_plot, input_width = 15.5, input_height = 15)
 
 ##################################################
 # Seraseq Controls
@@ -893,31 +910,79 @@ tbrca_data_collection_clean <- tbrca_data_collection %>%
            t_brca_mutation_status %in% c("Pathogenic BRCA1", "Pathogenic BRCA2") ~"BRCA positive",
            t_brca_mutation_status %in% c("No mutation detected", "no mutation detected") ~"BRCA negative"))
 
-tbrca_data_collection_clean %>%
+myriad_gi_profile_plot <- tbrca_data_collection_clean %>%
          group_by(gi_score, gis_pos_neg) %>%
          summarise(total = n()) %>%
   ggplot(aes(x = gi_score, y = total)) +
-  #geom_col(aes(fill = gis_pos_neg), width = 1) +
-  geom_smooth() +
-  scale_fill_manual(values = c("#CCCCCC", "#FF6666")) +
-  xlim(0, 100) +
+  geom_col(aes(fill = gis_pos_neg), width = 1) +
+  #geom_smooth() +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  scale_x_continuous(limits = c(0,100),
+                     breaks = c(0, 25, 42, 50, 75, 100)) +
   theme_bw() +
-  theme(panel.grid = element_blank()) +
+  theme(panel.grid = element_blank(), 
+        legend.position = "bottom") +
   #geom_vline(xintercept = 42, linetype = "dashed") +
-  labs(title = paste0("Myriad GI score results for ", nrow(tbrca_data_collection_clean), 
-                      " samples from the North West GLH"),
-       y = "Number of samples",
-       x = "Myriad GI score") 
+  labs(y = "Number of samples",
+       x = "Myriad GI score",
+       caption = paste0("Data for ", nrow(tbrca_data_collection_clean), " samples shown"),
+       fill = "Myriad GI Status",
+       title = "Myriad GI Scores for North West GLH Samples") 
+
+save_hrd_plot(myriad_gi_profile_plot)
+
+##################################################
+# Coverage over worksheets
+##################################################
+
+ggplot(compare_results, aes(x = worksheet, y = coverage.x)) +
+  geom_boxplot() +
+  ylim(0, 2)
+
+##################################################
+# RAD51B vs CCNE1
+##################################################
+
+ggplot(collated_seqone_info, aes(x = rad51b, y = ccne1)) +
+  geom_point() +
+  theme_bw() +
+  xlim(0, 10) +
+  ylim(0, 10)
+
+ggplot(collated_seqone_info %>%
+         filter(ccne1 <5), aes(x = ,
+                                 y = ccne1)) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = c(0:5))
+
+ggplot(collated_seqone_info, aes(x = ccne1,
+                               y = seqone_hrd_score)) +
+  geom_point(size = 3, alpha = 0.6, aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  scale_x_continuous(breaks = c(0:10))
+
+##################################################
+# Final run
+##################################################
+
+colnames(compare_results)
 
 compare_results %>%
-  filter(!is.na(seqone_hrd_score)) %>%
-  group_by(seqone_hrd_score) %>%
-  summarise(total = n()) %>%
-  ggplot(aes(x = seqone_hrd_score, y =total)) +
-  geom_col(width = 0.01) +
-  geom_smooth() +
-  xlim(0, 1) +
-  theme_bw() +
-  theme(panel.grid = element_blank())
+  filter(path_block_manual_check == "pathology blocks match" &
+           hrd_status_check == "Seqone HRD status NOT consistent with Myriad") %>%
+  select(dlms_dna_number, seqone_hrd_score, myriad_gi_score,
+         lga, lpc, ccne1, rad51b, coverage.x, qubit_dna_ul, input_ng)
+
+compare_results %>%
+  filter(dlms_dna_number == "23032088") %>%
+  ggplot(aes(x = seqone_hrd_score, y = coverage.x)) +
+  geom_point(size = 3, aes(colour = worksheet)) +
+  ylim(0, 2) +
+  xlim(0, 1)
+  
+
+23016516, 23032088, 20127786, 21011999, 23032088
+  
 
 ##################################################
