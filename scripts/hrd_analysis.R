@@ -379,10 +379,10 @@ path_block_plot <- ggplot(results_for_path_block_plot,
                           aes(x = myriad_gi_score, y = seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.6, aes(shape = hrd_status_check)) +
   theme_bw() +
-  theme(panel.grid = element_blank()) +
   scale_x_continuous(limits = c(0,100),
                      breaks = c(0, 25, 42, 50, 75, 100)) +
   ylim(0, 1) +
+  theme(panel.grid = element_blank()) +
   labs(x = "Myriad Genome Instability Score",
        y = "SeqOne HRD Score",
        title = "Comparison of Myriad vs SeqOne HRD Testing",
@@ -568,7 +568,10 @@ simplified_model <- compare_results %>%
     
     approximation_consistent = ifelse(model_approximation == seqone_hrd_status,
                                         "Yes",
-                                        "No")) %>%
+                                        "No"),
+    approximation_myriad_consistent = ifelse(model_approximation == myriad_hrd_status,
+                                             "Yes",
+                                             "No")) %>%
   filter(brca_status == "NEGATIVE") %>%
   mutate(ccne1_rounded = round(ccne1, 0))
 
@@ -596,6 +599,47 @@ lga_vs_lpc_plot <- ggplot(simplified_model, aes(x = lga,
   scale_size_binned(breaks = c(1,2,3,4,5,10))
 
 save_hrd_plot(lga_vs_lpc_plot, input_width = 15.5, input_height = 15)
+
+# Does the approximation agree with Myriad HRD status?
+
+myriad_v_approximation_plot <- ggplot(simplified_model %>%
+         filter(path_block_manual_check == "pathology blocks match" &
+                  !is.na(myriad_hrd_status)), aes(x = lga, y = lpc)) +
+  geom_point(aes(colour = myriad_hrd_status),
+             alpha = 0.6, size = 3) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  ylim(0, 40) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(x = "Large Genomic Alterations", 
+       y = "Loss of Parental Copy",
+       colour = "Myriad HRD status",
+       title = "SeqOne model approximation versus Myriad HRD status") +
+  geom_segment(aes(x = 18, y = 0, xend = 18, yend = 10), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 15, yend = 40), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 18, yend = 10), linetype = "dashed")
+
+# Does the approximation agree with SeqOne HRD status?
+
+seqon_v_approximation_plot <- ggplot(simplified_model %>%
+         filter(path_block_manual_check == "pathology blocks match" &
+                  !is.na(myriad_hrd_status)), aes(x = lga, y = lpc)) +
+  geom_point(aes(colour = seqone_hrd_status),
+             alpha = 0.6, size = 3) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  ylim(0, 40) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(x = "Large Genomic Alterations", 
+       y = "Loss of Parental Copy",
+       colour = "SeqOne HRD status",
+       title = "SeqOne model approximation versus SeqOne HRD status") +
+  geom_segment(aes(x = 18, y = 0, xend = 18, yend = 10), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 15, yend = 40), linetype = "dashed") +
+  geom_segment(aes(x = 15, y = 10, xend = 18, yend = 10), linetype = "dashed")
+
+merge_plot <- ggpubr::ggarrange(seqon_v_approximation_plot,
+                                myriad_v_approximation_plot)
 
 ##################################################
 # Seraseq Controls
