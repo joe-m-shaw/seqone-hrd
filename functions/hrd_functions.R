@@ -155,7 +155,6 @@ read_myriad_report <- function(filepath, file) {
   nhs_number_mod <- as.numeric(gsub(pattern = "(\\D)", "",
                                     nhs_number))
   
-  
   # Patient name
   myriad_patient_name <- sub(x = page1,
                              pattern = ".+Patient Name:\\s{10,15}(\\D{5,25})\n.+",
@@ -179,28 +178,12 @@ read_myriad_report <- function(filepath, file) {
   
   # Genomic Instability Score
   # Note: score can be 1 digit (i.e. "7") or 2 ("73")
-  
-  gi_score_regex <- ".+Patient Genomic Instability Score: (\\d{1,2}).+"
-  
-  gi_score_pg2 <- as.numeric(sub(x = page2,
-                                 pattern = gi_score_regex,
-                                 replacement = "\\1"))
-  
-  # Some reports have GI score on the third page
-  
-  gi_score_pg3 <- as.numeric(sub(x = page3,
-                                 pattern = gi_score_regex,
-                                 replacement = "\\1"))
-  
-  # Pick correct GI score
-  
-  myriad_gi_score <- ifelse(str_length(gi_score_pg2) %in% c(1,2),
-                            gi_score_pg2,
-                            ifelse(str_length(gi_score_pg3) %in% c(1,2),
-                                   gi_score_pg3, "NULL"))
+  # GIS may be on page 2 or page 3
+  myriad_gi_score <- as.numeric(sub(x = paste0(myriad_report_text[[2]], myriad_report_text[[3]]),
+                             pattern = ".+Patient Genomic Instability Score: (\\d{1,2}).+",
+                             replacement = "\\1"))
   
   assert_that(myriad_gi_score >= 0, myriad_gi_score <= 100, msg = "GI score outside 0-100 range")
-  
   
   myriad_hrd_status <- sub(x = page2,
                            pattern = ".+Myriad HRD Status:.(\\D{8}).+",
