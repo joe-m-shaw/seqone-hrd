@@ -167,10 +167,8 @@ kapa_data_collated <- rbind(
   extract_kapa_data("135001", 31))
 
 ##################################################
-# Compare SeqOne and Myriad Results
+# SeqOne QC Data
 ##################################################
-
-# Add QC data for SeqOne samples
 
 seqone_qc_data <- read_excel(paste0(hrd_data_path, "seqone_qc_metrics/seqone_qc_metrics_2023_10_03.xlsx")) |>
   janitor::clean_names() |>
@@ -179,49 +177,62 @@ seqone_qc_data <- read_excel(paste0(hrd_data_path, "seqone_qc_metrics/seqone_qc_
                 insert_size = ins_size,
                 million_reads = m_reads)
 
+##################################################
+# Compare SeqOne and Myriad Results
+##################################################
+
 seqone_mod <- collated_seqone_info |>
+  
+  # Analysis on September 1st and before was previous pipeline version
+  
   filter(!date %in% c("September 1, 2023", "August 31, 2023",
                       "August 24, 2023", "August 25, 2023")) |>
+  
   left_join(seqone_dlms_info |>
               select(dlms_dna_number, nhs_number, firstname, surname,
                      i_gene_r_no, pathno, ncc),
             by = "dlms_dna_number") |>
-  mutate(downsampled = ifelse(grepl(pattern = "downsampl", x = sample_id), "Yes", "No")) |>
+  
+  mutate(downsampled = ifelse(grepl(pattern = "downsampl", x = sample_id), "Yes", "No"),
+         
+         identity = ifelse(grepl(pattern = "Biobank|seraseq", x = surname,
+                                 ignore.case = TRUE),
+                           "Control", "Patient"),
+         
+         control_type = case_when(
+           grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) ~"Biobank control",
+           grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) ~"Seraseq control",
+           TRUE ~"patient")) |> 
+  
   left_join(seqone_qc_data, by = "shallow_sample_id")
 
-biobank_names <- unique(grep("Biobank", seqone_mod$surname,
-                             value = TRUE, ignore.case = TRUE))
+consistent_text <-   "Seqone HRD status consistent with Myriad"
 
-seraseq_names <- unique(grep("Seraseq", seqone_mod$surname,
-                             value = TRUE, ignore.case = TRUE))
+inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
 
 compare_results <- seqone_mod |>
+  
   left_join(collated_myriad_info_mod, by = "nhs_number") |>
+  
   left_join(path_block_check, by = "dlms_dna_number") |>
+  
   mutate(hrd_status_check = case_when(
     
-    myriad_hrd_status == "POSITIVE" & seqone_hrd_status == "POSITIVE" ~"Seqone HRD status consistent with Myriad",
-    myriad_hrd_status == "NEGATIVE" & seqone_hrd_status == "NEGATIVE" ~"Seqone HRD status consistent with Myriad",
-    myriad_hrd_status == "NEGATIVE" & seqone_hrd_status == "POSITIVE" ~"Seqone HRD status NOT consistent with Myriad",
-    myriad_hrd_status == "POSITIVE" & seqone_hrd_status == "NEGATIVE" ~"Seqone HRD status NOT consistent with Myriad",
-    TRUE ~"other"),
+    myriad_hrd_status == seqone_hrd_status ~consistent_text,
     
-    identity = ifelse(surname %in% c(biobank_names, seraseq_names), "Control", "Patient"),
-    control_type = case_when(
-      surname %in% biobank_names ~"Biobank control",
-      surname %in% seraseq_names ~"Seraseq control",
-      TRUE ~"patient")) |>
+    myriad_hrd_status != seqone_hrd_status ~inconsistent_text,
+
+    TRUE ~"other")) |> 
+  
   filter(downsampled == "No") |>
+    
   left_join(dna_concentrations_mod |>
               select(dlms_dna_number, qubit_dna_ul, input_ng,
                      input_genomes), by = "dlms_dna_number") |>
+    
   left_join(kapa_data_collated |>
               select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
             by = "shallow_sample_id")
-
-compare_results[compare_results$dlms_dna_number == 23032086, "path_block_manual_check"] <- "pathology blocks match"
-compare_results[compare_results$dlms_dna_number == 23032088, "path_block_manual_check"] <- "pathology blocks match"
-compare_results[compare_results$dlms_dna_number == 23031639, "path_block_manual_check"] <- "pathology blocks match"
 
 ##################################################
 # Repeat Testing Plots - Inter Run Variation
