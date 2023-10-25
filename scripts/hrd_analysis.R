@@ -738,26 +738,7 @@ merge_plot <- ggpubr::ggarrange(
   seqon_v_approximation_plot,
   myriad_v_approximation_plot
 )
-
-
-ggplot(compare_results, aes(lga, lpc)) +
-  geom_point(aes(colour = seqone_hrd_status)) +
-  scale_colour_manual(values = c(safe_blue, safe_red)) +
-  theme_bw() +
-  # Vertical lines
-  geom_segment(aes(x = 18, y = 0, xend = 18, yend = 4), linetype = "dashed") +
-  geom_segment(aes(x = 17, y = 4, xend = 17, yend = 9), linetype = "dashed") +
-  geom_segment(aes(x = 16, y = 9, xend = 16, yend = 13), linetype = "dashed") +
-  geom_segment(aes(x = 15, y = 13, xend = 15, yend = 18), linetype = "dashed") +
-  geom_segment(aes(x = 14, y = 18, xend = 14, yend = 23), linetype = "dashed") +
-  geom_segment(aes(x = 13, y = 23, xend = 13, yend = 28), linetype = "dashed") +
-  # Horizontal lines
-  geom_segment(aes(x = 18, y = 4, xend = 17, yend = 4), linetype = "dashed") +
-  geom_segment(aes(x = 17, y = 9, xend = 16, yend = 9), linetype = "dashed") +
-  geom_segment(aes(x = 16, y = 13, xend = 15, yend = 13), linetype = "dashed") +
-  geom_segment(aes(x = 15, y = 18, xend = 14, yend = 18), linetype = "dashed") +
-  geom_segment(aes(x = 14, y = 23, xend = 13, yend = 23), linetype = "dashed")
-
+  
 # Seraseq controls ------------------------------------------------------------------
 
 seraseq_control_data <- compare_results |>
@@ -1274,3 +1255,102 @@ for_volume_check <- compare_results |>
   arrange(dlms_dna_number)
 
 export_timestamp(hrd_output_path, for_volume_check)
+
+# SeqOne amended results ------------------------------------------------------------
+
+seqone_amended <- read_excel(path = 
+                               paste0(hrd_data_path,
+                                      "SeqOne_Manchester Amended Results 241023.xlsx")) |> 
+  janitor::clean_names() |> 
+  rename(shallow_sample_id = sample,
+         seqone_hrd_status_amended = amended_seq_one_hrd_status,
+         lga_amended  = lga,
+         lpc_amended = lpc)
+
+seqone_comparison <- compare_results |>
+  left_join(
+    seqone_amended |>
+      select(
+        shallow_sample_id, seqone_hrd_status_amended,
+        lga_amended, lpc_amended
+      ),
+    by = "shallow_sample_id"
+  ) |>
+  mutate(change_in_status = case_when(
+    seqone_hrd_status == seqone_hrd_status_amended ~ "No change",
+    seqone_hrd_status != seqone_hrd_status_amended ~ "Change"
+  ))
+
+seqone_myriad_plot <- seqone_comparison |> 
+  filter(path_block_manual_check == "pathology blocks match") |> 
+  ggplot(aes(seqone_hrd_status, myriad_hrd_status)) +
+  geom_jitter(size = 3, alpha = 0.6, 
+              width = 0.2, height = 0.2) +
+  theme_bw() +
+  labs(title = "Comparison of SeqOne original results with Myriad",
+       subtitle = "9 discrepant results")
+
+seqone_amended_myriad_plot <- seqone_comparison |> 
+  filter(path_block_manual_check == "pathology blocks match") |> 
+  ggplot(aes(seqone_hrd_status_amended, myriad_hrd_status)) +
+  geom_jitter(size = 3, alpha = 0.6, 
+              width = 0.2, height = 0.2) +
+  theme_bw() +
+  labs(title = "Comparison of SeqOne amended results with Myriad",
+       subtitle = "False positive is sample 23016526: 2.2ng/ul and 0.47x coverage")
+
+ggarrange(seqone_myriad_plot, seqone_amended_myriad_plot, nrow = 1)
+
+line_df <- data.frame(x =    c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
+                      y =    c( 0,  4,  9, 13, 18, 23,  4,  9, 13, 18, 23),
+                      xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
+                      yend = c( 4,  9, 13, 18, 23, 28, 4,   9, 13, 18, 23)
+)
+
+lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
+  geom_point(aes(colour = seqone_hrd_status),
+             size = 3) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  geom_segment(data = line_df,
+               mapping = aes(x = x, y = y, xend = xend, yend = yend),
+               linetype = "dashed") +
+  labs(title = "Original pipeline",
+       subtitle =  "CCNE1 and RAD51B included")
+
+
+lga_vs_lpc_amended <- ggplot(seqone_comparison, aes(lga_amended, lpc_amended)) +
+  geom_point(aes(colour = seqone_hrd_status_amended),
+             size = 3) +
+  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  geom_segment(data = line_df,
+               mapping = aes(x = x, y = y, xend = xend, yend = yend),
+               linetype = "dashed") +
+  labs(title = "New pipeline",
+       subtitle =  "CCNE1 and RAD51B removed, QC step added")
+
+ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
+          nrow = 1)
+
+lga_plot <- ggplot(seqone_comparison, aes(lga_amended, lga)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = "Large genomic alterations") +
+  ylim(0, 45) +
+  xlim(0, 45)
+
+lpc_plot <- ggplot(seqone_comparison, aes(lpc_amended, lpc)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = "Loss of parental copy") +
+  ylim(0, 45) +
+  xlim(0, 45)
+
+ggarrange(lga_plot, lpc_plot, nrow = 1)
