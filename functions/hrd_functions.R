@@ -1,6 +1,4 @@
-################################################################################
 # HRD Project Functions
-################################################################################
 
 source("scripts/hrd_filepaths.R")
 
@@ -8,9 +6,8 @@ library(pdftools)
 library(tidyverse)
 library(assertthat)
 
-##################################################
-# CSV Timestamp
-##################################################
+
+# CSV timestamp ---------------------------------------------------------------------
 
 export_timestamp <- function(filepath, input) {
   write.csv(input,
@@ -24,9 +21,7 @@ export_timestamp <- function(filepath, input) {
   )
 }
 
-##################################################
-# Plot Functions
-##################################################
+
 
 safe_colorblind_palette <- c(
   "#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499",
@@ -77,9 +72,11 @@ make_individual_plot <- function(input_sample) {
 }
 
 circle_individual_point <- function(dna_input) {
+  results <- results_for_path_block_plot
+
   output_plot <- path_block_plot +
     geom_point(
-      data = results_for_path_block_plot[results_for_path_block_plot$dlms_dna_number == dna_input, ],
+      data = results[results$dlms_dna_number == dna_input, ],
       aes(myriad_gi_score, seqone_hrd_score),
       pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
     )
@@ -87,9 +84,7 @@ circle_individual_point <- function(dna_input) {
   return(output_plot)
 }
 
-##################################################
-# Table Functions
-##################################################
+# Table functions -------------------------------------------------------------------
 
 get_sample_summary_info <- function(input_dna_no) {
   output <- compare_results |>
@@ -126,13 +121,13 @@ extract_kapa_data <- function(worksheet_number, worksheet_length) {
   return(output)
 }
 
-##################################################
-# PDF Functions
-##################################################
+
+# PDF functions ---------------------------------------------------------------------
 
 check_na <- function(input_table) {
-  assert_that(sum(is.na(input_table)) == 0, 
-              msg = paste0("NA values present: file ", file))
+  assert_that(sum(is.na(input_table)) == 0,
+    msg = paste0("NA values present: file ", file)
+  )
 }
 
 
@@ -207,13 +202,13 @@ read_myriad_report <- function(filepath, file) {
     replacement = "\\1"
   ))
 
-  assert_that(is.na(myriad_gi_score) == FALSE, 
-              msg = paste0("GI score is NA: file ", file))
-  
+  assert_that(is.na(myriad_gi_score) == FALSE,
+    msg = paste0("GI score is NA: file ", file)
+  )
+
   assert_that(myriad_gi_score >= 0, myriad_gi_score <= 100, msg = paste0(
-    
-    "GI score outside 0-100 range: file ", file)
-    )
+    "GI score outside 0-100 range: file ", file
+  ))
 
   myriad_hrd_status <- sub(
     x = page2,
@@ -222,10 +217,8 @@ read_myriad_report <- function(filepath, file) {
   )
 
   assert_that(myriad_hrd_status %in% c("POSITIVE", "NEGATIVE"),
-              
-              msg = paste0("Error in HRD status; file ", file)
-              
-              )
+    msg = paste0("Error in HRD status; file ", file)
+  )
 
   myriad_brca_status <- sub(
     x = page2,
@@ -272,33 +265,51 @@ read_seqone_report <- function(filepath, file) {
   ))
 
   assert_that(is.na(seqone_hrd_score) == FALSE,
-              msg = paste0("Seqone HRD score is NA: file", file))
-  
-  assert_that(seqone_hrd_score >= 0, seqone_hrd_score <= 1, msg = "SeqOne HRD score outside 0-1 range")
+    msg = paste0("Seqone HRD score is NA: file", file)
+  )
+
+  assert_that(seqone_hrd_score >= 0, seqone_hrd_score <= 1,
+    msg = "SeqOne HRD score outside 0-1 range"
+  )
 
   seqone_hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
 
-  assert_that(seqone_hrd_status %in% c("POSITIVE", "NEGATIVE"), msg = "SeqOne HRD score not dichotomous")
+  assert_that(seqone_hrd_status %in% c("POSITIVE", "NEGATIVE"),
+    msg = "SeqOne HRD score not dichotomous"
+  )
 
   lga <- as.numeric(grep_seqone_text(".+LGA Status.{38}(\\d{1,2}).+", page_1))
 
   lpc <- as.numeric(grep_seqone_text(".+LPC Status.{38}(\\d{1,2}).+", page_1))
 
-  ccne1 <- as.numeric(grep_seqone_text(".+CCNE1 Amplification.{29}((\\d{1}.\\d{2})|\\d{1}).+", page_1))
+  ccne1 <- as.numeric(grep_seqone_text(
+    ".+CCNE1 Amplification.{29}((\\d{1}.\\d{2})|\\d{1}).+", page_1
+  ))
 
-  rad51b <- as.numeric(grep_seqone_text(".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}|\\d{1}).+", page_1))
+  rad51b <- as.numeric(grep_seqone_text(
+    ".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}|\\d{1}).+", page_1
+  ))
 
-  seqone_ncc <- as.numeric(grep_seqone_text(".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1))
+  seqone_ncc <- as.numeric(grep_seqone_text(
+    ".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1
+  ))
 
   assert_that(seqone_ncc >= 20, seqone_ncc <= 100)
 
-  coverage <- as.numeric(grep_seqone_text(".+Coverage\\s{33,34}(.{1,4})X.+", page_1))
+  coverage <- as.numeric(grep_seqone_text(
+    ".+Coverage\\s{33,34}(.{1,4})X.+", page_1
+  ))
 
-  percent_mapping <- as.numeric(grep_seqone_text(".+% correct mapping.{24,25}((\\d{2}.\\d{1})|(\\d{2}))%.+", page_1))
+  percent_mapping <- as.numeric(grep_seqone_text(
+    ".+% correct mapping.{24,25}((\\d{2}.\\d{1})|(\\d{2}))%.+", page_1
+  ))
 
   assert_that(percent_mapping >= 0, percent_mapping <= 100)
 
-  shallow_sample_id <- trimws(grep_seqone_text(".+Shallow sample ID\\s{15,18}(WS\\d{6}_.{8,26}).+", page_1),
+  shallow_sample_id <- trimws(
+    grep_seqone_text(
+      ".+Shallow sample ID\\s{15,18}(WS\\d{6}_.{8,26}).+", page_1
+    ),
     which = "right"
   )
 
@@ -348,9 +359,7 @@ read_seqone_report <- function(filepath, file) {
   return(output)
 }
 
-##################################################
-# Collation Functions
-##################################################
+# Collation functions ---------------------------------------------------------------
 
 collate_myriad_reports <- function() {
   myriad_report_files <- list.files(myriad_reports_location)
@@ -398,5 +407,3 @@ collate_seqone_reports <- function() {
 
   return(output)
 }
-
-##################################################
