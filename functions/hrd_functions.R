@@ -131,7 +131,8 @@ extract_kapa_data <- function(worksheet_number, worksheet_length) {
 ##################################################
 
 check_na <- function(input_table) {
-  assert_that(sum(is.na(input_table)) == 0, msg = "NA values present")
+  assert_that(sum(is.na(input_table)) == 0, 
+              msg = paste0("NA values present: file ", file))
 }
 
 
@@ -206,7 +207,13 @@ read_myriad_report <- function(filepath, file) {
     replacement = "\\1"
   ))
 
-  assert_that(myriad_gi_score >= 0, myriad_gi_score <= 100, msg = "GI score outside 0-100 range")
+  assert_that(is.na(myriad_gi_score) == FALSE, 
+              msg = paste0("GI score is NA: file ", file))
+  
+  assert_that(myriad_gi_score >= 0, myriad_gi_score <= 100, msg = paste0(
+    
+    "GI score outside 0-100 range: file ", file)
+    )
 
   myriad_hrd_status <- sub(
     x = page2,
@@ -214,14 +221,17 @@ read_myriad_report <- function(filepath, file) {
     replacement = "\\1"
   )
 
-  assert_that(myriad_hrd_status %in% c("POSITIVE", "NEGATIVE"))
+  assert_that(myriad_hrd_status %in% c("POSITIVE", "NEGATIVE"),
+              
+              msg = paste0("Error in HRD status; file ", file)
+              
+              )
 
   myriad_brca_status <- sub(
     x = page2,
     pattern = ".+Tumor Mutation BRCA1/BRCA2 Status:.(\\D{8}).+",
     replacement = "\\1"
   )
-
 
   output <- data.frame(
     "myriad_r_number" = myriad_r_number,
@@ -261,6 +271,9 @@ read_seqone_report <- function(filepath, file) {
     page_1
   ))
 
+  assert_that(is.na(seqone_hrd_score) == FALSE,
+              msg = paste0("Seqone HRD score is NA: file", file))
+  
   assert_that(seqone_hrd_score >= 0, seqone_hrd_score <= 1, msg = "SeqOne HRD score outside 0-1 range")
 
   seqone_hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
