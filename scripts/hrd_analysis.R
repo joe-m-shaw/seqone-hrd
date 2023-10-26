@@ -1272,7 +1272,7 @@ seqone_comparison <- compare_results |>
     seqone_amended |>
       select(
         shallow_sample_id, seqone_hrd_status_amended,
-        lga_amended, lpc_amended
+        lga_amended, lpc_amended, low_tumor_fraction_returns_a_warning_only
       ),
     by = "shallow_sample_id"
   ) |>
@@ -1354,3 +1354,13 @@ lpc_plot <- ggplot(seqone_comparison, aes(lpc_amended, lpc)) +
   xlim(0, 45)
 
 ggarrange(lga_plot, lpc_plot, nrow = 1)
+
+seqone_comparison |> 
+  filter(seqone_hrd_status_amended == "NON-CONCLUSIVE") |> 
+  select(shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
+         low_tumor_fraction_returns_a_warning_only) |>  view()
+
+seqone_comparison |> 
+  filter(low_tumor_fraction_returns_a_warning_only == "YES") |> 
+  select(shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
+         low_tumor_fraction_returns_a_warning_only) |>  view()
