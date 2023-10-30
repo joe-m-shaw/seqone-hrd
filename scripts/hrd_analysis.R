@@ -233,6 +233,8 @@ consistent_text <- "Seqone HRD status consistent with Myriad"
 
 inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
 
+inconclusive_text <- "SeqOne HRD status inconclusive"
+
 compare_results <- seqone_mod |>
   left_join(collated_myriad_info_mod, by = "nhs_number") |>
   left_join(path_block_check, by = "dlms_dna_number") |>
@@ -783,39 +785,6 @@ collated_myriad_info_mod |>
   theme(axis.text.x = element_blank()) +
   geom_hline(yintercept = 42, linetype = "dashed")
 
-# Sensitivity and specificity -------------------------------------------------------
-
-data_for_sensitivity_calc <- compare_results |>
-  filter(path_block_manual_check == "pathology blocks match")
-
-true_positives <- nrow(data_for_sensitivity_calc |>
-  filter(seqone_hrd_status == "POSITIVE" &
-    hrd_status_check == "Seqone HRD status consistent with Myriad"))
-
-
-true_negatives <- nrow(data_for_sensitivity_calc |>
-  filter(seqone_hrd_status == "NEGATIVE" &
-    hrd_status_check == "Seqone HRD status consistent with Myriad"))
-
-false_positives <- nrow(data_for_sensitivity_calc |>
-  filter(seqone_hrd_status == "POSITIVE" &
-    hrd_status_check == "Seqone HRD status NOT consistent with Myriad"))
-
-false_negatives <- nrow(data_for_sensitivity_calc |>
-  filter(seqone_hrd_status == "NEGATIVE" &
-    hrd_status_check == "Seqone HRD status NOT consistent with Myriad"))
-
-
-data_table <- as.table(matrix(
-  c(
-    true_positives, false_positives,
-    false_negatives, true_negatives
-  ),
-  nrow = 2, byrow = TRUE
-))
-
-data_results <- epiR::epi.tests(data_table, conf.level = 0.95)
-
 # QC metrics ------------------------------------------------------------------------
 
 # Million reads
@@ -1278,8 +1247,20 @@ seqone_comparison <- compare_results |>
   ) |>
   mutate(change_in_status = case_when(
     seqone_hrd_status == seqone_hrd_status_amended ~ "No change",
-    seqone_hrd_status != seqone_hrd_status_amended ~ "Change"
-  ))
+    seqone_hrd_status != seqone_hrd_status_amended ~ "Change"),
+    
+    hrd_status_check_amended = case_when(
+      myriad_hrd_status == seqone_hrd_status_amended &
+        seqone_hrd_status_amended !="NON-CONCLUSIVE"~consistent_text,
+      
+      myriad_hrd_status != seqone_hrd_status_amended &
+        seqone_hrd_status_amended !="NON-CONCLUSIVE" ~inconsistent_text,
+      
+      myriad_hrd_status != seqone_hrd_status_amended &
+        seqone_hrd_status_amended =="NON-CONCLUSIVE" ~inconclusive_text,
+      
+      TRUE ~ "other"
+    ))
 
 seqone_myriad_plot <- seqone_comparison |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
@@ -1364,3 +1345,97 @@ seqone_comparison |>
   filter(low_tumor_fraction_returns_a_warning_only == "YES") |> 
   select(shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
          low_tumor_fraction_returns_a_warning_only) |>  view()
+
+# Sensitivity and specificity -------------------------------------------------------
+
+perform_sensitivity_calcs <- function(input_table) {
+  
+  required_columns <- c("seqone_hrd_status_amended", "hrd_status_check_amended",
+                        "myriad_hrd_status")
+  
+  stopifnot(required_columns %in% colnames(input_table))
+  
+  input_table_mod <- input_table |> 
+    mutate(
+    
+    category = case_when(
+      
+      seqone_hrd_status_amended == "POSITIVE" &
+        hrd_status_check_amended == consistent_text ~"true positive",
+      
+      seqone_hrd_status_amended == "NEGATIVE" &
+        hrd_status_check_amended == consistent_text ~"true negative",
+      
+      seqone_hrd_status_amended == "POSITIVE" &
+        hrd_status_check_amended == inconsistent_text ~"false positive",
+      
+      seqone_hrd_status_amended == "NEGATIVE" &
+        hrd_status_check_amended == inconsistent_text ~"false negative",
+      
+      seqone_hrd_status_amended == "NON-CONCLUSIVE" &
+        myriad_hrd_status == "POSITIVE" ~"inconclusive positive",
+      
+      seqone_hrd_status_amended == "NON-CONCLUSIVE" &
+        myriad_hrd_status == "NEGATIVE" ~"inconclusive negative"
+    )
+    
+  )
+  
+  counts <- input_table_mod |> 
+    count(category)
+  
+  true_positives <- sum(input_table_mod$category == "true positive")
+  
+  true_negatives <- sum(input_table_mod$category == "true negative")
+  
+  false_negatives <- sum(input_table_mod$category == "false negative")
+  
+  false_positives <- sum(input_table_mod$category == "false positive")
+  
+  inconclusive_negatives <- sum(input_table_mod$category == "inconclusive negative")
+  
+  inconclusive_positives <- sum(input_table_mod$category == "inconclusive positive")
+  
+  overall_stats <- tribble(
+    
+    ~col, ~seqone_positive, ~seqone_negative, ~seqone_inconclusive,
+    "myriad_positive", true_positives, false_negatives, inconclusive_positives,
+    "myriad_negative", false_positives, true_negatives, inconclusive_negatives
+  )
+  
+  results_minus_inconclusives <- sum(true_positives, true_negatives, 
+                                     false_positives, false_negatives)
+  
+  opa <- ((true_positives + true_negatives) / results_minus_inconclusives) * 100
+  
+  sensitivity <- (true_positives / sum(true_positives, false_positives)) * 100
+  
+  specificity <- (true_negatives / sum(true_negatives, false_negatives)) * 100
+  
+  samples <- length(unique(data_for_sensitivity_calc$dlms_dna_number))
+  
+  dna_inputs <- sum(true_positives, true_negatives, 
+                    false_positives, false_negatives,
+                    inconclusive_negatives, inconclusive_positives)
+  
+  print(overall_stats)
+  
+  print(paste0("OPA = ", round(opa, 2), "%"))
+  
+  print(paste0("Sensitivity = ", round(sensitivity, 2), "%"))
+  
+  print(paste0("Specificity = ", round(specificity, 2), "%"))
+  
+  print(paste0("DNA inputs: ", dna_inputs))
+  
+  print(paste0("Unique samples = ", samples))
+  
+}
+
+perform_sensitivity_calcs(seqone_comparison |>
+                            filter(path_block_manual_check == "pathology blocks match"))
+
+perform_sensitivity_calcs(seqone_comparison |>
+                            filter(path_block_manual_check == "pathology blocks match" &
+                                     input_ng > 49 & 
+                                     coverage.x >= 0.5))
