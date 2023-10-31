@@ -131,10 +131,10 @@ check_na <- function(input_table) {
 }
 
 
-read_myriad_report <- function(filepath, file) {
+read_myriad_report <- function(file) {
   # Use pdf_text to read PDF as a single string per page
 
-  myriad_report_text <- pdftools::pdf_text(pdf = paste0(filepath, file))
+  myriad_report_text <- pdftools::pdf_text(pdf = file)
 
   page1 <- myriad_report_text[[1]]
 
@@ -243,11 +243,11 @@ read_myriad_report <- function(filepath, file) {
   gi_score_double <- parse_number(gi_score_char)
 
   assert_that(is.na(gi_score_double) == FALSE,
-    msg = paste0("GI score is NA: file ", file)
+    msg = paste0("GI score is NA: file ", basename(file))
   )
 
   assert_that(gi_score_double >= 0, gi_score_double <= 100, msg = paste0(
-    "GI score outside 0-100 range: file ", file
+    "GI score outside 0-100 range: file ", basename(file)
   ))
 
   # HRD status
@@ -284,7 +284,7 @@ read_myriad_report <- function(filepath, file) {
     "myriad_gi_score" = gi_score_double,
     "myriad_hrd_status" = myriad_hrd_status,
     "myriad_brca_status" = myriad_brca_status,
-    "myriad_filename" = file
+    "myriad_filename" = basename(file)
   )
 
   check_na(output)
@@ -519,25 +519,6 @@ read_seqone_report <- function(filepath, file) {
 }
 
 # Collation functions ---------------------------------------------------------------
-
-collate_myriad_reports <- function() {
-  myriad_report_files <- list.files(myriad_reports_location)
-
-  output <- data.frame()
-
-  for (i in myriad_report_files) {
-    tmp_output <- read_myriad_report(myriad_reports_location, i)
-
-    output <- rbind(output, tmp_output)
-
-    rm(tmp_output)
-  }
-
-  # Check all files included
-  stopifnot(setdiff(myriad_report_files, output$myriad_filename) == 0)
-
-  return(output)
-}
 
 collate_seqone_reports <- function() {
   seqone_reports <- list.files(seqone_report_location)

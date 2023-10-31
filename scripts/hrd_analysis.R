@@ -1,25 +1,37 @@
 # Homologous Recombination Deficiency Validation: Analysis
 # joseph.shaw3@nhs.net
 
+# Setup -----------------------------------------------------------------------------
+
 rm(list = ls())
 
-
-# Packages and filepaths ------------------------------------------------------------
+## Packages and filepaths -----------------------------------------------------------
 
 library("ggpubr")
 library("readxl")
 library("epiR")
 
-# Source scripts and collate data ---------------------------------------------------
+## DLMS connection and functions ----------------------------------------------------
 
 source("scripts/dlms_connection.R")
 source("functions/hrd_functions.R")
 
-collated_myriad_info <- collate_myriad_reports()
+# Collate data ----------------------------------------------------------------------
+
+## Source scripts and collate data --------------------------------------------------
+
+myriad_report_files <- list.files(myriad_reports_location, full.names = TRUE)
+
+collated_myriad_info <- myriad_report_files |> 
+  map(read_myriad_report) |> 
+  list_rbind()
+
+# Check all files included
+stopifnot(setdiff(basename(myriad_report_files), collated_myriad_info$myriad_filename) == 0)
 
 collated_seqone_info <- collate_seqone_reports()
 
-# Edit Myriad information -----------------------------------------------------------
+## Edit Myriad information ----------------------------------------------------------
 
 # pdf_text doesn't work on these reports as resolution is too low.
 # I had to collate data manually in an Excel
@@ -37,7 +49,7 @@ collated_myriad_info_mod <- rbind(
     select(-dlms_dna_number)
 )
 
-# Pathology block ID check ----------------------------------------------------------
+## Pathology block ID check ---------------------------------------------------------
 
 # Extract data from DLMS via ODBC
 seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) |>
@@ -63,8 +75,9 @@ seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) |>
     )
   )
 
-stopifnot(setdiff(seqone_dlms_info$dlms_dna_number, 
-                  collated_seqone_info$dlms_dna_number) == 0)
+stopifnot(setdiff(
+  seqone_dlms_info$dlms_dna_number,
+  collated_seqone_info$dlms_dna_number) == 0)
 
 # Enter a fake NHS number for the Seraseq and Biobank controls, to allow
 # Myriad scores to be joined later, and to keep Biobank controls within the
@@ -95,13 +108,16 @@ export_timestamp(hrd_data_path, export_for_check)
 # Writing of pathology block IDs is inconsistent, so a manual check is required
 # Seraseq controls classified as "pathology blocks match"
 
-path_block_check <- read_csv(paste0(hrd_data_path, 
-                                    "2023_10_24_14_10_20_export_for_check_edit.csv"),
+path_block_check <- read_csv(
+  paste0(
+    hrd_data_path,
+    "2023_10_24_14_10_20_export_for_check_edit.csv"
+  ),
   show_col_types = FALSE
 ) |>
   select(dlms_dna_number, path_block_manual_check)
 
-# Initial DNA concentrations --------------------------------------------------------
+## Initial DNA concentrations -------------------------------------------------------
 
 dna_concentrations <- read_excel(
   path = paste0(hrd_data_path, "HS2_sample_prep_export.xlsx"),
@@ -139,8 +155,8 @@ dna_concentrations_mod <- dna_concentrations |>
         dna_concentrations$comments, value = TRUE
       )),
       qubit_dna_ul,
-      round((dilution_dna_volume * qubit_dna_ul) / 
-              (dilution_water_volume + dilution_dna_volume), 2)
+      round((dilution_dna_volume * qubit_dna_ul) /
+        (dilution_water_volume + dilution_dna_volume), 2)
     ),
 
     # 15ul of diluted or neat (undiluted) DNA used in fragmentation reaction
@@ -156,7 +172,7 @@ dna_concentrations_mod <- dna_concentrations |>
   # and dilution volumes
   filter(!base::duplicated(dlms_dna_number))
 
-# qPCR library QC -------------------------------------------------------------------
+## qPCR library QC ------------------------------------------------------------------
 
 tech_team <- "S:/central shared/Genetics/Repository/Technical Teams/"
 
@@ -184,10 +200,12 @@ kapa_data_collated <- rbind(
   extract_kapa_data("135001", 31)
 )
 
-# SeqOne QC data --------------------------------------------------------------------
+## SeqOne QC data -------------------------------------------------------------------
 
-seqone_qc_data <- read_excel(paste0(hrd_data_path, 
-                                    "seqone_qc_metrics/seqone_qc_metrics_2023_10_03.xlsx")) |>
+seqone_qc_data <- read_excel(paste0(
+  hrd_data_path,
+  "seqone_qc_metrics/seqone_qc_metrics_2023_10_03.xlsx"
+)) |>
   janitor::clean_names() |>
   dplyr::rename(
     shallow_sample_id = sample,
@@ -196,15 +214,30 @@ seqone_qc_data <- read_excel(paste0(hrd_data_path,
     million_reads = m_reads
   )
 
-# Compare SeqOne and Myriad results -------------------------------------------------
+## Amended SeqOne scores ------------------------------------------------------------
+
+seqone_amended <- read_excel(
+  path =
+    paste0(
+      hrd_data_path,
+      "SeqOne_Manchester Amended Results 241023.xlsx"
+    )
+) |>
+  janitor::clean_names() |>
+  rename(
+    shallow_sample_id = sample,
+    seqone_hrd_status_amended = amended_seq_one_hrd_status,
+    lga_amended = lga,
+    lpc_amended = lpc
+  )
+
+
+## Edit SeqOne information ----------------------------------------------------------
 
 seqone_mod <- collated_seqone_info |>
   # Analysis on September 1st and before was previous pipeline version
 
-  filter(!date %in% c(
-    "September 1, 2023", "August 31, 2023",
-    "August 24, 2023", "August 25, 2023"
-  )) |>
+  filter(date > "2023-09-01") |>
   left_join(
     seqone_dlms_info |>
       select(
@@ -228,6 +261,8 @@ seqone_mod <- collated_seqone_info |>
     )
   ) |>
   left_join(seqone_qc_data, by = "shallow_sample_id")
+
+## Join data tables together --------------------------------------------------------
 
 consistent_text <- "Seqone HRD status consistent with Myriad"
 
@@ -253,10 +288,34 @@ compare_results <- seqone_mod |>
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
     by = "shallow_sample_id"
+  ) |>
+  left_join(
+    seqone_amended |>
+      select(
+        shallow_sample_id, seqone_hrd_status_amended,
+        lga_amended, lpc_amended, low_tumor_fraction_returns_a_warning_only
+      ),
+    by = "shallow_sample_id"
+  ) |>
+  mutate(
+    change_in_status = case_when(
+      seqone_hrd_status == seqone_hrd_status_amended ~ "No change",
+      seqone_hrd_status != seqone_hrd_status_amended ~ "Change"
+    ),
+    hrd_status_check_amended = case_when(
+      myriad_hrd_status == seqone_hrd_status_amended &
+        seqone_hrd_status_amended != "NON-CONCLUSIVE" ~ consistent_text,
+      myriad_hrd_status != seqone_hrd_status_amended &
+        seqone_hrd_status_amended != "NON-CONCLUSIVE" ~ inconsistent_text,
+      myriad_hrd_status != seqone_hrd_status_amended &
+        seqone_hrd_status_amended == "NON-CONCLUSIVE" ~ inconclusive_text,
+      TRUE ~ "other"
+    )
   )
 
+# Analyse Data ----------------------------------------------------------------------
 
-# Repeat testing plots - inter run variation ----------------------------------------
+## Inter run variation --------------------------------------------------------------
 
 repeat_results <- compare_results |>
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
@@ -302,7 +361,7 @@ sample_23032088_plot <- make_individual_plot(23032088)
 
 sample_21013520_plot <- make_individual_plot(21013520)
 
-# Intra-run variation ---------------------------------------------------------------
+## Intra-run variation --------------------------------------------------------------
 
 intra_run_plot <- compare_results |>
   filter(worksheet == "WS133557") |>
@@ -323,7 +382,7 @@ intra_run_plot <- compare_results |>
 
 save_hrd_plot(intra_run_plot, input_width = 10, input_height = 10)
 
-# Repeat testing summaries ----------------------------------------------------------
+## Repeat testing summaries ---------------------------------------------------------
 
 summary_21013520 <- get_sample_summary_info(21013520)
 
@@ -341,7 +400,7 @@ summary_21011999 <- get_sample_summary_info(21011999)
 
 export_timestamp(hrd_output_path, summary_21011999)
 
-# Compare results of mid output run - WS134928 --------------------------------------
+## Compare results of mid output run - WS134928 -------------------------------------
 
 mid_output_run <- seqone_mod |>
   filter(worksheet == "WS134928")
@@ -387,7 +446,7 @@ ggplot(
     caption = "Plot name: WS134928_WS134687_plot"
   )
 
-# HRD status comparison with Myriad -------------------------------------------------
+## HRD status comparison with Myriad ------------------------------------------------
 
 comparison_summary <- compare_results |>
   filter(!is.na(myriad_gi_score) & myriad_gi_score != "NA") |>
@@ -411,7 +470,7 @@ myriad_comparison_plot <- ggplot(comparison_summary, aes(
   facet_wrap(~path_block_manual_check) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-# Impact of pathology blocks --------------------------------------------------------
+## Impact of pathology blocks -------------------------------------------------------
 
 results_for_path_block_plot <- compare_results |>
   filter(path_block_manual_check != "NA" & !is.na(myriad_gi_score))
@@ -472,8 +531,10 @@ ggplot(
     x = "Myriad Genome Instability Score",
     y = "SeqOne HRD Score",
     title = "Comparison of Myriad vs SeqOne HRD Testing",
-    subtitle = paste0("Data for ", nrow(high_quality_results), 
-                      " DNA inputs: path blocks match, >=49ng input, >=1x coverage")
+    subtitle = paste0(
+      "Data for ", nrow(high_quality_results),
+      " DNA inputs: path blocks match, >=49ng input, >=1x coverage"
+    )
   ) +
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.1) +
   theme_bw() +
@@ -542,7 +603,7 @@ ggplot(
   ggpubr::stat_cor(method = "pearson", label.x = 50, label.y = 0.25) +
   labs(title = "DNA samples with lower than 50ng input")
 
-# Individual discrepant samples -----------------------------------------------------
+## Individual discrepant samples ----------------------------------------------------
 
 # Sample 23034142
 red_circle_23034142 <- circle_individual_point(23034142)
@@ -591,7 +652,7 @@ coverage_plot <- compare_results |>
   ) +
   facet_wrap(~path_block_manual_check)
 
-# Export tables ---------------------------------------------------------------------
+## Export tables --------------------------------------------------------------------
 
 inconsistent_summary <- compare_results |>
   filter(hrd_status_check == "Seqone HRD status NOT consistent with Myriad") |>
@@ -618,7 +679,7 @@ results_patient_ids_removed <- compare_results |>
 
 export_timestamp(hrd_output_path, results_patient_ids_removed)
 
-# Impact of read length -------------------------------------------------------------
+## Impact of read length ------------------------------------------------------------
 
 compare_results |>
   filter(downsampled == "No" & path_block_manual_check != "NA") |>
@@ -633,7 +694,7 @@ compare_results |>
   ) +
   facet_wrap(~path_block_manual_check)
 
-# Comparison with SeqOne simplified model -------------------------------------------
+## Comparison with SeqOne simplified model ------------------------------------------
 
 simplified_model <- compare_results |>
   filter(!is.na(myriad_brca_status)) |>
@@ -740,8 +801,8 @@ merge_plot <- ggpubr::ggarrange(
   seqon_v_approximation_plot,
   myriad_v_approximation_plot
 )
-  
-# Seraseq controls ------------------------------------------------------------------
+
+## Seraseq controls -----------------------------------------------------------------
 
 seraseq_control_data <- compare_results |>
   filter(control_type == "Seraseq control") |>
@@ -763,7 +824,7 @@ ggplot(seraseq_control_data, aes(x = seqone_hrd_score, y = insert_size)) +
   geom_vline(xintercept = 0.5, linetype = "dashed") +
   xlim(0, 1)
 
-# Biobank controls ------------------------------------------------------------------
+## Biobank controls -----------------------------------------------------------------
 
 compare_results |>
   filter(surname %in% biobank_names) |>
@@ -773,7 +834,7 @@ compare_results |>
   labs(x = "", y = "SeqOne HRD score") +
   theme_bw()
 
-# Myriad results --------------------------------------------------------------------
+## Myriad results -------------------------------------------------------------------
 
 collated_myriad_info_mod |>
   ggplot(aes(
@@ -785,7 +846,7 @@ collated_myriad_info_mod |>
   theme(axis.text.x = element_blank()) +
   geom_hline(yintercept = 42, linetype = "dashed")
 
-# QC metrics ------------------------------------------------------------------------
+## QC metrics -----------------------------------------------------------------------
 
 # Million reads
 ggplot(compare_results, aes(
@@ -902,7 +963,7 @@ ggplot(compare_results, aes(
     legend.title = element_blank()
   )
 
-# Sample extraction information -----------------------------------------------------
+## Sample extraction information ----------------------------------------------------
 
 # Get tissues
 seqone_tissue_types <- unique(seqone_dlms_info$tissue)
@@ -966,7 +1027,7 @@ ggplot(seqone_dlms_extractions, aes(x = tissue_type, y = )) +
 ggplot(seqone_dlms_extractions, aes(x = run_date, y = concentration)) +
   geom_point()
 
-# Impact of DNA concentration -------------------------------------------------------
+## Impact of DNA concentration ------------------------------------------------------
 
 ggplot(
   compare_results |>
@@ -1020,7 +1081,7 @@ ggplot(
   theme(axis.text.x = element_blank()) +
   labs(x = "")
 
-# Tumour BRCA referral DNA concentrations -------------------------------------------
+## Tumour BRCA referral DNA concentrations ------------------------------------------
 
 brca_query <- "SELECT * FROM MolecularDB.dbo.Samples WHERE DISEASE IN (204)"
 
@@ -1040,8 +1101,8 @@ samples_passing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "Yes", ])
 
 samples_failing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "No", ])
 
-fail_rate <- round((samples_failing_qc / 
-                      (samples_passing_qc + samples_failing_qc)) * 100, 1)
+fail_rate <- round((samples_failing_qc /
+  (samples_passing_qc + samples_failing_qc)) * 100, 1)
 
 ggplot(tbrca_data_mod, aes(x = disease, y = concentration)) +
   geom_boxplot() +
@@ -1050,8 +1111,10 @@ ggplot(tbrca_data_mod, aes(x = disease, y = concentration)) +
   labs(
     y = "DNA concentration (ng/ul)",
     x = "Tumour BRCA referrals",
-    title = paste0("DNA concentrations for ", 
-                   nrow(tbrca_data_mod), " tumour BRCA referrals"),
+    title = paste0(
+      "DNA concentrations for ",
+      nrow(tbrca_data_mod), " tumour BRCA referrals"
+    ),
     subtitle = paste0(
       "Samples below ", dna_qc_threshold, " ng/ul: ", samples_failing_qc,
       " (", fail_rate, "%)"
@@ -1066,7 +1129,7 @@ ggplot(tbrca_data_mod, aes(x = disease, y = concentration)) +
 
 min(tbrca_data_mod$date_in)
 
-# Spread of Myriad GI scores --------------------------------------------------------
+## Spread of Myriad GI scores -------------------------------------------------------
 
 tbrca_data_collection <- read_excel(
   paste0(
@@ -1086,9 +1149,9 @@ tbrca_data_collection_clean <- tbrca_data_collection |>
   mutate(
     gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested),
     brca_mutation_clean = case_when(
-      t_brca_mutation_status %in% 
+      t_brca_mutation_status %in%
         c("Pathogenic BRCA1", "Pathogenic BRCA2") ~ "BRCA positive",
-      t_brca_mutation_status %in% 
+      t_brca_mutation_status %in%
         c("No mutation detected", "no mutation detected") ~ "BRCA negative"
     ),
     borderline = ifelse(gi_score >= 37 & gi_score <= 47, "Yes", "No")
@@ -1148,20 +1211,21 @@ compare_results |>
 
 compare_results |>
   filter(!is.na(seqone_hrd_score)) |>
-  mutate(borderline = ifelse(seqone_hrd_score >= 0.4 & seqone_hrd_score <= 0.6, 
-                             "Yes", "No")) |>
+  mutate(borderline = ifelse(seqone_hrd_score >= 0.4 & seqone_hrd_score <= 0.6,
+    "Yes", "No"
+  )) |>
   group_by(borderline) |>
   summarise(total = n())
 
 11 / (11 + 78)
 
-# Coverage over worksheets ----------------------------------------------------------
+## Coverage over worksheets ---------------------------------------------------------
 
 ggplot(compare_results, aes(x = worksheet, y = coverage.x)) +
   geom_boxplot() +
   ylim(0, 2)
 
-# RAD51B and CCNE1 ------------------------------------------------------------------
+## RAD51B and CCNE1 -----------------------------------------------------------------
 
 ggplot(collated_seqone_info, aes(x = rad51b, y = ccne1)) +
   geom_point() +
@@ -1186,137 +1250,83 @@ ggplot(collated_seqone_info, aes(
   theme_bw() +
   scale_x_continuous(breaks = c(0:10))
 
-# Samples for final run -------------------------------------------------------------
+## SeqOne amended results -----------------------------------------------------------
 
-run4 <- compare_results |>
-  filter(path_block_manual_check == "pathology blocks match" &
-    hrd_status_check == "Seqone HRD status NOT consistent with Myriad") |>
-  select(
-    dlms_dna_number, seqone_hrd_score, myriad_gi_score,
-    lga, lpc, ccne1, rad51b, coverage.x, qubit_dna_ul, input_ng,
-    seqone_hrd_status, myriad_hrd_status
-  )
-
-compare_results |>
-  filter(dlms_dna_number == "23032088") |>
-  ggplot(aes(x = seqone_hrd_score, y = coverage.x)) +
-  geom_point(size = 3, aes(colour = worksheet)) +
-  ylim(0, 2) +
-  xlim(0, 1)
-
-run4_check <- compare_results |>
-  filter(path_block_manual_check == "pathology blocks match" & coverage.x < 1.2) |>
-  select(
-    dlms_dna_number, seqone_hrd_score, myriad_gi_score,
-    lga, lpc, ccne1, rad51b, coverage.x, qubit_dna_ul, input_ng,
-    seqone_hrd_status, myriad_hrd_status, hrd_status_check
-  )
-
-run4_samples <- c(
-  23016516, 23032088, 20127786, 21011999,
-  21013520, 23031639, 23032086
-)
-
-for_volume_check <- compare_results |>
-  filter(dlms_dna_number %in% run4_samples) |>
-  filter(!base::duplicated(dlms_dna_number)) |>
-  select(dlms_dna_number, firstname, surname, qubit_dna_ul) |>
-  arrange(dlms_dna_number)
-
-export_timestamp(hrd_output_path, for_volume_check)
-
-# SeqOne amended results ------------------------------------------------------------
-
-seqone_amended <- read_excel(path = 
-                               paste0(hrd_data_path,
-                                      "SeqOne_Manchester Amended Results 241023.xlsx")) |> 
-  janitor::clean_names() |> 
-  rename(shallow_sample_id = sample,
-         seqone_hrd_status_amended = amended_seq_one_hrd_status,
-         lga_amended  = lga,
-         lpc_amended = lpc)
-
-seqone_comparison <- compare_results |>
-  left_join(
-    seqone_amended |>
-      select(
-        shallow_sample_id, seqone_hrd_status_amended,
-        lga_amended, lpc_amended, low_tumor_fraction_returns_a_warning_only
-      ),
-    by = "shallow_sample_id"
-  ) |>
-  mutate(change_in_status = case_when(
-    seqone_hrd_status == seqone_hrd_status_amended ~ "No change",
-    seqone_hrd_status != seqone_hrd_status_amended ~ "Change"),
-    
-    hrd_status_check_amended = case_when(
-      myriad_hrd_status == seqone_hrd_status_amended &
-        seqone_hrd_status_amended !="NON-CONCLUSIVE"~consistent_text,
-      
-      myriad_hrd_status != seqone_hrd_status_amended &
-        seqone_hrd_status_amended !="NON-CONCLUSIVE" ~inconsistent_text,
-      
-      myriad_hrd_status != seqone_hrd_status_amended &
-        seqone_hrd_status_amended =="NON-CONCLUSIVE" ~inconclusive_text,
-      
-      TRUE ~ "other"
-    ))
-
-seqone_myriad_plot <- seqone_comparison |> 
-  filter(path_block_manual_check == "pathology blocks match") |> 
+seqone_myriad_plot <- compare_results |>
+  filter(path_block_manual_check == "pathology blocks match") |>
   ggplot(aes(seqone_hrd_status, myriad_hrd_status)) +
-  geom_jitter(size = 3, alpha = 0.6, 
-              width = 0.2, height = 0.2) +
+  geom_jitter(
+    size = 3, alpha = 0.6,
+    width = 0.2, height = 0.2
+  ) +
   theme_bw() +
-  labs(title = "Comparison of SeqOne original results with Myriad",
-       subtitle = "9 discrepant results")
+  labs(
+    title = "Comparison of SeqOne original results with Myriad",
+    subtitle = "9 discrepant results"
+  )
 
-seqone_amended_myriad_plot <- seqone_comparison |> 
-  filter(path_block_manual_check == "pathology blocks match") |> 
+seqone_amended_myriad_plot <- compare_results |>
+  filter(path_block_manual_check == "pathology blocks match") |>
   ggplot(aes(seqone_hrd_status_amended, myriad_hrd_status)) +
-  geom_jitter(size = 3, alpha = 0.6, 
-              width = 0.2, height = 0.2) +
+  geom_jitter(
+    size = 3, alpha = 0.6,
+    width = 0.2, height = 0.2
+  ) +
   theme_bw() +
-  labs(title = "Comparison of SeqOne amended results with Myriad",
-       subtitle = "False positive is sample 23016526: 2.2ng/ul and 0.47x coverage")
+  labs(
+    title = "Comparison of SeqOne amended results with Myriad",
+    subtitle = "False positive is sample 23016526: 2.2ng/ul and 0.47x coverage"
+  )
 
 ggarrange(seqone_myriad_plot, seqone_amended_myriad_plot, nrow = 1)
 
-line_df <- data.frame(x =    c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
-                      y =    c( 0,  4,  9, 13, 18, 23,  4,  9, 13, 18, 23),
-                      xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
-                      yend = c( 4,  9, 13, 18, 23, 28, 4,   9, 13, 18, 23)
+line_df <- data.frame(
+  x = c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
+  y = c(0, 4, 9, 13, 18, 23, 4, 9, 13, 18, 23),
+  xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
+  yend = c(4, 9, 13, 18, 23, 28, 4, 9, 13, 18, 23)
 )
 
 lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
   geom_point(aes(colour = seqone_hrd_status),
-             size = 3) +
+    size = 3
+  ) +
   scale_colour_manual(values = c(safe_blue, safe_red)) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  geom_segment(data = line_df,
-               mapping = aes(x = x, y = y, xend = xend, yend = yend),
-               linetype = "dashed") +
-  labs(title = "Original pipeline",
-       subtitle =  "CCNE1 and RAD51B included")
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Original pipeline",
+    subtitle = "CCNE1 and RAD51B included"
+  )
 
 
-lga_vs_lpc_amended <- ggplot(seqone_comparison, aes(lga_amended, lpc_amended)) +
+lga_vs_lpc_amended <- ggplot(compare_results, aes(lga_amended, lpc_amended)) +
   geom_point(aes(colour = seqone_hrd_status_amended),
-             size = 3) +
+    size = 3
+  ) +
   scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  geom_segment(data = line_df,
-               mapping = aes(x = x, y = y, xend = xend, yend = yend),
-               linetype = "dashed") +
-  labs(title = "New pipeline",
-       subtitle =  "CCNE1 and RAD51B removed, QC step added")
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "New pipeline",
+    subtitle = "CCNE1 and RAD51B removed, QC step added"
+  )
 
 ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
-          nrow = 1)
+  nrow = 1
+)
 
-lga_plot <- ggplot(seqone_comparison, aes(lga_amended, lga)) +
+lga_plot <- ggplot(compare_results, aes(lga_amended, lga)) +
   geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
   scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
@@ -1325,7 +1335,7 @@ lga_plot <- ggplot(seqone_comparison, aes(lga_amended, lga)) +
   ylim(0, 45) +
   xlim(0, 45)
 
-lpc_plot <- ggplot(seqone_comparison, aes(lpc_amended, lpc)) +
+lpc_plot <- ggplot(compare_results, aes(lpc_amended, lpc)) +
   geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
   scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
@@ -1336,106 +1346,28 @@ lpc_plot <- ggplot(seqone_comparison, aes(lpc_amended, lpc)) +
 
 ggarrange(lga_plot, lpc_plot, nrow = 1)
 
-seqone_comparison |> 
-  filter(seqone_hrd_status_amended == "NON-CONCLUSIVE") |> 
-  select(shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
-         low_tumor_fraction_returns_a_warning_only) |>  view()
+compare_results |>
+  filter(seqone_hrd_status_amended == "NON-CONCLUSIVE") |>
+  select(
+    shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
+    low_tumor_fraction_returns_a_warning_only
+  ) |>
+  view()
 
-seqone_comparison |> 
-  filter(low_tumor_fraction_returns_a_warning_only == "YES") |> 
-  select(shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
-         low_tumor_fraction_returns_a_warning_only) |>  view()
+compare_results |>
+  filter(low_tumor_fraction_returns_a_warning_only == "YES") |>
+  select(
+    shallow_sample_id, coverage.x, input_ng, seqone_hrd_status_amended,
+    low_tumor_fraction_returns_a_warning_only
+  ) |>
+  view()
 
-# Sensitivity and specificity -------------------------------------------------------
+## Sensitivity and specificity ------------------------------------------------------
 
-perform_sensitivity_calcs <- function(input_table) {
-  
-  required_columns <- c("seqone_hrd_status_amended", "hrd_status_check_amended",
-                        "myriad_hrd_status")
-  
-  stopifnot(required_columns %in% colnames(input_table))
-  
-  input_table_mod <- input_table |> 
-    mutate(
-    
-    category = case_when(
-      
-      seqone_hrd_status_amended == "POSITIVE" &
-        hrd_status_check_amended == consistent_text ~"true positive",
-      
-      seqone_hrd_status_amended == "NEGATIVE" &
-        hrd_status_check_amended == consistent_text ~"true negative",
-      
-      seqone_hrd_status_amended == "POSITIVE" &
-        hrd_status_check_amended == inconsistent_text ~"false positive",
-      
-      seqone_hrd_status_amended == "NEGATIVE" &
-        hrd_status_check_amended == inconsistent_text ~"false negative",
-      
-      seqone_hrd_status_amended == "NON-CONCLUSIVE" &
-        myriad_hrd_status == "POSITIVE" ~"inconclusive positive",
-      
-      seqone_hrd_status_amended == "NON-CONCLUSIVE" &
-        myriad_hrd_status == "NEGATIVE" ~"inconclusive negative"
-    )
-    
-  )
-  
-  counts <- input_table_mod |> 
-    count(category)
-  
-  true_positives <- sum(input_table_mod$category == "true positive")
-  
-  true_negatives <- sum(input_table_mod$category == "true negative")
-  
-  false_negatives <- sum(input_table_mod$category == "false negative")
-  
-  false_positives <- sum(input_table_mod$category == "false positive")
-  
-  inconclusive_negatives <- sum(input_table_mod$category == "inconclusive negative")
-  
-  inconclusive_positives <- sum(input_table_mod$category == "inconclusive positive")
-  
-  overall_stats <- tribble(
-    
-    ~col, ~seqone_positive, ~seqone_negative, ~seqone_inconclusive,
-    "myriad_positive", true_positives, false_negatives, inconclusive_positives,
-    "myriad_negative", false_positives, true_negatives, inconclusive_negatives
-  )
-  
-  results_minus_inconclusives <- sum(true_positives, true_negatives, 
-                                     false_positives, false_negatives)
-  
-  opa <- ((true_positives + true_negatives) / results_minus_inconclusives) * 100
-  
-  sensitivity <- (true_positives / sum(true_positives, false_positives)) * 100
-  
-  specificity <- (true_negatives / sum(true_negatives, false_negatives)) * 100
-  
-  samples <- length(unique(data_for_sensitivity_calc$dlms_dna_number))
-  
-  dna_inputs <- sum(true_positives, true_negatives, 
-                    false_positives, false_negatives,
-                    inconclusive_negatives, inconclusive_positives)
-  
-  print(overall_stats)
-  
-  print(paste0("OPA = ", round(opa, 2), "%"))
-  
-  print(paste0("Sensitivity = ", round(sensitivity, 2), "%"))
-  
-  print(paste0("Specificity = ", round(specificity, 2), "%"))
-  
-  print(paste0("DNA inputs: ", dna_inputs))
-  
-  print(paste0("Unique samples = ", samples))
-  
-}
+perform_sensitivity_calcs(compare_results |>
+  filter(path_block_manual_check == "pathology blocks match"))
 
-perform_sensitivity_calcs(seqone_comparison |>
-                            filter(path_block_manual_check == "pathology blocks match"))
-
-perform_sensitivity_calcs(seqone_comparison |>
-                            filter(path_block_manual_check == "pathology blocks match" &
-                                     input_ng > 49 & 
-                                     coverage.x >= 0.5))
+perform_sensitivity_calcs(compare_results |>
+  filter(path_block_manual_check == "pathology blocks match" &
+    input_ng > 49 &
+    coverage.x >= 0.5))
