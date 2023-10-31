@@ -5,16 +5,21 @@
 
 rm(list = ls())
 
+# Functions -------------------------------------------------------------------------
+
+source("functions/hrd_functions.R")
+
 ## Packages and filepaths -----------------------------------------------------------
 
 library("ggpubr")
 library("readxl")
+library("RODBC")
 library("epiR")
 
-## DLMS connection and functions ----------------------------------------------------
+# DLMS connection -------------------------------------------------------------------
 
-source("scripts/dlms_connection.R")
-source("functions/hrd_functions.R")
+# Connection setup for PC38698
+moldb_connection <- RODBC::odbcConnect(dsn = "moldb")
 
 # Collate data ----------------------------------------------------------------------
 

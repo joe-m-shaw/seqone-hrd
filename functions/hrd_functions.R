@@ -417,6 +417,24 @@ read_seqone_report <- function(file) {
 }
 
 
+# Database functions ----------------------------------------------------------------
+
+get_sample_data <- function(sample_vector) {
+  
+  stopifnot(length(sample_vector) >=1)
+  
+  sample_query <- paste0("SELECT * FROM MolecularDB.dbo.Samples WHERE LABNO IN (",
+                         paste(sample_vector, collapse = ", "),
+                         ")")
+  
+  output_data <- sqlQuery(channel = moldb_connection,
+                          query = sample_query) |> 
+    janitor::clean_names()
+  
+  return(output_data)
+  
+}
+
 # Plot functions --------------------------------------------------------------------
 
 safe_colorblind_palette <- c(
