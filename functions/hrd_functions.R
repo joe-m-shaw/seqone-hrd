@@ -226,6 +226,8 @@ read_myriad_report <- function(filepath, file) {
   
   myriad_pathology_block_pg2 <- str_extract(page2, path_block_2_regex, group = 2)
 
+  # GI score
+  
   gi_score_regex <- regex(
     r"[
     Patient\sGenomic\sInstability\sScore:
@@ -248,6 +250,8 @@ read_myriad_report <- function(filepath, file) {
     "GI score outside 0-100 range: file ", file
   ))
 
+  # HRD status
+  
   hrd_status_regex <- regex(
     r"[
     Myriad\sHRD\sStatus:\s
@@ -258,6 +262,8 @@ read_myriad_report <- function(filepath, file) {
   
   myriad_hrd_status <- str_extract(page2, hrd_status_regex, group = 1)
 
+  # BRCA status
+  
   brca_status_regex <- regex(
     r"[
     Tumor\sMutation\sBRCA1/BRCA2\sStatus:\s
@@ -286,103 +292,214 @@ read_myriad_report <- function(filepath, file) {
   return(output)
 }
 
-grep_seqone_text <- function(input_regex, page) {
-  output <- sub(
-    pattern = input_regex,
-    x = page,
-    replacement = "\\1"
-  )
-
-  return(output)
-}
-
 read_seqone_report <- function(filepath, file) {
   seqone_report_text <- pdftools::pdf_text(pdf = paste0(filepath, file))
 
-  page_1 <- seqone_report_text[[1]]
+  page1 <- seqone_report_text[[1]]
 
-  seqone_hrd_score <- as.numeric(grep_seqone_text(
-    ".+CLASS\n\\s{78,83}((0.\\d{2})|(0.\\d{1})|(\\d{1})).+",
-    page_1
-  ))
+  # HRD score
+  
+  hrd_score_regex <- regex(
+    r"[
+    CLASS\n
+    \s{78,83}                      # Variable whitespace
+    ((0\.\d{1,2})|(\d{1}))         # Variable formats: 0.99, 0.9, 1
+                                   # Use \. to specify decimal point
+    ]",
+    comments = TRUE
+  )
+  
+  hrd_score_char <- str_extract(page1, hrd_score_regex, group = 1)
+  
+  hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
 
-  assert_that(is.na(seqone_hrd_score) == FALSE,
+  assert_that(is.na(hrd_score_double) == FALSE,
     msg = paste0("Seqone HRD score is NA: file", file)
   )
 
-  assert_that(seqone_hrd_score >= 0, seqone_hrd_score <= 1,
+  assert_that(hrd_score_double >= 0, hrd_score_double <= 1,
     msg = "SeqOne HRD score outside 0-1 range"
   )
 
-  seqone_hrd_status <- grep_seqone_text(".+SeqOne HRD Status1 : (\\D{8}).+", page_1)
-
-  assert_that(seqone_hrd_status %in% c("POSITIVE", "NEGATIVE"),
-    msg = "SeqOne HRD score not dichotomous"
+  # HRD status
+  
+  hrd_status_regex <- regex(
+    r"[
+    SeqOne\sHRD\sStatus1\s:\s
+    (NEGATIVE | POSITIVE)
+    ]",
+    comments = TRUE
   )
+  
+  seqone_hrd_status <- str_extract(page1, hrd_status_regex, group = 1)
 
-  lga <- as.numeric(grep_seqone_text(".+LGA Status.{38}(\\d{1,2}).+", page_1))
+  # LGA
+  
+  lga_regex <- regex(
+    r"[
+    LGA\sStatus
+    \s{38}          # Variable whitespace
+    (\d{1,2})       # Group LGA status
+    ]",
+    comments = TRUE
+  )
+  
+  lga <- parse_number(str_extract(page1, lga_regex, group = 1))
+  
+  # LPC
+  
+  lpc_regex <- regex(
+    r"[
+    LPC\sStatus
+    \s{38}            # Variable whitespace
+    (\d{1,2})
+    ]",
+    comments = TRUE
+  )
+  
+  lpc <- parse_number(str_extract(page1, lpc_regex, group = 1))
 
-  lpc <- as.numeric(grep_seqone_text(".+LPC Status.{38}(\\d{1,2}).+", page_1))
+  # CCNE1
+  
+  ccne1_regex <- regex(
+    r"[
+    CCNE1\sAmplification
+    \s{29}                     # Variable whitespace
+    ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
+    ]",
+    comments = TRUE
+  )
+  
+  ccne1 <- parse_number(str_extract(page1, ccne1_regex, group = 1), 
+                        locale = locale(decimal_mark = "."))
+  
+  # RAD51B
+  
+  rad51b_regex <- regex(
+    r"[
+    RAD51B\sAmplification
+    \s{28}
+    ((\d{1}\.\d{1,2})|(\d{1}))
+    ]",
+    comments = TRUE
+  )
+  
+  rad51b <- parse_number(str_extract(page1, rad51b_regex, group =1),
+               locale = locale(decimal_mark = "."))
 
-  ccne1 <- as.numeric(grep_seqone_text(
-    ".+CCNE1 Amplification.{29}((\\d{1}.\\d{2})|\\d{1}).+", page_1
-  ))
-
-  rad51b <- as.numeric(grep_seqone_text(
-    ".+RAD51B Amplification.{28}(\\d{1}.\\d{1,2}|\\d{1}).+", page_1
-  ))
-
-  seqone_ncc <- as.numeric(grep_seqone_text(
-    ".+% of tumoral cells.{23,24}(\\d{2})%.+", page_1
-  ))
+  # Neoplastic cell content
+  
+  ncc_regex <- regex(
+    r"[
+    %\sof\stumoral\scells
+    \s{23,24}               # Variable whitespace
+    (\d{2})                 # Grouped NCC value
+    %
+    ]",
+    comments = TRUE
+  )
+  
+  seqone_ncc <- parse_number(str_extract(page1, ncc_regex, group = 1))
 
   assert_that(seqone_ncc >= 20, seqone_ncc <= 100)
 
-  coverage <- as.numeric(grep_seqone_text(
-    ".+Coverage\\s{33,34}(.{1,4})X.+", page_1
-  ))
+  # Coverage
+  
+  coverage_regex <- regex(
+    r"[
+    Coverage
+    \s{33,34}                      # Variable whitespace
+    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format. 1.57, 1.5, 1
+    X
+    ]",
+    comments = TRUE
+  )
+  
+  coverage <- parse_number(str_extract(page1, coverage_regex, group = 1),
+               locale = locale(decimal_mark = "."))
 
-  percent_mapping <- as.numeric(grep_seqone_text(
-    ".+% correct mapping.{24,25}((\\d{2}.\\d{1})|(\\d{2}))%.+", page_1
-  ))
+  # Percent mapping
+  
+  percent_map_regex <- regex(
+    r"[
+    %\scorrect\smapping
+    \s{24,25}                     # Variable whitespace
+    ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
+                                  # Assume percent mapping always above 10
+    %
+    ]",
+    comments = TRUE
+  )
+  
+  percent_mapping <- parse_number(str_extract(page1, percent_map_regex, group = 1),
+               locale = locale(decimal_mark = "."))
 
   assert_that(percent_mapping >= 0, percent_mapping <= 100)
 
-  shallow_sample_id <- trimws(
-    grep_seqone_text(
-      ".+Shallow sample ID\\s{15,18}(WS\\d{6}_.{8,26}).+", page_1
-    ),
-    which = "right"
+  # Shallow sample ID
+  
+  ss_id_regex <- regex(
+    r"{
+    Shallow\ssample\sID
+    \s{15,18}             # Variable whitespace
+    (WS\d{6})             # Group 1: worksheet
+    _
+    (\d{8})               # Group 2: 8 digit DLMS number
+    ([^\s]{0,17})         # Group 3: Additional sample info (only present for some samples)
+                          # Select any character after the underscore that isn't a space
+                          # String may be 17 characters. Example: "b_0.5_downsampled"
+    }",
+    comments = TRUE
   )
-
-  sample_id <- sub(
-    pattern = "WS\\d{6}_(.{8,26})",
-    x = shallow_sample_id,
-    replacement = "\\1"
+  
+  worksheet <- str_extract(page1, ss_id_regex, group = 1)
+  
+  dlms_dna_number <- parse_number(str_extract(page1, ss_id_regex, group = 2))
+  
+  modifier <- str_extract(page1, ss_id_regex, group = 3)
+  
+  sample_id <- str_c(dlms_dna_number, modifier)
+  
+  shallow_sample_id <- str_c(worksheet, "_", dlms_dna_number, modifier)
+  
+  # Date
+  
+  date_regex <- regex(
+    r"[
+    Date
+    \s{32}        # Variable whitespace
+    (\w{3,9}      # Month as text. Shortest is "May" (3), longest "September" (9)
+    \s
+    \d{1,2}       # Day (1-31)
+    ,\s
+    \d{4})        # Year 
+    ]",
+    comments = TRUE
   )
-
-  worksheet <- sub(
-    pattern = "^(WS\\d{6}).+",
-    x = shallow_sample_id,
-    replacement = "\\1"
+  
+  date <- mdy(str_extract(page1, date_regex, group = 1))
+  
+  # User
+  
+  user_regex <- regex(
+    r"[
+    User
+    \s{30,32}         # Variable whitespace
+    ([^\s]{10,26})    # Username - any character that isn't space
+    ]",
+    comments = TRUE
   )
+  
+  user <- str_extract(page1, user_regex, group = 1)
 
-  dlms_dna_number <- as.numeric(sub(
-    pattern = "^(\\d{8}).+",
-    replacement = "\\1",
-    x = sample_id
-  ))
-
-  date <- grep_seqone_text(".+Date.{32}(\\D{3,9}.\\d{1,2}..\\d{4}).+", page_1)
-
-  user <- grep_seqone_text(".+User\\s{30,32}(.{10,26})\\s+.+", page_1)
-
+  # Output table
+  
   output <- data.frame(
     "shallow_sample_id" = shallow_sample_id,
     "worksheet" = worksheet,
     "sample_id" = sample_id,
     "dlms_dna_number" = dlms_dna_number,
-    "seqone_hrd_score" = seqone_hrd_score,
+    "seqone_hrd_score" = hrd_score_double,
     "seqone_hrd_status" = seqone_hrd_status,
     "lga" = lga,
     "lpc" = lpc,
