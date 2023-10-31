@@ -143,97 +143,139 @@ read_myriad_report <- function(filepath, file) {
   page3 <- myriad_report_text[[3]]
 
   # iGene R Number
-
-  myriad_r_number <- sub(
-    x = page2,
-    pattern = ".+Patient ID:.{6}(R\\d{2}-\\w{4}).+",
-    replacement = "\\1"
+  
+  r_number_regex <- regex(
+    r"[
+    Patient\sID:        # Escape space with \s
+    \s{6}               # 6 spaces
+    (R\d{2}-\w{4})      # R number grouped
+    ]",
+    comments = TRUE
   )
+  
+  myriad_r_number <- str_extract(page2, r_number_regex, group = 1)
 
   # NHS Number
-  # Note: size of whitespace between "No:" and number can vary
-
-  nhs_number <- sub(
-    x = page1,
-    pattern = ".+NHS No:.{10,20}(\\d{3}.{1}\\d{3}.{1}\\d{4}).+",
-    replacement = "\\1"
+  
+  nhs_no_regex <- regex(
+    r"[
+    NHS\sNo:        
+    .{10,20}                    # Size of whitespace between "No:" and number can vary
+                                # Use . instead of \s as samples can have a leading
+                                # 0 before NHS number (example: R22-031L)
+    (\d{3}\s\d{3}\s\d{4})       # Grouped NHS number format
+    ]",
+    comments = TRUE
   )
-
-  nhs_number_mod <- as.numeric(gsub(
-    pattern = "(\\D)", "",
-    nhs_number
-  ))
-
+  
+  nhs_no_char <- str_extract(page1, nhs_no_regex, group = 1)
+  
+  nhs_no_double <- parse_number(nhs_no_char, locale = locale(grouping_mark = " "))
+  
   # Patient name
-  myriad_patient_name <- sub(
-    x = page1,
-    pattern = ".+Patient Name:\\s{10,15}(\\D{5,25})\n.+",
-    replacement = "\\1"
+  
+  patient_name_regex <- regex(
+    r"[
+    Patient\sName:
+    \s{10,15}           # Variable whitespace
+    (\D{5,25})          # Names as non-digits with variable lengths
+    \n                  # New line marks end of the name
+    ]",
+    comments = TRUE
   )
+  
+  myriad_patient_name <- str_extract(page1, patient_name_regex, group = 1)
 
   # Patient date of birth
-  myriad_dob <- sub(
-    x = page1,
-    pattern = ".+Date of Birth:\\s{10,15}(\\d{2}/\\d{2}/\\d{4})\n.+",
-    replacement = "\\1"
+  
+  dob_regex <- regex(
+    r"[
+    Date\sof\sBirth:
+    \s{10,15}                 # Variable whitespace
+    (\d{2}/\d{2}/\d{4})       # DOB in dd/mm/yyyy format
+    \n                        # Mark end of DOB with newline
+    ]",
+    comments = TRUE
   )
+  
+  myriad_dob <- str_extract(page1, dob_regex, group = 1)
 
   # Pathology Block
-  # Note: some reports say "Block(s)" whilst others say "Specimen(s)"
+  
+  path_block_1_regex <- regex(
+    r"[
+    Pathology\sNo:
+    \s{10,30}         # Variable whitespace
+    (.{5,25})         # Path blocks can have various formats from different labs
+    \n                # Specify end of block number with new line
+    ]",
+    comments = TRUE
+  )
+  
+  myriad_pathology_block_pg1 <- str_extract(page1, path_block_1_regex, group = 1)
+  
+  path_block_2_regex <- regex(
+    r"[
+    (Block\(s\)|Specimen\(s\))  # Some say "Block(s)" whilst others say "Specimen(s)"
+    \sAnalyzed:\s
+    (.{5,20})                   # Path blocks can have various formats from different labs
+    \n                          # Specify end of block number with new line
+    ]",
+    comments = TRUE
+  )
+  
+  myriad_pathology_block_pg2 <- str_extract(page2, path_block_2_regex, group = 2)
 
-  myriad_pathology_block_pg2 <- gsub("[\n]", "", sub(
-    x = page2,
-    pattern = ".+(Block\\(s\\)|Specimen\\(s\\)) Analyzed:(.{5,20})\n\n.+",
-    replacement = "\\2"
-  ))
+  gi_score_regex <- regex(
+    r"[
+    Patient\sGenomic\sInstability\sScore:
+    \s
+    (\d{1,2})                               # Score can be 1 digit (i.e. "7") or 2 ("73")
+    \n                                      # Mark end of score with newline
+    ]",
+    comments = TRUE
+  )
+  
+  gi_score_char <- str_extract(str_c(page2, page3), gi_score_regex, group = 1)
+  
+  gi_score_double <- parse_number(gi_score_char)
 
-  myriad_pathology_block_pg1 <- gsub("[\n]", "", sub(
-    x = page1,
-    pattern = ".+Pathology No:\\s{10,30}(.{5,25})(\\n\\n\\n\\n\\n|\\n).+",
-    replacement = "\\1"
-  ))
-
-  # Genomic Instability Score
-  # Note: score can be 1 digit (i.e. "7") or 2 ("73")
-  # GIS may be on page 2 or page 3
-  myriad_gi_score <- as.numeric(sub(
-    x = paste0(myriad_report_text[[2]], myriad_report_text[[3]]),
-    pattern = ".+Patient Genomic Instability Score: (\\d{1,2}).+",
-    replacement = "\\1"
-  ))
-
-  assert_that(is.na(myriad_gi_score) == FALSE,
+  assert_that(is.na(gi_score_double) == FALSE,
     msg = paste0("GI score is NA: file ", file)
   )
 
-  assert_that(myriad_gi_score >= 0, myriad_gi_score <= 100, msg = paste0(
+  assert_that(gi_score_double >= 0, gi_score_double <= 100, msg = paste0(
     "GI score outside 0-100 range: file ", file
   ))
 
-  myriad_hrd_status <- sub(
-    x = page2,
-    pattern = ".+Myriad HRD Status:.(\\D{8}).+",
-    replacement = "\\1"
+  hrd_status_regex <- regex(
+    r"[
+    Myriad\sHRD\sStatus:\s
+    (NEGATIVE | POSITIVE)
+    ]",
+    comments = TRUE
   )
+  
+  myriad_hrd_status <- str_extract(page2, hrd_status_regex, group = 1)
 
-  assert_that(myriad_hrd_status %in% c("POSITIVE", "NEGATIVE"),
-    msg = paste0("Error in HRD status; file ", file)
+  brca_status_regex <- regex(
+    r"[
+    Tumor\sMutation\sBRCA1/BRCA2\sStatus:\s
+    (NEGATIVE | POSITIVE)
+    ]",
+    comments = TRUE
   )
-
-  myriad_brca_status <- sub(
-    x = page2,
-    pattern = ".+Tumor Mutation BRCA1/BRCA2 Status:.(\\D{8}).+",
-    replacement = "\\1"
-  )
+  
+  myriad_brca_status <- str_extract(page2, brca_status_regex, group = 1)
 
   output <- data.frame(
     "myriad_r_number" = myriad_r_number,
     "myriad_patient_name" = myriad_patient_name,
     "myriad_dob" = myriad_dob,
-    "nhs_number" = nhs_number_mod,
+    "nhs_number" = nhs_no_double,
     "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
     "myriad_pathology_block_pg2" = myriad_pathology_block_pg2,
-    "myriad_gi_score" = myriad_gi_score,
+    "myriad_gi_score" = gi_score_double,
     "myriad_hrd_status" = myriad_hrd_status,
     "myriad_brca_status" = myriad_brca_status,
     "myriad_filename" = file
@@ -407,3 +449,90 @@ collate_seqone_reports <- function() {
 
   return(output)
 }
+
+# Test metric functions -------------------------------------------------------------
+
+perform_sensitivity_calcs <- function(input_table) {
+  
+  required_columns <- c("seqone_hrd_status_amended", "hrd_status_check_amended",
+                        "myriad_hrd_status")
+  
+  stopifnot(required_columns %in% colnames(input_table))
+  
+  input_table_mod <- input_table |> 
+    mutate(
+      
+      category = case_when(
+        
+        seqone_hrd_status_amended == "POSITIVE" &
+          hrd_status_check_amended == consistent_text ~"true positive",
+        
+        seqone_hrd_status_amended == "NEGATIVE" &
+          hrd_status_check_amended == consistent_text ~"true negative",
+        
+        seqone_hrd_status_amended == "POSITIVE" &
+          hrd_status_check_amended == inconsistent_text ~"false positive",
+        
+        seqone_hrd_status_amended == "NEGATIVE" &
+          hrd_status_check_amended == inconsistent_text ~"false negative",
+        
+        seqone_hrd_status_amended == "NON-CONCLUSIVE" &
+          myriad_hrd_status == "POSITIVE" ~"inconclusive positive",
+        
+        seqone_hrd_status_amended == "NON-CONCLUSIVE" &
+          myriad_hrd_status == "NEGATIVE" ~"inconclusive negative"
+      )
+      
+    )
+  
+  counts <- input_table_mod |> 
+    count(category)
+  
+  true_positives <- sum(input_table_mod$category == "true positive")
+  
+  true_negatives <- sum(input_table_mod$category == "true negative")
+  
+  false_negatives <- sum(input_table_mod$category == "false negative")
+  
+  false_positives <- sum(input_table_mod$category == "false positive")
+  
+  inconclusive_negatives <- sum(input_table_mod$category == "inconclusive negative")
+  
+  inconclusive_positives <- sum(input_table_mod$category == "inconclusive positive")
+  
+  overall_stats <- tribble(
+    
+    ~col, ~seqone_positive, ~seqone_negative, ~seqone_inconclusive,
+    "myriad_positive", true_positives, false_negatives, inconclusive_positives,
+    "myriad_negative", false_positives, true_negatives, inconclusive_negatives
+  )
+  
+  results_minus_inconclusives <- sum(true_positives, true_negatives, 
+                                     false_positives, false_negatives)
+  
+  opa <- ((true_positives + true_negatives) / results_minus_inconclusives) * 100
+  
+  sensitivity <- (true_positives / sum(true_positives, false_positives)) * 100
+  
+  specificity <- (true_negatives / sum(true_negatives, false_negatives)) * 100
+  
+  samples <- length(unique(input_table_mod$dlms_dna_number))
+  
+  dna_inputs <- sum(true_positives, true_negatives, 
+                    false_positives, false_negatives,
+                    inconclusive_negatives, inconclusive_positives)
+  
+  print(overall_stats)
+  
+  print(paste0("OPA = ", round(opa, 2), "%"))
+  
+  print(paste0("Sensitivity = ", round(sensitivity, 2), "%"))
+  
+  print(paste0("Specificity = ", round(specificity, 2), "%"))
+  
+  print(paste0("DNA inputs: ", dna_inputs))
+  
+  print(paste0("Unique samples = ", samples))
+  
+}
+
