@@ -21,8 +21,6 @@ export_timestamp <- function(filepath, input) {
   )
 }
 
-
-
 safe_colorblind_palette <- c(
   "#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499",
   "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888"
@@ -129,7 +127,6 @@ check_na <- function(input_table) {
     msg = paste0("NA values present: file ", file)
   )
 }
-
 
 read_myriad_report <- function(file) {
   # Use pdf_text to read PDF as a single string per page
@@ -292,8 +289,8 @@ read_myriad_report <- function(file) {
   return(output)
 }
 
-read_seqone_report <- function(filepath, file) {
-  seqone_report_text <- pdftools::pdf_text(pdf = paste0(filepath, file))
+read_seqone_report <- function(file) {
+  seqone_report_text <- pdftools::pdf_text(pdf = file)
 
   page1 <- seqone_report_text[[1]]
 
@@ -314,11 +311,11 @@ read_seqone_report <- function(filepath, file) {
   hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
 
   assert_that(is.na(hrd_score_double) == FALSE,
-    msg = paste0("Seqone HRD score is NA: file", file)
+    msg = str_c("Seqone HRD score is NA. File: ", basename(file))
   )
 
   assert_that(hrd_score_double >= 0, hrd_score_double <= 1,
-    msg = "SeqOne HRD score outside 0-1 range"
+    msg = str_c("SeqOne HRD score outside 0-1 range. File: ", basename(file))
   )
 
   # HRD status
@@ -364,7 +361,7 @@ read_seqone_report <- function(filepath, file) {
   ccne1_regex <- regex(
     r"[
     CCNE1\sAmplification
-    \s{29}                     # Variable whitespace
+    \s{29}                       # Variable whitespace
     ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
     ]",
     comments = TRUE
@@ -510,40 +507,10 @@ read_seqone_report <- function(filepath, file) {
     "percent_mapping" = percent_mapping,
     "date" = date,
     "user" = user,
-    "filename" = file
+    "filename" = basename(file)
   )
 
   check_na(output)
-
-  return(output)
-}
-
-# Collation functions ---------------------------------------------------------------
-
-collate_seqone_reports <- function() {
-  seqone_reports <- list.files(seqone_report_location)
-
-  output <- data.frame()
-
-  for (i in seqone_reports) {
-    tmp_output <- read_seqone_report(seqone_report_location, i)
-
-    output <- rbind(output, tmp_output)
-
-    rm(tmp_output)
-  }
-
-  # Check all files collated
-  stopifnot(setdiff(seqone_reports, output$filename) == 0)
-
-  # Check to make sure a report wasn't saved twice
-  collated_seqone_check <- output |>
-    # Combination of sample ID and run date should be unique
-    mutate(sample_date = paste0(shallow_sample_id, " ", date))
-
-  stopifnot(!duplicated(collated_seqone_check$sample_date))
-
-  rm(collated_seqone_check)
 
   return(output)
 }

@@ -18,18 +18,39 @@ source("functions/hrd_functions.R")
 
 # Collate data ----------------------------------------------------------------------
 
-## Source scripts and collate data --------------------------------------------------
+## Collate Myriad data --------------------------------------------------------------
 
 myriad_report_files <- list.files(myriad_reports_location, full.names = TRUE)
 
-collated_myriad_info <- myriad_report_files |> 
-  map(read_myriad_report) |> 
+collated_myriad_info <- myriad_report_files |>
+  map(read_myriad_report) |>
   list_rbind()
 
 # Check all files included
-stopifnot(setdiff(basename(myriad_report_files), collated_myriad_info$myriad_filename) == 0)
+stopifnot(setdiff(
+  basename(myriad_report_files),
+  collated_myriad_info$myriad_filename
+) == 0)
 
-collated_seqone_info <- collate_seqone_reports()
+## Collate SeqOne data --------------------------------------------------------------
+
+seqone_report_files <- list.files(seqone_report_location, full.names = TRUE)
+
+collated_seqone_info <- seqone_report_files |>
+  map(read_seqone_report) |>
+  list_rbind()
+
+# Check all files collated
+stopifnot(setdiff(
+  basename(seqone_report_files),
+  collated_seqone_info$filename
+) == 0)
+
+# Check to make sure a report wasn't saved twice
+stopifnot(nrow(collated_seqone_info |>
+  # Combination of shallow sample ID and run date should be unique
+  mutate(sample_date = str_c(shallow_sample_id, " ", date)) |>
+  filter(duplicated(sample_date))) == 0)
 
 ## Edit Myriad information ----------------------------------------------------------
 
@@ -77,7 +98,8 @@ seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) |>
 
 stopifnot(setdiff(
   seqone_dlms_info$dlms_dna_number,
-  collated_seqone_info$dlms_dna_number) == 0)
+  collated_seqone_info$dlms_dna_number
+) == 0)
 
 # Enter a fake NHS number for the Seraseq and Biobank controls, to allow
 # Myriad scores to be joined later, and to keep Biobank controls within the
