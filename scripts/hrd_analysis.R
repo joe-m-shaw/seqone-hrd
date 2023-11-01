@@ -617,10 +617,10 @@ myriad_gi_profile_plot <- tbrca_data_collection_clean |>
 ## LGA and LPC ----------------------------------------------------------------------
 
 line_df <- data.frame(
-  x = c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
-  y = c(0, 4, 9, 13, 18, 23, 4, 9, 13, 18, 23),
+  x =    c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
+  y =    c(0,   4,  9, 13, 18, 23,  4,  9, 13, 18, 23),
   xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
-  yend = c(4, 9, 13, 18, 23, 28, 4, 9, 13, 18, 23)
+  yend = c(4,   9, 13, 18, 23, 36,  4,  9, 13, 18, 23)
 )
 
 lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
@@ -644,7 +644,8 @@ lga_vs_lpc_amended <- ggplot(compare_results, aes(lga_amended, lpc_amended)) +
   geom_point(aes(colour = seqone_hrd_status_amended),
     size = 3
   ) +
-  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  scale_colour_manual(name = "SeqOne HRD Status", 
+                      values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
   theme(legend.position = "bottom") +
   geom_segment(
@@ -653,9 +654,13 @@ lga_vs_lpc_amended <- ggplot(compare_results, aes(lga_amended, lpc_amended)) +
     linetype = "dashed"
   ) +
   labs(
-    title = "New pipeline",
-    subtitle = "CCNE1 and RAD51B removed, QC step added"
+    x = "Large Genomic Alterations",
+    y = "Loss of Parental Copy",
+    title = "LGA and LPC results for SomaHRD v2",
+    subtitle = str_c("Data for ", nrow(compare_results), " samples")
   )
+  
+save_hrd_plot(lga_vs_lpc_amended)
 
 ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
   nrow = 1
