@@ -146,6 +146,9 @@ path_block_check <- read_csv(
 
 ## Initial DNA concentrations -------------------------------------------------------
 
+x <- read_excel(str_c(hrd_data_path, "HS2 Sample Prep 2023 - NEW.xlsx"),
+                sheet = "HRD_SeqOne")
+
 dna_concentrations <- read_excel(
   path = paste0(hrd_data_path, "HS2_sample_prep_export.xlsx"),
   col_types = c(
@@ -224,7 +227,8 @@ kapa_data_collated <- rbind(
   extract_kapa_data("133557", 20),
   extract_kapa_data("134687", 31),
   extract_kapa_data("134928", 7),
-  extract_kapa_data("135001", 31)
+  extract_kapa_data("135001", 31),
+  extract_kapa_data("135498", 7)
 )
 
 ## SeqOne QC data -------------------------------------------------------------------
@@ -291,21 +295,9 @@ seqone_mod <- collated_seqone_info |>
 
 ## Join data tables together --------------------------------------------------------
 
-consistent_text <- "Seqone HRD status consistent with Myriad"
-
-inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
-
-inconclusive_text <- "SeqOne HRD status inconclusive"
-
-compare_results <- seqone_mod |>
+join_tables <- seqone_mod |>
   left_join(collated_myriad_info_mod, by = "nhs_number") |>
   left_join(path_block_check, by = "dlms_dna_number") |>
-  mutate(hrd_status_check = case_when(
-    myriad_hrd_status == seqone_hrd_status ~ consistent_text,
-    myriad_hrd_status != seqone_hrd_status ~ inconsistent_text,
-    TRUE ~ "other"
-  )) |>
-  filter(downsampled == "No") |>
   left_join(dna_concentrations_mod |>
     select(
       dlms_dna_number, qubit_dna_ul, input_ng,
@@ -323,24 +315,96 @@ compare_results <- seqone_mod |>
         lga_amended, lpc_amended, low_tumor_fraction_returns_a_warning_only
       ),
     by = "shallow_sample_id"
-  ) |>
-  mutate(
-    change_in_status = case_when(
-      seqone_hrd_status == seqone_hrd_status_amended ~ "No change",
-      seqone_hrd_status != seqone_hrd_status_amended ~ "Change"
-    ),
-    hrd_status_check_amended = case_when(
-      myriad_hrd_status == seqone_hrd_status_amended &
-        seqone_hrd_status_amended != "NON-CONCLUSIVE" ~ consistent_text,
-      myriad_hrd_status != seqone_hrd_status_amended &
-        seqone_hrd_status_amended != "NON-CONCLUSIVE" ~ inconsistent_text,
-      myriad_hrd_status != seqone_hrd_status_amended &
-        seqone_hrd_status_amended == "NON-CONCLUSIVE" ~ inconclusive_text,
-      TRUE ~ "other"
-    )
-  )
+  ) 
 
 # Analyse Data ----------------------------------------------------------------------
+
+## Compare SeqOne and Myriad results ------------------------------------------------
+
+compare_results <- join_tables |> 
+  filter(downsampled == "No") |>
+  mutate(
+    
+    # Outome of results from original pipeline
+    outcome_v1 = case_when(
+      
+      seqone_hrd_status == pos_text & myriad_hrd_status == pos_text ~true_pos_text,
+      
+      seqone_hrd_status == neg_text & myriad_hrd_status == neg_text ~true_neg_text,
+      
+      seqone_hrd_status == pos_text & myriad_hrd_status == neg_text ~false_pos_text,
+      
+      seqone_hrd_status == neg_text & myriad_hrd_status == pos_text ~false_neg_text,
+      
+      TRUE ~ "other"),
+    
+    outcome_v2 = case_when(
+      
+      seqone_hrd_status_amended == pos_text & myriad_hrd_status == pos_text ~true_pos_text,
+      
+      seqone_hrd_status_amended == neg_text & myriad_hrd_status == neg_text ~true_neg_text,
+      
+      seqone_hrd_status_amended == pos_text & myriad_hrd_status == neg_text ~false_pos_text,
+      
+      seqone_hrd_status_amended == neg_text & myriad_hrd_status == pos_text ~false_neg_text,
+      
+      seqone_hrd_status_amended == incon_text & myriad_hrd_status == pos_text ~incon_pos_text,
+      
+      seqone_hrd_status_amended == incon_text & myriad_hrd_status == neg_text ~incon_neg_text,
+      
+      TRUE ~ "other")
+    
+    )
+      
+
+## Sensitivity and specificity ------------------------------------------------------
+
+compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match") |> 
+  compare_tests(outcome_v1)
+
+compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match") |> 
+  compare_tests(outcome_v2)
+
+compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match" &
+           coverage.x >= 1 & input_ng >= 49) |> 
+  compare_tests(outcome_v2)
+
+
+## Myriad and SeqOne score correlation ----------------------------------------------
+
+
+## HRD status comparison with Myriad ------------------------------------------------
+
+comparison_summary <- compare_results |>
+  filter(!is.na(myriad_gi_score) & myriad_gi_score != "NA") |>
+  filter(path_block_manual_check != "NA") |>
+  group_by(hrd_status_check, path_block_manual_check) |>
+  summarise(total = n())
+
+myriad_comparison_plot <- ggplot(comparison_summary, aes(
+  x = hrd_status_check,
+  y = total
+)) +
+  geom_col() +
+  geom_text(aes(label = total), vjust = -0.5) +
+  theme_bw() +
+  labs(
+    y = "Total DNA Inputs", x = "",
+    title = "Consistency of Myriad and Seqone Testing",
+    subtitle = paste0("Data for ", sum(comparison_summary$total), " DNA inputs"),
+    caption = "Plot name: myriad_comparison_plot"
+  ) +
+  facet_wrap(~path_block_manual_check) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+
+
 
 ## Inter run variation --------------------------------------------------------------
 
@@ -409,24 +473,6 @@ intra_run_plot <- compare_results |>
 
 save_hrd_plot(intra_run_plot, input_width = 10, input_height = 10)
 
-## Repeat testing summaries ---------------------------------------------------------
-
-summary_21013520 <- get_sample_summary_info(21013520)
-
-export_timestamp(hrd_output_path, summary_21013520)
-
-summary_23032088 <- get_sample_summary_info(23032088)
-
-export_timestamp(hrd_output_path, summary_23032088)
-
-summary_20127786 <- get_sample_summary_info(20127786)
-
-export_timestamp(hrd_output_path, summary_20127786)
-
-summary_21011999 <- get_sample_summary_info(21011999)
-
-export_timestamp(hrd_output_path, summary_21011999)
-
 ## Compare results of mid output run - WS134928 -------------------------------------
 
 mid_output_run <- seqone_mod |>
@@ -472,30 +518,6 @@ ggplot(
     title = "Sample libraries repeated on mid-output run (WS134928)",
     caption = "Plot name: WS134928_WS134687_plot"
   )
-
-## HRD status comparison with Myriad ------------------------------------------------
-
-comparison_summary <- compare_results |>
-  filter(!is.na(myriad_gi_score) & myriad_gi_score != "NA") |>
-  filter(path_block_manual_check != "NA") |>
-  group_by(hrd_status_check, path_block_manual_check) |>
-  summarise(total = n())
-
-myriad_comparison_plot <- ggplot(comparison_summary, aes(
-  x = hrd_status_check,
-  y = total
-)) +
-  geom_col() +
-  geom_text(aes(label = total), vjust = -0.5) +
-  theme_bw() +
-  labs(
-    y = "Total DNA Inputs", x = "",
-    title = "Consistency of Myriad and Seqone Testing",
-    subtitle = paste0("Data for ", sum(comparison_summary$total), " DNA inputs"),
-    caption = "Plot name: myriad_comparison_plot"
-  ) +
-  facet_wrap(~path_block_manual_check) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ## Impact of pathology blocks -------------------------------------------------------
 
@@ -1388,13 +1410,3 @@ compare_results |>
     low_tumor_fraction_returns_a_warning_only
   ) |>
   view()
-
-## Sensitivity and specificity ------------------------------------------------------
-
-perform_sensitivity_calcs(compare_results |>
-  filter(path_block_manual_check == "pathology blocks match"))
-
-perform_sensitivity_calcs(compare_results |>
-  filter(path_block_manual_check == "pathology blocks match" &
-    input_ng > 49 &
-    coverage.x >= 0.5))

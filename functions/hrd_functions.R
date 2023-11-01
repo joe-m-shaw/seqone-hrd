@@ -7,6 +7,32 @@ library(tidyverse)
 library(assertthat)
 
 
+# Standard text ---------------------------------------------------------------------
+
+pos_text <- "POSITIVE"
+
+neg_text <- "NEGATIVE"
+
+incon_text <- "NON-CONCLUSIVE"
+
+true_pos_text <- "true_positive"
+
+true_neg_text <- "true_negative"
+
+false_pos_text <- "false_positive"
+
+false_neg_text <- "false_negative"
+
+incon_pos_text <- "inconclusive_positive"
+
+incon_neg_text <- "inconclusive_negative"
+
+consistent_text <- "Seqone HRD status consistent with Myriad"
+
+inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
+
+inconclusive_text <- "SeqOne HRD status inconclusive"
+
 # CSV timestamp ---------------------------------------------------------------------
 
 export_timestamp <- function(filepath, input) {
@@ -538,87 +564,58 @@ extract_kapa_data <- function(worksheet_number, worksheet_length) {
 
 # Test metric functions -------------------------------------------------------------
 
-perform_sensitivity_calcs <- function(input_table) {
+count_category <- function(input_table, outcome_column, match_text) {
   
-  required_columns <- c("seqone_hrd_status_amended", "hrd_status_check_amended",
-                        "myriad_hrd_status")
-  
-  stopifnot(required_columns %in% colnames(input_table))
-  
-  input_table_mod <- input_table |> 
-    mutate(
-      
-      category = case_when(
-        
-        seqone_hrd_status_amended == "POSITIVE" &
-          hrd_status_check_amended == consistent_text ~"true positive",
-        
-        seqone_hrd_status_amended == "NEGATIVE" &
-          hrd_status_check_amended == consistent_text ~"true negative",
-        
-        seqone_hrd_status_amended == "POSITIVE" &
-          hrd_status_check_amended == inconsistent_text ~"false positive",
-        
-        seqone_hrd_status_amended == "NEGATIVE" &
-          hrd_status_check_amended == inconsistent_text ~"false negative",
-        
-        seqone_hrd_status_amended == "NON-CONCLUSIVE" &
-          myriad_hrd_status == "POSITIVE" ~"inconclusive positive",
-        
-        seqone_hrd_status_amended == "NON-CONCLUSIVE" &
-          myriad_hrd_status == "NEGATIVE" ~"inconclusive negative"
-      )
-      
-    )
-  
-  counts <- input_table_mod |> 
-    count(category)
-  
-  true_positives <- sum(input_table_mod$category == "true positive")
-  
-  true_negatives <- sum(input_table_mod$category == "true negative")
-  
-  false_negatives <- sum(input_table_mod$category == "false negative")
-  
-  false_positives <- sum(input_table_mod$category == "false positive")
-  
-  inconclusive_negatives <- sum(input_table_mod$category == "inconclusive negative")
-  
-  inconclusive_positives <- sum(input_table_mod$category == "inconclusive positive")
-  
-  overall_stats <- tribble(
-    
-    ~col, ~seqone_positive, ~seqone_negative, ~seqone_inconclusive,
-    "myriad_positive", true_positives, false_negatives, inconclusive_positives,
-    "myriad_negative", false_positives, true_negatives, inconclusive_negatives
-  )
-  
-  results_minus_inconclusives <- sum(true_positives, true_negatives, 
-                                     false_positives, false_negatives)
-  
-  opa <- ((true_positives + true_negatives) / results_minus_inconclusives) * 100
-  
-  sensitivity <- (true_positives / sum(true_positives, false_positives)) * 100
-  
-  specificity <- (true_negatives / sum(true_negatives, false_negatives)) * 100
-  
-  samples <- length(unique(input_table_mod$dlms_dna_number))
-  
-  dna_inputs <- sum(true_positives, true_negatives, 
-                    false_positives, false_negatives,
-                    inconclusive_negatives, inconclusive_positives)
-  
-  print(overall_stats)
-  
-  print(paste0("OPA = ", round(opa, 2), "%"))
-  
-  print(paste0("Sensitivity = ", round(sensitivity, 2), "%"))
-  
-  print(paste0("Specificity = ", round(specificity, 2), "%"))
-  
-  print(paste0("DNA inputs: ", dna_inputs))
-  
-  print(paste0("Unique samples = ", samples))
+  nrow(input_table |> 
+         filter( {{outcome_column }}  == {{ match_text }}))
   
 }
 
+compare_tests <- function(input_table, outcome_column) {
+  
+  true_positives <- count_category(input_table, {{ outcome_column}} , true_pos_text)
+  
+  true_negatives <- count_category(input_table, {{ outcome_column}} , true_neg_text)
+  
+  false_positives <- count_category(input_table, {{ outcome_column}} , false_pos_text)
+  
+  false_negatives <- count_category(input_table, {{ outcome_column}} , false_neg_text)
+
+  incon_positives <- count_category(input_table, {{ outcome_column}} , incon_pos_text)
+  
+  incon_negatives <- count_category(input_table, {{ outcome_column}} , incon_neg_text)
+  
+  opa = round(((true_positives + true_negatives) / sum(true_positives, false_positives,
+                                                     true_negatives, false_negatives)) * 100, 1)
+  
+  sensitivity = round((true_positives / sum(true_positives, false_positives)) * 100, 1)
+  
+  specificity = round((true_negatives / sum(true_negatives, false_negatives)) * 100, 1)
+  
+  dna_inputs <- nrow(input_table)
+  
+  unique_samples <- length(unique(input_table$dlms_dna_number))
+  
+  check <- ifelse(dna_inputs == sum(true_positives, true_negatives, false_positives,
+                                    false_negatives, incon_positives, incon_negatives),
+                  "DNA inputs match table sum",
+                  "Check required")
+  
+  metrics <- tribble(
+    ~metric,          ~result,
+    "OPA (%)",         opa, 
+    "Sensitivity (%)", sensitivity,
+    "Specificity (%)", specificity,
+    "Unique samples", unique_samples,
+    "DNA inputs", dna_inputs
+    )
+  
+  confusion_matrix <- tribble(
+  ~"x",      ~"x",   ~"HRD",          ~"HRP",           ~"Inconclusive",
+  "Myriad", "HRD",   true_positives,  false_negatives,  incon_positives,
+  "x",      "HRP",   false_positives, true_negatives,   incon_negatives
+  )
+  
+  return(list(confusion_matrix, metrics, check))
+  
+}
