@@ -14,7 +14,6 @@ source("functions/hrd_functions.R")
 library("ggpubr")
 library("readxl")
 library("RODBC")
-library("epiR")
 
 ## DLMS connection ------------------------------------------------------------------
 
@@ -130,7 +129,7 @@ export_for_check <- seqone_dlms_info |>
   ) |>
   arrange(nhs_number)
 
-export_timestamp(hrd_data_path, export_for_check)
+# export_timestamp(hrd_data_path, export_for_check)
 
 # Writing of pathology block IDs is inconsistent, so a manual check is required
 # Seraseq controls classified as "pathology blocks match"
@@ -201,9 +200,6 @@ seqone_dlms_extractions <- seqone_dlms_info |>
   left_join(extraction_batch_info, by = "dlms_dna_number")
 
 ## Initial DNA concentrations -------------------------------------------------------
-
-x <- read_excel(str_c(hrd_data_path, "HS2 Sample Prep 2023 - NEW.xlsx"),
-                sheet = "HRD_SeqOne")
 
 dna_concentrations <- read_excel(
   path = paste0(hrd_data_path, "HS2_sample_prep_export.xlsx"),
@@ -417,7 +413,7 @@ compare_results <- join_tables |>
 
 coverage_threshold <- 0.5
 
-input_threshold <- 49
+input_threshold <- 47
 
 v1_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
@@ -440,20 +436,27 @@ v2_results_filtered <- compare_results |>
 add_version <- function(input_table, version_text) {
   
   input_table |> 
-    mutate(version = version_text) |> 
-    relocate(version)
+    mutate(Analysis = version_text) |> 
+    relocate(Analysis)
   
 }
 
-metric_table <- rbind(add_version(v1_results[[2]], "Pipeline v1"),
-                      add_version(v1_results_filtered[[2]], "Pipeline v1, thresholds applied"),
-                      add_version(v2_results[[2]], "Pipeline v2"),
-                      add_version(v2_results_filtered[[2]], "Pipeline v2, thresholds applied"))
+metric_table <- rbind(add_version(v1_results[[2]], "SomaHRD v1"),
+                      add_version(v1_results_filtered[[2]], "SomaHRD v1, thresholds applied"),
+                      add_version(v2_results[[2]], "SomaHRD v2"),
+                      add_version(v2_results_filtered[[2]], "SomaHRD v2, thresholds applied"))
+
+# export_timestamp(hrd_output_path, metric_table)
+
+# export_timestamp(hrd_output_path, v1_results[[1]])
+
+# export_timestamp(hrd_output_path, v2_results[[1]])
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 
 compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match") |> 
+  filter(path_block_manual_check == "pathology blocks match" & 
+           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
   ggplot(aes(myriad_gi_score, seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.7) +
   theme_bw() +
@@ -466,7 +469,9 @@ compare_results |>
   labs(
     x = "Myriad Genome Instability Score",
     y = "SeqOne HRD Score",
-    title = "Comparison of Myriad vs SeqOne HRD Testing") +
+    title = "Comparison of Myriad vs SeqOne HRD Scores",
+    subtitle = str_c("DNA inputs with coverage >= ", coverage_threshold,
+                     "X; DNA input >= ", input_threshold, "ng")) +
   ggpubr::stat_cor(method = "pearson", label.x = 75, label.y = 0.1)
 
 ## Inter run variation --------------------------------------------------------------
@@ -514,6 +519,8 @@ intra_run_table <- compare_results |>
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
   select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage.x) |> 
   arrange(sample_id)
+
+export_timestamp(input = intra_run_table)
 
 ## Comparison with SeqOne simplified model ------------------------------------------
 
