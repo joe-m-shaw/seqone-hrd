@@ -415,18 +415,40 @@ compare_results <- join_tables |>
 
 ## Sensitivity and specificity ------------------------------------------------------
 
-compare_results |> 
+coverage_threshold <- 0.5
+
+input_threshold <- 49
+
+v1_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
   compare_tests(outcome_v1)
 
-compare_results |> 
+v1_results_filtered <- compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match" &
+           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
+  compare_tests(outcome_v1)
+
+v2_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
   compare_tests(outcome_v2)
 
-compare_results |> 
+v2_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" &
-           coverage.x >= 1 & input_ng >= 49) |> 
+           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v2)
+
+add_version <- function(input_table, version_text) {
+  
+  input_table |> 
+    mutate(version = version_text) |> 
+    relocate(version)
+  
+}
+
+metric_table <- rbind(add_version(v1_results[[2]], "Pipeline v1"),
+                      add_version(v1_results_filtered[[2]], "Pipeline v1, thresholds applied"),
+                      add_version(v2_results[[2]], "Pipeline v2"),
+                      add_version(v2_results_filtered[[2]], "Pipeline v2, thresholds applied"))
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 

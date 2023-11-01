@@ -602,12 +602,8 @@ compare_tests <- function(input_table, outcome_column) {
                   "Check required")
   
   metrics <- tribble(
-    ~metric,          ~result,
-    "OPA (%)",         opa, 
-    "Sensitivity (%)", sensitivity,
-    "Specificity (%)", specificity,
-    "Unique samples", unique_samples,
-    "DNA inputs", dna_inputs
+    ~"OPA (%)", ~"Sensitivity (%)", ~"Specificity (%)", ~"Unique samples", ~"DNA inputs",
+    opa,        sensitivity,       specificity,         unique_samples,    dna_inputs
     )
   
   confusion_matrix <- tribble(
