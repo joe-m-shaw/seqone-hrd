@@ -433,14 +433,6 @@ v2_results_filtered <- compare_results |>
            coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v2)
 
-add_version <- function(input_table, version_text) {
-  
-  input_table |> 
-    mutate(Analysis = version_text) |> 
-    relocate(Analysis)
-  
-}
-
 metric_table <- rbind(add_version(v1_results[[2]], "SomaHRD v1"),
                       add_version(v1_results_filtered[[2]], "SomaHRD v1, thresholds applied"),
                       add_version(v2_results[[2]], "SomaHRD v2"),
@@ -479,10 +471,9 @@ compare_results |>
 repeat_results <- compare_results |>
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
     base::duplicated(dlms_dna_number, fromLast = FALSE)) |>
-  filter(downsampled == "No") |>
   mutate(input_category = case_when(
-    input_ng >= 48 ~ "50ng input",
-    input_ng < 48 ~ "lower than 50ng input"
+    input_ng >= input_threshold ~ "50ng input",
+    input_ng < input_threshold ~ "lower than 50ng input"
   ))
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
@@ -509,7 +500,7 @@ repeat_facet_plot <- ggplot(repeat_results, aes(
   ) +
   geom_hline(yintercept = 0.50, linetype = "dashed")
 
-#save_hrd_plot(repeat_facet_plot, input_width = 15, input_height = 15)
+# save_hrd_plot(repeat_facet_plot, input_width = 15, input_height = 15)
 
 ## Intra-run variation --------------------------------------------------------------
 
@@ -517,12 +508,10 @@ intra_run_table <- compare_results |>
   filter(worksheet == "WS133557") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage.x) |> 
+  select(sample_id, seqone_hrd_score, lga, lpc, coverage.x) |> 
   arrange(sample_id)
 
 export_timestamp(input = intra_run_table)
-
-## Comparison with SeqOne simplified model ------------------------------------------
 
 ## Seraseq controls -----------------------------------------------------------------
 
@@ -543,68 +532,15 @@ ggplot(seraseq_control_data, aes(x = worksheet, y = seqone_hrd_score)) +
 
 ## Biobank controls -----------------------------------------------------------------
 
-compare_results |>
-  filter(surname %in% biobank_names) |>
-  ggplot(aes(x = surname, y = seqone_hrd_score)) +
-  geom_point(size = 3) +
-  ylim(0, 1) +
-  labs(x = "", y = "SeqOne HRD score") +
-  theme_bw()
+biobank_control_results <- compare_results |> 
+  filter(control_type == "Biobank control") |> 
+  select(dlms_dna_number, seqone_hrd_status, seqone_hrd_score, lga, lpc, ccne1, rad51b)
+
+export_timestamp(input = biobank_control_results)
 
 ## QC metrics -----------------------------------------------------------------------
 
 # Add function to plot results by QC metric
-
-## Impact of DNA concentration ------------------------------------------------------
-
-ggplot(
-  compare_results |>
-    filter(path_block_manual_check == "pathology blocks match"),
-  aes(x = input_ng, y = coverage.x)
-) +
-  geom_point(size = 3, aes(
-    shape = hrd_status_check,
-    colour = hrd_status_check
-  )) +
-  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
-  theme_bw() +
-  theme(panel.grid = element_blank()) +
-  ylim(0, 2) +
-  xlim(0, 55) +
-  facet_wrap(~path_block_manual_check)
-
-ggplot(
-  compare_results |>
-    filter(path_block_manual_check == "pathology blocks match"),
-  aes(x = input_genomes, y = lga)
-) +
-  geom_point(size = 3, aes(
-    shape = hrd_status_check,
-    colour = hrd_status_check
-  )) +
-  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
-  theme_bw() +
-  theme(panel.grid = element_blank()) +
-  facet_wrap(~path_block_manual_check)
-
-ggplot(
-  compare_results |>
-    filter(path_block_manual_check == "pathology blocks match"),
-  aes(
-    x = reorder(dlms_dna_number, qubit_dna_ul),
-    y = qubit_dna_ul
-  )
-) +
-  geom_point(size = 3, aes(
-    shape = hrd_status_check,
-    colour = hrd_status_check
-  )) +
-  scale_colour_manual(values = c("#CCCCCC", "#FF0000")) +
-  geom_hline(yintercept = 3.3, linetype = "dashed") +
-  scale_y_continuous(trans = "log10") +
-  theme_bw() +
-  theme(axis.text.x = element_blank()) +
-  labs(x = "")
 
 ## Tumour BRCA referral DNA concentrations ------------------------------------------
 
@@ -653,41 +589,32 @@ tbrca_data_collection_clean <- tbrca_data_collection |>
         c("Pathogenic BRCA1", "Pathogenic BRCA2") ~ "BRCA positive",
       t_brca_mutation_status %in%
         c("No mutation detected", "no mutation detected") ~ "BRCA negative"
-    ),
-    borderline = ifelse(gi_score >= 37 & gi_score <= 47, "Yes", "No")
+    )
   )
-
-tbrca_data_collection_clean |>
-  group_by(borderline) |>
-  summarise(total = n())
-
-243 / (sum(1864, 243))
 
 myriad_gi_profile_plot <- tbrca_data_collection_clean |>
   ggplot(aes(x = gi_score, y = )) +
   geom_histogram(binwidth = 1, aes(fill = gis_pos_neg)) +
   scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
   scale_x_continuous(
-    limits = c(0, 100),
     breaks = c(0, 25, 42, 50, 75, 100)
   ) +
-  theme_bw() +
   theme(
     panel.grid = element_blank(),
     legend.position = "bottom"
   ) +
-  # geom_vline(xintercept = 42, linetype = "dashed") +
   labs(
     y = "Number of samples",
     x = "Myriad GI score",
-    caption = paste0("Data for ", nrow(tbrca_data_collection_clean), " samples shown"),
     fill = "Myriad GI Status",
-    title = "Myriad GI Scores for North West GLH Samples"
+    title = "Myriad GI Scores for North West GLH Samples",
+    subtitle = paste0("Data for ", nrow(tbrca_data_collection_clean), " samples shown")
   )
 
-#save_hrd_plot(myriad_gi_profile_plot)
+# save_hrd_plot(myriad_gi_profile_plot)
 
-## SeqOne amended results -----------------------------------------------------------
+## LGA and LPC ----------------------------------------------------------------------
 
 line_df <- data.frame(
   x = c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),

@@ -632,3 +632,11 @@ compare_tests <- function(input_table, outcome_column) {
   return(list(confusion_matrix, metrics, check))
   
 }
+
+add_version <- function(input_table, version_text) {
+  
+  input_table |> 
+    mutate(Analysis = version_text) |> 
+    relocate(Analysis)
+  
+}
