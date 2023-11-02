@@ -87,7 +87,7 @@ read_myriad_report <- function(file) {
   
   r_number_regex <- regex(
     r"[
-    Patient\sID:        # Escape space with \s
+    Patient\sID:        # Escape space with backslash s
     \s{6}               # 6 spaces
     (R\d{2}-\w{4})      # R number grouped
     ]",
@@ -101,9 +101,9 @@ read_myriad_report <- function(file) {
   nhs_no_regex <- regex(
     r"[
     NHS\sNo:        
-    .{10,20}                    # Size of whitespace between "No:" and number can vary
-                                # Use . instead of \s as samples can have a leading
-                                # 0 before NHS number (example: R22-031L)
+    .{10,20}                    # Size of whitespace between No: and number can vary
+                                # Use . instead of backslash s as samples can have a leading
+                                # 0 before NHS number. Example: R22-031L
     (\d{3}\s\d{3}\s\d{4})       # Grouped NHS number format
     ]",
     comments = TRUE
@@ -157,7 +157,7 @@ read_myriad_report <- function(file) {
   
   path_block_2_regex <- regex(
     r"[
-    (Block\(s\)|Specimen\(s\))  # Some say "Block(s)" whilst others say "Specimen(s)"
+    (Block\(s\)|Specimen\(s\))  # Some say Block(s) whilst others say Specimen(s)
     \sAnalyzed:\s
     (.{5,20})                   # Path blocks can have various formats from different labs
     \n                          # Specify end of block number with new line
@@ -173,7 +173,7 @@ read_myriad_report <- function(file) {
     r"[
     Patient\sGenomic\sInstability\sScore:
     \s
-    (\d{1,2})                               # Score can be 1 digit (i.e. "7") or 2 ("73")
+    (\d{1,2})                               # Score can be 1 digit (i.e. 7) or 2 (73)
     \n                                      # Mark end of score with newline
     ]",
     comments = TRUE
@@ -245,7 +245,7 @@ read_seqone_report <- function(file) {
     CLASS\n
     \s{78,83}                      # Variable whitespace
     ((0\.\d{1,2})|(\d{1}))         # Variable formats: 0.99, 0.9, 1
-                                   # Use \. to specify decimal point
+                                   # Use backslash . to specify decimal point
     ]",
     comments = TRUE
   )
@@ -350,7 +350,7 @@ read_seqone_report <- function(file) {
     r"[
     Coverage
     \s{33,34}                      # Variable whitespace
-    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format. 1.57, 1.5, 1
+    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
     X
     ]",
     comments = TRUE
@@ -386,9 +386,9 @@ read_seqone_report <- function(file) {
     (WS\d{6})             # Group 1: worksheet
     _
     (\d{8})               # Group 2: 8 digit DLMS number
-    ([^\s]{0,17})         # Group 3: Additional sample info (only present for some samples)
+    ([^\s]{0,17})         # Group 3: Additional sample info only present for some samples
                           # Select any character after the underscore that isn't a space
-                          # String may be 17 characters. Example: "b_0.5_downsampled"
+                          # String may be 17 characters. Example: b_0.5_downsampled
     }",
     comments = TRUE
   )
@@ -409,7 +409,7 @@ read_seqone_report <- function(file) {
     r"[
     Date
     \s{32}        # Variable whitespace
-    (\w{3,9}      # Month as text. Shortest is "May" (3), longest "September" (9)
+    (\w{3,9}      # Month as text. Shortest is May (3), longest September (9)
     \s
     \d{1,2}       # Day (1-31)
     ,\s
