@@ -287,6 +287,30 @@ kapa_data_collated <- rbind(
   extract_kapa_data("135498", 7)
 )
 
+tbrca_data_collection <- read_excel(
+  paste0(
+    hrd_data_path,
+    "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"
+  ),
+  skip = 1
+) |>
+  janitor::clean_names()
+
+tbrca_data_collection_clean <- tbrca_data_collection |>
+  mutate(
+    gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested,
+                          na = c(
+                            "Fail", "Inconclusive",
+                            "Not tested", NA
+                          )),
+    brca_mutation_clean = case_when(
+      t_brca_mutation_status %in%
+        c("Pathogenic BRCA1", "Pathogenic BRCA2") ~ "BRCA positive",
+      t_brca_mutation_status %in%
+        c("No mutation detected", "no mutation detected") ~ "BRCA negative"
+    )
+  )
+
 ## SeqOne QC data -------------------------------------------------------------------
 
 seqone_qc_data <- read_excel(paste0(
@@ -546,7 +570,8 @@ export_timestamp(input = biobank_control_results)
 
 # Add function to plot results by QC metric
 
-## Tumour BRCA referral DNA concentrations ------------------------------------------
+
+## Manchester tBRCA DNA concentrations ----------------------------------------------
 
 brca_query <- "SELECT * FROM MolecularDB.dbo.Samples WHERE DISEASE IN (204)"
 
@@ -569,31 +594,7 @@ samples_failing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "No", ])
 fail_rate <- round((samples_failing_qc /
   (samples_passing_qc + samples_failing_qc)) * 100, 1)
 
-## Spread of Myriad GI scores -------------------------------------------------------
-
-tbrca_data_collection <- read_excel(
-  paste0(
-    hrd_data_path,
-    "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"
-  ),
-  skip = 1
-) |>
-  janitor::clean_names()
-
-tbrca_data_collection_clean <- tbrca_data_collection |>
-  mutate(
-    gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested,
-                          na = c(
-                            "Fail", "Inconclusive",
-                            "Not tested", NA
-                          )),
-    brca_mutation_clean = case_when(
-      t_brca_mutation_status %in%
-        c("Pathogenic BRCA1", "Pathogenic BRCA2") ~ "BRCA positive",
-      t_brca_mutation_status %in%
-        c("No mutation detected", "no mutation detected") ~ "BRCA negative"
-    )
-  )
+## Manchester tBRCA GI scores -------------------------------------------------------
 
 tbrca_gi_scores <- tbrca_data_collection_clean |>
   filter(!is.na(gi_score))
