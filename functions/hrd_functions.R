@@ -605,9 +605,14 @@ compare_tests <- function(input_table, outcome_column) {
   opa = round(((true_positives + true_negatives) / sum(true_positives, false_positives,
                                                      true_negatives, false_negatives)) * 100, 1)
   
+  all_samples = sum(true_positives, true_negatives, false_positives, false_negatives,
+                    incon_positives, incon_negatives)
+  
   sensitivity = round((true_positives / sum(true_positives, false_positives)) * 100, 1)
   
   specificity = round((true_negatives / sum(true_negatives, false_negatives)) * 100, 1)
+  
+  inconclusive_rate  = round(((incon_positives + incon_negatives) / all_samples) * 100, 1)
   
   dna_inputs <- nrow(input_table)
   
@@ -619,8 +624,8 @@ compare_tests <- function(input_table, outcome_column) {
                   "Check required")
   
   metrics <- tribble(
-    ~"OPA (%)", ~"Sensitivity (%)", ~"Specificity (%)", ~"Unique samples", ~"DNA inputs",
-    opa,        sensitivity,       specificity,         unique_samples,    dna_inputs
+    ~"OPA (%)", ~"Sensitivity (%)", ~"Specificity (%)", ~"Unique samples", ~"DNA inputs", ~"Inconclusive rate (%)",
+    opa,        sensitivity,       specificity,         unique_samples,    dna_inputs, inconclusive_rate
     )
   
   confusion_matrix <- tribble(
