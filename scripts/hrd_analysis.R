@@ -36,6 +36,10 @@ stopifnot(setdiff(
   collated_myriad_info$myriad_filename
 ) == 0)
 
+# Change HRD status for BRCA positive sample with GIS of 5 (for SeqOne comparison later)
+
+collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", "myriad_hrd_status"] <- "NEGATIVE"
+
 ## Collate SeqOne data --------------------------------------------------------------
 
 seqone_report_files <- list.files(seqone_report_location, full.names = TRUE)
