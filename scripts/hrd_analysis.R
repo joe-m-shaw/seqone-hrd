@@ -524,6 +524,25 @@ repeat_results <- compare_results |>
     input_ng < input_threshold ~ "lower than 50ng input"
   ))
 
+lpc_lga_facet_plot <- plot_lpc_lga(repeat_results) +
+  labs(title = "Inter-run variation with SomaHRDv2",
+       x = "LGA", y = "LPC") +
+  facet_wrap(~dlms_dna_number)
+
+save_hrd_plot(lpc_lga_facet_plot)
+
+repeat_variation <- repeat_results |> 
+  group_by(dlms_dna_number) |> 
+  summarise(max_lga = max(lga_amended),
+            min_lga = min(lga_amended),
+            range_lga = max_lga-min_lga,
+            max_lpc = max(lpc_amended),
+            min_lpc = min(lpc_amended),
+            range_lpc = max_lpc - min_lpc)
+
+median(repeat_variation$range_lga)
+median(repeat_variation$range_lpc)
+
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
   y = seqone_hrd_score
@@ -571,12 +590,8 @@ seraseq_control_data <- compare_results |>
     "High-Positive FFPE HRD"
   )))
 
-ggplot(seraseq_control_data, aes(x = worksheet, y = seqone_hrd_score)) +
-  geom_point(size = 3) +
-  facet_wrap(~firstname_factor) +
-  theme_bw() +
-  theme(panel.grid = element_blank()) +
-  labs(title = "Seraseq Controls: repeat SeqOne data")
+plot_lpc_lga(seraseq_control_data) +
+  facet_wrap(~firstname_factor)
 
 ## Biobank controls -----------------------------------------------------------------
 
@@ -704,13 +719,6 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
 277/(277+2108)
   
 ## LGA and LPC ----------------------------------------------------------------------
-
-line_df <- data.frame(
-  x =    c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
-  y =    c(0,   4,  9, 13, 18, 23,  4,  9, 13, 18, 23),
-  xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
-  yend = c(4,   9, 13, 18, 23, 36,  4,  9, 13, 18, 23)
-)
 
 lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
   geom_point(aes(colour = seqone_hrd_status),

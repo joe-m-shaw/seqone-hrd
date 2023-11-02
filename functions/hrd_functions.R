@@ -507,6 +507,30 @@ plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outc
   
 }
 
+# Line delineating positive from negative SeqOne results
+line_df <- data.frame(
+  x =    c(18, 17, 16, 15, 14, 13, 18, 17, 16, 15, 14),
+  y =    c(0,   4,  9, 13, 18, 23,  4,  9, 13, 18, 23),
+  xend = c(18, 17, 16, 15, 14, 13, 17, 16, 15, 14, 13),
+  yend = c(4,   9, 13, 18, 23, 36,  4,  9, 13, 18, 23)
+)
+
+plot_lpc_lga <- function(df) {
+  
+  ggplot(df, aes(x = lga_amended, y = lpc_amended)) +
+    geom_point(aes(colour = seqone_hrd_status_amended),
+               size = 2, alpha = 0.6) +
+    scale_colour_manual(name = "SeqOne HRD Status",
+                        values = c(safe_blue, safe_grey, safe_red)) +
+    geom_segment(
+      data = line_df,
+      mapping = aes(x = x, y = y, xend = xend, yend = yend)
+    ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+  
+}
+
 save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi = 300) {
   # Default inputs allow for presenting a plot as half an A4 page
 
