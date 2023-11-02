@@ -581,13 +581,12 @@ tbrca_data_collection <- read_excel(
   janitor::clean_names()
 
 tbrca_data_collection_clean <- tbrca_data_collection |>
-  filter(!gis_score_numerical_value_or_fail_not_tested %in% c(
-    "Fail", "Inconclusive",
-    "Not tested", NA
-  )) |>
-  filter(t_brca_mutation_status != "Fail") |>
   mutate(
-    gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested),
+    gi_score = as.numeric(gis_score_numerical_value_or_fail_not_tested,
+                          na = c(
+                            "Fail", "Inconclusive",
+                            "Not tested", NA
+                          )),
     brca_mutation_clean = case_when(
       t_brca_mutation_status %in%
         c("Pathogenic BRCA1", "Pathogenic BRCA2") ~ "BRCA positive",
@@ -596,7 +595,10 @@ tbrca_data_collection_clean <- tbrca_data_collection |>
     )
   )
 
-myriad_gi_profile_plot <- tbrca_data_collection_clean |>
+tbrca_gi_scores <- tbrca_data_collection_clean |>
+  filter(!is.na(gi_score))
+
+myriad_gi_profile_plot <- tbrca_gi_scores |> 
   ggplot(aes(x = gi_score, y = )) +
   geom_histogram(binwidth = 1, aes(fill = gis_pos_neg)) +
   scale_fill_manual(values = c(safe_blue, safe_red)) +
@@ -613,11 +615,25 @@ myriad_gi_profile_plot <- tbrca_data_collection_clean |>
     x = "Myriad GI score",
     fill = "Myriad GI Status",
     title = "Myriad GI Scores for North West GLH Samples",
-    subtitle = paste0("Data for ", nrow(tbrca_data_collection_clean), " samples shown")
+    subtitle = paste0("Data for ", nrow(tbrca_gi_scores), " samples shown")
   )
 
 # save_hrd_plot(myriad_gi_profile_plot)
 
+exclude <- c("Fail", "Not tested", "Awaiting result")
+
+tbrca_inconclusive_data <- tbrca_data_collection_clean |> 
+  filter(!gis_score_numerical_value_or_fail_not_tested %in% exclude &
+           !gis_pos_neg %in% exclude &
+           !overall_hrd_pos_neg %in% exclude) |> 
+  mutate(result_type = case_when(
+    gis_score_numerical_value_or_fail_not_tested == "Inconclusive" ~"Inconclusive",
+    gi_score >=0 & gi_score <= 100 ~"Conclusive result"
+  )) |> 
+  count(result_type)
+  
+277/(277+2108)
+  
 ## LGA and LPC ----------------------------------------------------------------------
 
 line_df <- data.frame(
