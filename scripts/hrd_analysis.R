@@ -454,8 +454,12 @@ compare_results <- join_tables |>
       
       TRUE ~ "other"),
     
+    outcome_binary_v2 = factor(outcome_binary_v2, levels = c(consistent_text,
+                                                            inconsistent_text,
+                                                            inconclusive_text))
+    
     )
-      
+
 
 ## Sensitivity and specificity ------------------------------------------------------
 
@@ -463,34 +467,34 @@ coverage_threshold <- 0.5
 
 input_threshold <- 47
 
-v1_results <- compare_results |> 
+v1.1_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
   compare_tests(outcome_v1)
 
-v1_results_filtered <- compare_results |> 
+v1.1_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" &
            coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v1)
 
-v2_results <- compare_results |> 
+v1.2_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") |> 
   compare_tests(outcome_v2)
 
-v2_results_filtered <- compare_results |> 
+v1.2_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" &
            coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v2)
 
-metric_table <- rbind(add_version(v1_results[[2]], "SomaHRD v1"),
-                      add_version(v1_results_filtered[[2]], "SomaHRD v1, thresholds applied"),
-                      add_version(v2_results[[2]], "SomaHRD v2"),
-                      add_version(v2_results_filtered[[2]], "SomaHRD v2, thresholds applied"))
+metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
+                      add_version(v1.1_results_filtered[[2]], "SomaHRD v1.1, thresholds applied"),
+                      add_version(v1.2_results[[2]], "SomaHRD v1.2"),
+                      add_version(v1.2_results_filtered[[2]], "SomaHRD v1.2, thresholds applied"))
 
 # export_timestamp(hrd_output_path, metric_table)
 
-# export_timestamp(hrd_output_path, v1_results[[1]])
+# export_timestamp(hrd_output_path, v1.1_results[[1]])
 
-# export_timestamp(hrd_output_path, v2_results[[1]])
+# export_timestamp(hrd_output_path, v1.2_results[[1]])
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 
@@ -525,11 +529,11 @@ repeat_results <- compare_results |>
   ))
 
 lpc_lga_facet_plot <- plot_lpc_lga(repeat_results) +
-  labs(title = "Inter-run variation with SomaHRDv2",
+  labs(title = "Inter-run variation with SomaHRDv1.2",
        x = "LGA", y = "LPC") +
   facet_wrap(~dlms_dna_number)
 
-save_hrd_plot(lpc_lga_facet_plot)
+#save_hrd_plot(lpc_lga_facet_plot)
 
 repeat_variation <- repeat_results |> 
   group_by(dlms_dna_number) |> 
@@ -538,10 +542,43 @@ repeat_variation <- repeat_results |>
             range_lga = max_lga-min_lga,
             max_lpc = max(lpc_amended),
             min_lpc = min(lpc_amended),
-            range_lpc = max_lpc - min_lpc)
+            range_lpc = max_lpc - min_lpc,
+            max_cov = max(coverage.x),
+            min_cov = min(coverage.x),
+            range_cov = max_cov - min_cov)
 
-median(repeat_variation$range_lga)
-median(repeat_variation$range_lpc)
+
+plot_variation <- function(df = repeat_variation, yvar) {
+  
+  ggplot(df, aes(x = , y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(axis.text.x = element_blank()) +
+    ylim(0,30)
+
+}
+
+lga_variation <- plot_variation(yvar = range_lga) +
+  labs(y = "LGA variation", title = "LGA variation in repeated samples")
+
+lpc_variation <- plot_variation(yvar = range_lpc) +
+  labs(y = "LPC variation", title = "LPC variation in repeated samples")
+
+ggarrange(lga_variation, lpc_variation, ncol = 2, nrow = 1)
+
+
+ggplot(repeat_variation, aes(x = range_cov, y = range_lpc)) +
+  geom_point()
+
+
+
+
+
+compare_results |> 
+  filter(dlms_dna_number == 21003549) |> 
+  select(shallow_sample_id, lga_amended, lpc_amended,
+         coverage.x, insert_size)
+
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -575,7 +612,7 @@ intra_run_table <- compare_results |>
   filter(worksheet == "WS133557") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_score, lga, lpc, coverage.x) |> 
+  select(sample_id, seqone_hrd_status_amended, lga_amended, lpc_amended, coverage.x) |> 
   arrange(sample_id)
 
 export_timestamp(input = intra_run_table)
@@ -590,21 +627,49 @@ seraseq_control_data <- compare_results |>
     "High-Positive FFPE HRD"
   )))
 
-plot_lpc_lga(seraseq_control_data) +
+seraseq_plot <- plot_lpc_lga(seraseq_control_data) +
   facet_wrap(~firstname_factor)
+
+save_hrd_plot(seraseq_plot)
 
 ## Biobank controls -----------------------------------------------------------------
 
 biobank_control_results <- compare_results |> 
   filter(control_type == "Biobank control") |> 
-  select(dlms_dna_number, seqone_hrd_status, seqone_hrd_score, lga, lpc, ccne1, rad51b)
+  select(dlms_dna_number, seqone_hrd_status_amended, lga_amended, lpc_amended)
 
 export_timestamp(input = biobank_control_results)
 
 ## QC metrics -----------------------------------------------------------------------
 
+coverage_line <- geom_hline(yintercept = coverage_threshold, linetype = "dashed")
+
+input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
+
 filtered_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") 
+
+cov_v11 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v1) +
+  labs(x = "", title = "Coverage - SomaHRDv1.1") +
+  coverage_line
+
+cov_v12 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v2) +
+  labs(x = "", title = "Coverage - SomaHRDv1.2") +
+  coverage_line
+
+input_v11 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v1) +
+  labs(x = "", title = "DNA input - SomaHRDv1.1")
+
+input_v12 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v2) +
+  labs(x = "", title = "DNA input - SomaHRDv1.2") 
+
+coverage_input_plot <- ggarrange(cov_v12, input_v12,
+          nrow = 2, ncol = 1,
+          common.legend = TRUE,
+          legend = "bottom")
+
+save_hrd_plot(coverage_input_plot)
+
 
 coverage_plot_v1 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v1)
 

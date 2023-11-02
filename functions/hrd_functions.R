@@ -491,10 +491,9 @@ safe_grey <- "#888888"
 
 plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outcome) {
   
-  title_label <- rlang::englue("{{ yvar }}")
+  #title_label <- rlang::englue("{{ yvar }}")
   
-  ggplot(df, aes(x = reorder({{ x_var }}, {{ yvar }}),
-                 y = {{ yvar }})) +
+  ggplot(df, aes(x = {{ x_var }}, y = {{ yvar }})) +
     geom_point(size = 3, alpha = 0.6,
                aes(colour = {{ outcome }})) +
     scale_colour_manual(name = "",
@@ -502,8 +501,7 @@ plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outc
     theme_bw() +
     theme(axis.text.x = element_blank(),
           panel.grid = element_blank(),
-          legend.position = "bottom") +
-    labs(x = "", title = title_label)
+          legend.position = "bottom")
   
 }
 
