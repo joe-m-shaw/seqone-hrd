@@ -487,6 +487,25 @@ safe_colorblind_palette <- c(
 
 safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
+safe_grey <- "#888888"
+
+plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outcome) {
+  
+  title_label <- rlang::englue("{{ yvar }}")
+  
+  ggplot(df, aes(x = reorder({{ x_var }}, {{ yvar }}),
+                 y = {{ yvar }})) +
+    geom_point(size = 3, alpha = 0.6,
+               aes(colour = {{ outcome }})) +
+    scale_colour_manual(name = "",
+                        values = c(safe_blue, safe_red, safe_grey)) +
+    theme_bw() +
+    theme(axis.text.x = element_blank(),
+          panel.grid = element_blank(),
+          legend.position = "bottom") +
+    labs(x = "", title = title_label)
+  
+}
 
 save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi = 300) {
   # Default inputs allow for presenting a plot as half an A4 page

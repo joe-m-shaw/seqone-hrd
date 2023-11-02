@@ -432,7 +432,27 @@ compare_results <- join_tables |>
       
       seqone_hrd_status_amended == incon_text & myriad_hrd_status == neg_text ~incon_neg_text,
       
-      TRUE ~ "other")
+      TRUE ~ "other"),
+    
+    outcome_binary_v1 = case_when(
+      
+      outcome_v1 %in% c(true_pos_text, true_neg_text) ~consistent_text,
+      
+      outcome_v1 %in% c(false_pos_text, false_neg_text) ~inconsistent_text,
+      
+      outcome_v1 %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
+      
+      TRUE ~ "other"),
+    
+    outcome_binary_v2 = case_when(
+      
+      outcome_v2 %in% c(true_pos_text, true_neg_text) ~consistent_text,
+      
+      outcome_v2 %in% c(false_pos_text, false_neg_text) ~inconsistent_text,
+      
+      outcome_v2 %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
+      
+      TRUE ~ "other"),
     
     )
       
@@ -568,8 +588,56 @@ export_timestamp(input = biobank_control_results)
 
 ## QC metrics -----------------------------------------------------------------------
 
-# Add function to plot results by QC metric
+filtered_results <- compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match") 
 
+coverage_plot_v1 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v1)
+
+readlength_plot_v1 <- plot_qc(yvar = read_length, outcome = outcome_binary_v1)
+
+millreads_plot_v1 <- plot_qc(yvar = million_reads, outcome = outcome_binary_v1)
+
+insertsize_plot_v1 <- plot_qc(yvar = insert_size, outcome = outcome_binary_v1)
+
+percentq30_plot_v1 <- plot_qc(yvar = percent_q30, outcome = outcome_binary_v1)
+
+percentaligned_plot_v1 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary_v1)
+
+percentdups_plot_v1 <- plot_qc(yvar = percent_dups, outcome = outcome_binary_v1)
+
+input_plot_v1 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v1)
+
+qc_metrics_v1 <- ggarrange(coverage_plot_v1, readlength_plot_v1, 
+                           millreads_plot_v1, insertsize_plot_v1,
+                           percentq30_plot_v1, percentaligned_plot_v1, 
+                           percentdups_plot_v1, input_plot_v1,
+          ncol = 4, nrow = 2,
+          common.legend = TRUE,
+          legend = "bottom")
+
+coverage_plot_v2 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v2)
+
+readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary_v2)
+
+millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary_v2)
+
+insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary_v2)
+
+percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary_v2)
+
+percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary_v2)
+
+percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary_v2)
+
+input_plot_v2 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v2)
+
+qc_metrics_v2 <- ggarrange(coverage_plot_v2, readlength_plot_v2, 
+                           millreads_plot_v2, insertsize_plot_v2, 
+                           percentq30_plot_v2, percentaligned_plot_v2,
+                           percentdups_plot_v2, input_plot_v2,
+                           ncol = 4, nrow = 2,
+                           common.legend = TRUE,
+                           legend = "bottom")
 
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
 
