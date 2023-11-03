@@ -302,6 +302,25 @@ get_hrd_status <- function(page) {
   
 }
 
+get_lga <- function(page) {
+  
+  lga_regex <- regex(
+    r"[
+    LGA\sStatus
+    \s{35, 38}      # Variable whitespace - 35 in v1.2
+    (\d{1,2})       # Group LGA status
+    ]",
+    comments = TRUE
+  )
+  
+  lga <- parse_number(str_extract(page, lga_regex, group = 1))
+  
+  return(lga)
+  
+}
+
+
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -324,16 +343,7 @@ read_seqone_report <- function(file) {
 
   # LGA
   
-  lga_regex <- regex(
-    r"[
-    LGA\sStatus
-    \s{38}          # Variable whitespace
-    (\d{1,2})       # Group LGA status
-    ]",
-    comments = TRUE
-  )
-  
-  lga <- parse_number(str_extract(page1, lga_regex, group = 1))
+  lga <- get_lga(page1)
   
   # LPC
   
