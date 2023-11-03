@@ -350,6 +350,8 @@ get_ncc <- function(page) {
   
   seqone_ncc <- parse_number(str_extract(page, ncc_regex, group = 1))
   
+  assert_that(seqone_ncc >= 20, seqone_ncc <= 100)
+  
   return(seqone_ncc)
   
 }
@@ -373,6 +375,27 @@ get_coverage <- function(page) {
   
 }
 
+get_percent_mapping <- function(page) {
+  
+  percent_map_regex <- regex(
+    r"[
+    %\scorrect\smapping
+    \s{24,45}                     # Variable whitespace between versions
+    ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
+                                  # Assume percent mapping always above 10
+    %
+    ]",
+    comments = TRUE
+  )
+  
+  percent_mapping <- parse_number(str_extract(page, percent_map_regex, group = 1),
+                                  locale = locale(decimal_mark = "."))
+  
+  assert_that(percent_mapping >= 0, percent_mapping <= 100)
+  
+  return(percent_mapping)
+  
+}
 
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
@@ -434,29 +457,13 @@ read_seqone_report <- function(file) {
 
   seqone_ncc <- get_ncc(page1)
   
-  assert_that(seqone_ncc >= 20, seqone_ncc <= 100)
-
   # Coverage
   
   coverage <- get_coverage(page1)
 
   # Percent mapping
   
-  percent_map_regex <- regex(
-    r"[
-    %\scorrect\smapping
-    \s{24,25}                     # Variable whitespace
-    ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
-                                  # Assume percent mapping always above 10
-    %
-    ]",
-    comments = TRUE
-  )
-  
-  percent_mapping <- parse_number(str_extract(page1, percent_map_regex, group = 1),
-               locale = locale(decimal_mark = "."))
-
-  assert_that(percent_mapping >= 0, percent_mapping <= 100)
+  percent_mapping <- get_percent_mapping(page1)
 
   # Shallow sample ID
   
