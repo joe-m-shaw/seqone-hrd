@@ -339,7 +339,8 @@ seqone_amended <- read_excel(
     shallow_sample_id = sample,
     seqone_hrd_status_amended = amended_seq_one_hrd_status,
     lga_amended = lga,
-    lpc_amended = lpc
+    lpc_amended = lpc,
+    low_tumor_fraction = low_tumor_fraction_returns_a_warning_only
   )
 
 
@@ -392,7 +393,7 @@ join_tables <- seqone_mod |>
     seqone_amended |>
       select(
         shallow_sample_id, seqone_hrd_status_amended,
-        lga_amended, lpc_amended, low_tumor_fraction_returns_a_warning_only
+        lga_amended, lpc_amended, low_tumor_fraction
       ),
     by = "shallow_sample_id"
   ) 
@@ -456,7 +457,11 @@ compare_results <- join_tables |>
     
     outcome_binary_v2 = factor(outcome_binary_v2, levels = c(consistent_text,
                                                             inconsistent_text,
-                                                            inconclusive_text))
+                                                            inconclusive_text)),
+    
+    
+    seqone_hrd_status_amended =factor(seqone_hrd_status_amended, levels = 
+                                        c(neg_text, pos_text, incon_text))
     
     )
 
@@ -548,37 +553,15 @@ repeat_variation <- repeat_results |>
             range_cov = max_cov - min_cov)
 
 
-plot_variation <- function(df = repeat_variation, yvar) {
-  
-  ggplot(df, aes(x = , y = {{ yvar }})) +
-    geom_boxplot() +
-    theme_bw() +
-    theme(axis.text.x = element_blank()) +
-    ylim(0,30)
-
-}
-
 lga_variation <- plot_variation(yvar = range_lga) +
-  labs(y = "LGA variation", title = "LGA variation in repeated samples")
+  labs(y = "Difference in LGA between sample repeats", title = "LGA variation")
 
 lpc_variation <- plot_variation(yvar = range_lpc) +
-  labs(y = "LPC variation", title = "LPC variation in repeated samples")
+  labs(y = "Difference in LPC between sample repeats", title = "LPC variation")
 
-ggarrange(lga_variation, lpc_variation, ncol = 2, nrow = 1)
+lga_lpc_variation <- ggarrange(lga_variation, lpc_variation, ncol = 2, nrow = 1)
 
-
-ggplot(repeat_variation, aes(x = range_cov, y = range_lpc)) +
-  geom_point()
-
-
-
-
-
-compare_results |> 
-  filter(dlms_dna_number == 21003549) |> 
-  select(shallow_sample_id, lga_amended, lpc_amended,
-         coverage.x, insert_size)
-
+save_hrd_plot(lga_lpc_variation)
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -636,7 +619,8 @@ save_hrd_plot(seraseq_plot)
 
 biobank_control_results <- compare_results |> 
   filter(control_type == "Biobank control") |> 
-  select(dlms_dna_number, seqone_hrd_status_amended, lga_amended, lpc_amended)
+  select(dlms_dna_number, seqone_hrd_status_amended, lga_amended, lpc_amended,
+         low_tumor_fraction)
 
 export_timestamp(input = biobank_control_results)
 
@@ -668,32 +652,10 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
           common.legend = TRUE,
           legend = "bottom")
 
-save_hrd_plot(coverage_input_plot)
+# save_hrd_plot(coverage_input_plot)
 
-
-coverage_plot_v1 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v1)
-
-readlength_plot_v1 <- plot_qc(yvar = read_length, outcome = outcome_binary_v1)
-
-millreads_plot_v1 <- plot_qc(yvar = million_reads, outcome = outcome_binary_v1)
-
-insertsize_plot_v1 <- plot_qc(yvar = insert_size, outcome = outcome_binary_v1)
-
-percentq30_plot_v1 <- plot_qc(yvar = percent_q30, outcome = outcome_binary_v1)
-
-percentaligned_plot_v1 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary_v1)
-
-percentdups_plot_v1 <- plot_qc(yvar = percent_dups, outcome = outcome_binary_v1)
-
-input_plot_v1 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v1)
-
-qc_metrics_v1 <- ggarrange(coverage_plot_v1, readlength_plot_v1, 
-                           millreads_plot_v1, insertsize_plot_v1,
-                           percentq30_plot_v1, percentaligned_plot_v1, 
-                           percentdups_plot_v1, input_plot_v1,
-          ncol = 4, nrow = 2,
-          common.legend = TRUE,
-          legend = "bottom")
+outlier_sample <- compare_results |> 
+  filter(dlms_dna_number == 21003549)
 
 coverage_plot_v2 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v2)
 
@@ -769,6 +731,8 @@ myriad_gi_profile_plot <- tbrca_gi_scores |>
 
 # save_hrd_plot(myriad_gi_profile_plot)
 
+## Manchester tBRCA inconclusive rate -----------------------------------------------
+
 exclude <- c("Fail", "Not tested", "Awaiting result")
 
 tbrca_inconclusive_data <- tbrca_data_collection_clean |> 
@@ -780,9 +744,10 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
     gi_score >=0 & gi_score <= 100 ~"Conclusive result"
   )) |> 
   count(result_type)
-  
-277/(277+2108)
-  
+
+max(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
+min(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
+
 ## LGA and LPC ----------------------------------------------------------------------
 
 lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
@@ -802,23 +767,11 @@ lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
     subtitle = "CCNE1 and RAD51B included"
   )
 
-lga_vs_lpc_amended <- ggplot(compare_results, aes(lga_amended, lpc_amended)) +
-  geom_point(aes(colour = seqone_hrd_status_amended),
-    size = 3
-  ) +
-  scale_colour_manual(name = "SeqOne HRD Status", 
-                      values = c(safe_blue, "#CCCCCC", safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  geom_segment(
-    data = line_df,
-    mapping = aes(x = x, y = y, xend = xend, yend = yend),
-    linetype = "dashed"
-  ) +
+lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
   labs(
     x = "Large Genomic Alterations",
     y = "Loss of Parental Copy",
-    title = "LGA and LPC results for SomaHRD v2",
+    title = "LGA and LPC results for SomaHRD v1.2",
     subtitle = str_c("Data for ", nrow(compare_results), " samples")
   )
   
