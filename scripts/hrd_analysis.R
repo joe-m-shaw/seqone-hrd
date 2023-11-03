@@ -618,7 +618,7 @@ intra_run_table <- compare_results |>
   select(sample_id, seqone_hrd_status_amended, lga_amended, lpc_amended, coverage) |> 
   arrange(sample_id)
 
-export_timestamp(input = intra_run_table)
+# export_timestamp(input = intra_run_table)
 
 ## Seraseq controls -----------------------------------------------------------------
 
@@ -633,7 +633,7 @@ seraseq_control_data <- compare_results |>
 seraseq_plot <- plot_lpc_lga(seraseq_control_data) +
   facet_wrap(~firstname_factor)
 
-save_hrd_plot(seraseq_plot)
+# save_hrd_plot(seraseq_plot)
 
 ## Biobank controls -----------------------------------------------------------------
 
@@ -795,7 +795,7 @@ lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
     subtitle = str_c("Data for ", nrow(compare_results), " samples")
   )
   
-save_hrd_plot(lga_vs_lpc_amended)
+# save_hrd_plot(lga_vs_lpc_amended)
 
 ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
   nrow = 1

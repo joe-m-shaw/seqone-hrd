@@ -64,7 +64,8 @@ export_timestamp <- function(filepath = hrd_output_path, input) {
   )
 }
 
-# PDF functions ---------------------------------------------------------------------
+
+# Reading Myriad PDFs ---------------------------------------------------------------
 
 check_na <- function(input_table) {
   assert_that(sum(is.na(input_table)) == 0,
@@ -233,6 +234,52 @@ read_myriad_report <- function(file) {
   return(output)
 }
 
+
+# Reading SeqOne PDFs ---------------------------------------------------------------
+
+get_hrd_score <- function(page, version) {
+  
+  assert_that(version %in% c("1.1", "1.2"))
+  
+  hrd_score_regex_1_1 <- regex(
+    r"[
+    CLASS\n
+    \s{78,83}                     # Variable whitespace
+    ((0\.\d{1,2})|(\d{1}))        # Variable formats: 0.99, 0.9, 1
+                                  # Use backslash . to specify decimal point
+    ]",
+    comments = TRUE
+  )
+
+  hrd_score_regex_1_2 <- regex(
+    r"[
+    HRD\sSummary\n
+    \s{67}
+    (\d{1}\.\d{2})
+    ]",
+    comments = TRUE
+  )
+  
+  if(version == "1.1") {
+    
+    hrd_score_regex <- hrd_score_regex_1_1
+    
+  }
+  
+  if(version == "1.2") {
+    
+    hrd_score_regex <- hrd_score_regex_1_2
+    
+  }
+  
+  hrd_score_char <- str_extract(page, hrd_score_regex, group = 1)
+  
+  hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
+
+  return(hrd_score_double)
+  
+}
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -240,27 +287,14 @@ read_seqone_report <- function(file) {
 
   # HRD score
   
-  hrd_score_regex <- regex(
-    r"[
-    CLASS\n
-    \s{78,83}                      # Variable whitespace
-    ((0\.\d{1,2})|(\d{1}))         # Variable formats: 0.99, 0.9, 1
-                                   # Use backslash . to specify decimal point
-    ]",
-    comments = TRUE
+  hrd_score <- get_hrd_score(page = page1, version = "1.1")
+  
+  assert_that(is.na(hrd_score) == FALSE,
+              msg = str_c("Seqone HRD score is NA. File: ", basename(file))
   )
   
-  hrd_score_char <- str_extract(page1, hrd_score_regex, group = 1)
-  
-  hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
-
-  assert_that(is.na(hrd_score_double) == FALSE,
-    msg = str_c("Seqone HRD score is NA. File: ", basename(file))
-  )
-
-  assert_that(hrd_score_double >= 0, hrd_score_double <= 1,
-    msg = str_c("SeqOne HRD score outside 0-1 range. File: ", basename(file))
-  )
+  assert_that(hrd_score >= 0, hrd_score <= 1,
+              msg = str_c("SeqOne HRD score outside 0-1 range. File: ", basename(file)))
 
   # HRD status
   
@@ -440,7 +474,7 @@ read_seqone_report <- function(file) {
     "worksheet" = worksheet,
     "sample_id" = sample_id,
     "dlms_dna_number" = dlms_dna_number,
-    "seqone_hrd_score" = hrd_score_double,
+    "seqone_hrd_score" = hrd_score,
     "seqone_hrd_status" = seqone_hrd_status,
     "lga" = lga,
     "lpc" = lpc,
@@ -454,7 +488,7 @@ read_seqone_report <- function(file) {
     "filename" = basename(file)
   )
 
-  check_na(output)
+  #check_na(output)
 
   return(output)
 }
