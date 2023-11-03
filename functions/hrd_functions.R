@@ -354,6 +354,26 @@ get_ncc <- function(page) {
   
 }
 
+get_coverage <- function(page) {
+  
+  coverage_regex <- regex(
+    r"[
+    Coverage
+    \s{33,54}                      # Variable whitespace between versions
+    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
+    X
+    ]",
+    comments = TRUE
+  )
+  
+  coverage <- parse_number(str_extract(page, coverage_regex, group = 1),
+                           locale = locale(decimal_mark = "."))
+  
+  return(coverage)
+  
+}
+
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -418,18 +438,7 @@ read_seqone_report <- function(file) {
 
   # Coverage
   
-  coverage_regex <- regex(
-    r"[
-    Coverage
-    \s{33,34}                      # Variable whitespace
-    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
-    X
-    ]",
-    comments = TRUE
-  )
-  
-  coverage <- parse_number(str_extract(page1, coverage_regex, group = 1),
-               locale = locale(decimal_mark = "."))
+  coverage <- get_coverage(page1)
 
   # Percent mapping
   
