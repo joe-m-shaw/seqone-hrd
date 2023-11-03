@@ -205,17 +205,21 @@ seqone_dlms_extractions <- seqone_dlms_info |>
 
 ## Initial DNA concentrations -------------------------------------------------------
 
+# Export from Sharepoint
 dna_concentrations <- read_excel(
-  path = paste0(hrd_data_path, "HS2_sample_prep_export.xlsx"),
+  path = paste0(hrd_data_path, "HS2 Sample Prep 2023 - NEW.xlsx"),
   col_types = c(
     "date", "numeric", "text", "text",
     "date", "numeric", "numeric",
     "numeric", "numeric", "numeric",
+    "date", "numeric", "numeric", "numeric", "numeric","numeric",
     "date", "text", "numeric",
-    "numeric", "text", "text"
-  )
+    "numeric", "text", "text",
+    "text","text"
+  ),
+  sheet = "HRD_SeqOne"
 ) |>
-  janitor::clean_names() |>
+  janitor::clean_names() |> 
   dplyr::rename(
     dlms_dna_number = sample_id,
     forename = name,
@@ -225,14 +229,20 @@ dna_concentrations <- read_excel(
     nd_260_230 = x8,
     stock_volume_ul = qubit,
     qubit_dna_ul = x10,
+    cleanup_date = clean_up,
+    cleanup_nanodrop_ng_ul = x12,
+    cleanup_260_280 = x13,
+    cleanup_260_230 = x14,
+    cleanup_volume = x15,
+    cleanup_qubit_ng_ul = x16,
     dilution_date = dilution,
-    dilution_worksheet = x12,
-    dilution_dna_volume = x13,
-    dilution_water_volume = x14
-  ) |>
-  filter(!is.na(dlms_dna_number))
+    dilution_worksheet = x18,
+    dilution_dna_volume = x19,
+    dilution_water_volume = x20
+  )
 
 dna_concentrations_mod <- dna_concentrations |>
+  slice(-(1:28)) |> 
   mutate(
     dilution_concentration = ifelse(
 
@@ -247,16 +257,21 @@ dna_concentrations_mod <- dna_concentrations |>
 
     # 15ul of diluted or neat (undiluted) DNA used in fragmentation reaction
     input_ng = dilution_concentration * 15,
+    
+    # Worksheet not added to spreadsheet - add by date
+    dilution_worksheet = case_when(
+      
+      as.character(date_submitted) %in% c("2023-07-21",
+                                          "2023-07-26",
+                                          "2023-08-03") ~"WS133557",
+      
+      as.character(date_submitted) == "2023-09-15" ~"WS134687",
+      
+      as.character(date_submitted) == "2023-09-27" ~"WS135001",
+      
+      as.character(date_submitted) == "2023-10-12" ~"WS135498")
 
-    # 1 haploid genome = 3.3 picograms
-    input_genomes = (input_ng * 1000) / 3.3
-  ) |>
-  # Some samples used on previous runs. Filtering by comments isolates
-  # the dilutions for the HRD runs
-  filter(!is.na(comments)) |>
-  # Checked: repeat rows of the same DNA number have the same DNA concentration
-  # and dilution volumes
-  filter(!base::duplicated(dlms_dna_number))
+  )
 
 ## qPCR library QC ------------------------------------------------------------------
 
@@ -286,6 +301,8 @@ kapa_data_collated <- rbind(
   extract_kapa_data("135001", 31),
   extract_kapa_data("135498", 7)
 )
+
+## tBRCA data -----------------------------------------------------------------------
 
 tbrca_data_collection <- read_excel(
   paste0(
@@ -370,24 +387,27 @@ seqone_mod <- collated_seqone_info |>
       grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) ~ "Biobank control",
       grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) ~ "Seraseq control",
       TRUE ~ "patient"
-    )
+    ),
+    
+    dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
+    
   ) |>
-  left_join(seqone_qc_data, by = "shallow_sample_id")
+  left_join(seqone_qc_data |> 
+              select(-coverage), by = "shallow_sample_id")
 
 ## Join data tables together --------------------------------------------------------
 
 join_tables <- seqone_mod |>
-  left_join(collated_myriad_info_mod, by = "nhs_number") |>
-  left_join(path_block_check, by = "dlms_dna_number") |>
+  left_join(collated_myriad_info_mod, by = "nhs_number", keep = FALSE) |>
+  left_join(path_block_check, by = "dlms_dna_number",  keep = FALSE) |>
   left_join(dna_concentrations_mod |>
-    select(
-      dlms_dna_number, qubit_dna_ul, input_ng,
-      input_genomes
-    ), by = "dlms_dna_number") |>
+    select(dlms_dna_number, dilution_worksheet, qubit_dna_ul, input_ng), 
+    by = c("dlms_dna_number", "dilution_worksheet"),
+    keep = FALSE) |>
   left_join(
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
-    by = "shallow_sample_id"
+    by = "shallow_sample_id",  keep = FALSE
   ) |>
   left_join(
     seqone_amended |>
@@ -395,7 +415,7 @@ join_tables <- seqone_mod |>
         shallow_sample_id, seqone_hrd_status_amended,
         lga_amended, lpc_amended, low_tumor_fraction
       ),
-    by = "shallow_sample_id"
+    by = "shallow_sample_id",  keep = FALSE
   ) 
 
 # Analyse Data ----------------------------------------------------------------------
@@ -478,7 +498,7 @@ v1.1_results <- compare_results |>
 
 v1.1_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" &
-           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
+           coverage >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v1)
 
 v1.2_results <- compare_results |> 
@@ -487,7 +507,7 @@ v1.2_results <- compare_results |>
 
 v1.2_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" &
-           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
+           coverage >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests(outcome_v2)
 
 metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
@@ -505,7 +525,7 @@ metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
 
 compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & 
-           coverage.x >= coverage_threshold & input_ng >= input_threshold) |> 
+           coverage >= coverage_threshold & input_ng >= input_threshold) |> 
   ggplot(aes(myriad_gi_score, seqone_hrd_score)) +
   geom_point(size = 3, alpha = 0.7) +
   theme_bw() +
@@ -548,8 +568,8 @@ repeat_variation <- repeat_results |>
             max_lpc = max(lpc_amended),
             min_lpc = min(lpc_amended),
             range_lpc = max_lpc - min_lpc,
-            max_cov = max(coverage.x),
-            min_cov = min(coverage.x),
+            max_cov = max(coverage),
+            min_cov = min(coverage),
             range_cov = max_cov - min_cov)
 
 
@@ -561,7 +581,7 @@ lpc_variation <- plot_variation(yvar = range_lpc) +
 
 lga_lpc_variation <- ggarrange(lga_variation, lpc_variation, ncol = 2, nrow = 1)
 
-save_hrd_plot(lga_lpc_variation)
+# save_hrd_plot(lga_lpc_variation)
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -595,7 +615,7 @@ intra_run_table <- compare_results |>
   filter(worksheet == "WS133557") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status_amended, lga_amended, lpc_amended, coverage.x) |> 
+  select(sample_id, seqone_hrd_status_amended, lga_amended, lpc_amended, coverage) |> 
   arrange(sample_id)
 
 export_timestamp(input = intra_run_table)
@@ -633,11 +653,11 @@ input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
 filtered_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") 
 
-cov_v11 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v1) +
+cov_v11 <- plot_qc(yvar = coverage, outcome = outcome_binary_v1) +
   labs(x = "", title = "Coverage - SomaHRDv1.1") +
   coverage_line
 
-cov_v12 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v2) +
+cov_v12 <- plot_qc(yvar = coverage, outcome = outcome_binary_v2) +
   labs(x = "", title = "Coverage - SomaHRDv1.2") +
   coverage_line
 
@@ -657,7 +677,7 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
 outlier_sample <- compare_results |> 
   filter(dlms_dna_number == 21003549)
 
-coverage_plot_v2 <- plot_qc(yvar = coverage.x, outcome = outcome_binary_v2)
+coverage_plot_v2 <- plot_qc(yvar = coverage, outcome = outcome_binary_v2)
 
 readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary_v2)
 

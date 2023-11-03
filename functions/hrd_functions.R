@@ -608,7 +608,7 @@ get_sample_summary_info <- function(input_dna_no) {
     select(
       worksheet, dlms_dna_number, seqone_hrd_score,
       seqone_hrd_status, lga, lpc, ccne1, rad51b,
-      coverage.x, percent_mapping, million_reads, read_length,
+      coverage, percent_mapping, million_reads, read_length,
       insert_size, percent_q30, percent_aligned, percent_dups,
       myriad_gi_score, myriad_hrd_status
     )
