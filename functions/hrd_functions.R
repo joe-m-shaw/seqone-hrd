@@ -427,6 +427,27 @@ get_shallow_sample_id <- function(page) {
   
 }
 
+get_date <- function(page) {
+  
+  date_regex <- regex(
+    r"[
+    Date
+    \s{32}        # Variable whitespace
+    (\w{3,9}      # Month as text. Shortest is May (3), longest September (9)
+    \s
+    \d{1,2}       # Day (1-31)
+    ,\s
+    \d{4})        # Year 
+    ]",
+    comments = TRUE
+  )
+  
+  date <- mdy(str_extract(page, date_regex, group = 1))
+  
+  return(date)
+  
+}
+
 
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
@@ -512,20 +533,7 @@ read_seqone_report <- function(file) {
   
   # Date
   
-  date_regex <- regex(
-    r"[
-    Date
-    \s{32}        # Variable whitespace
-    (\w{3,9}      # Month as text. Shortest is May (3), longest September (9)
-    \s
-    \d{1,2}       # Day (1-31)
-    ,\s
-    \d{4})        # Year 
-    ]",
-    comments = TRUE
-  )
-  
-  date <- mdy(str_extract(page1, date_regex, group = 1))
+  date <- get_date(page1)
   
   # User
   
