@@ -397,6 +397,37 @@ get_percent_mapping <- function(page) {
   
 }
 
+get_shallow_sample_id <- function(page) {
+  
+  ss_id_regex <- regex(
+    r"{
+    Shallow\ssample\sID
+    \s{15,18}             # Variable whitespace
+    (WS\d{6})             # Group 1: worksheet
+    _
+    (\d{8})               # Group 2: 8 digit DLMS number
+    ([^\s]{0,17})         # Group 3: Additional sample info only present for some samples
+    # Select any character after the underscore that isn't a space
+    # String may be 17 characters. Example: b_0.5_downsampled
+    }",
+    comments = TRUE
+  )
+  
+  worksheet <- str_extract(page, ss_id_regex, group = 1)
+  
+  dlms_dna_number <- parse_number(str_extract(page, ss_id_regex, group = 2))
+  
+  modifier <- str_extract(page, ss_id_regex, group = 3)
+  
+  sample_id <- str_c(dlms_dna_number, modifier)
+  
+  shallow_sample_id <- str_c(worksheet, "_", dlms_dna_number, modifier)
+  
+  return(list(worksheet, dlms_dna_number, modifier, sample_id, shallow_sample_id))
+  
+}
+
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -467,29 +498,17 @@ read_seqone_report <- function(file) {
 
   # Shallow sample ID
   
-  ss_id_regex <- regex(
-    r"{
-    Shallow\ssample\sID
-    \s{15,18}             # Variable whitespace
-    (WS\d{6})             # Group 1: worksheet
-    _
-    (\d{8})               # Group 2: 8 digit DLMS number
-    ([^\s]{0,17})         # Group 3: Additional sample info only present for some samples
-                          # Select any character after the underscore that isn't a space
-                          # String may be 17 characters. Example: b_0.5_downsampled
-    }",
-    comments = TRUE
-  )
+  id_string <- get_shallow_sample_id(page1)
   
-  worksheet <- str_extract(page1, ss_id_regex, group = 1)
+  worksheet <- id_string[[1]]
   
-  dlms_dna_number <- parse_number(str_extract(page1, ss_id_regex, group = 2))
+  dlms_dna_number <- id_string[[2]]
   
-  modifier <- str_extract(page1, ss_id_regex, group = 3)
+  modifier <- id_string[[3]]
   
-  sample_id <- str_c(dlms_dna_number, modifier)
+  sample_id <- id_string[[4]]
   
-  shallow_sample_id <- str_c(worksheet, "_", dlms_dna_number, modifier)
+  shallow_sample_id <- id_string[[5]]
   
   # Date
   
