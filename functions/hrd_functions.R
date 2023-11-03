@@ -237,9 +237,15 @@ read_myriad_report <- function(file) {
 
 # Reading SeqOne PDFs ---------------------------------------------------------------
 
-get_hrd_score <- function(page, version) {
+check_version <- function(version) {
   
   assert_that(version %in% c("1.1", "1.2"))
+  
+}
+
+get_hrd_score <- function(page, version) {
+  
+  check_version(version)
   
   hrd_score_regex_1_1 <- regex(
     r"[
@@ -280,6 +286,22 @@ get_hrd_score <- function(page, version) {
   
 }
 
+get_hrd_status <- function(page) {
+  
+  hrd_status_regex <- regex(
+    r"[
+    SeqOne\sHRD\sStatus1\s:\s
+    (NEGATIVE | POSITIVE)
+    ]",
+    comments = TRUE
+  )
+  
+  seqone_hrd_status <- str_extract(page, hrd_status_regex, group = 1)
+  
+  return(seqone_hrd_status)
+  
+}
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -298,15 +320,7 @@ read_seqone_report <- function(file) {
 
   # HRD status
   
-  hrd_status_regex <- regex(
-    r"[
-    SeqOne\sHRD\sStatus1\s:\s
-    (NEGATIVE | POSITIVE)
-    ]",
-    comments = TRUE
-  )
-  
-  seqone_hrd_status <- str_extract(page1, hrd_status_regex, group = 1)
+  seqone_hrd_status <- get_hrd_status(page1)
 
   # LGA
   
