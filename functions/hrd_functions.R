@@ -448,6 +448,54 @@ get_date <- function(page) {
   
 }
 
+get_user <- function(page) {
+  
+  user_regex <- regex(
+    r"[
+    User
+    \s{30,32}         # Variable whitespace
+    ([^\s]{10,26})    # Username - any character that isn't space
+    ]",
+    comments = TRUE
+  )
+  
+  user <- str_extract(page, user_regex, group = 1)
+  
+  return(user)
+  
+}
+
+get_robustness <- function(page, version) {
+  
+  check_version(version)
+  
+  robustness_regex <- regex(
+    r"[
+    Robustness\sof\sgenomic\sinstability
+    \s{29}
+    (\d{1}\.\d{2})
+    ]",
+    comments = TRUE
+  )
+  
+  if (version == "1.1") {
+    
+    robustness <- "not calculated"
+    
+  }
+  
+  if (version == "1.2") {
+    
+    robustness <- parse_number(str_extract(page, robustness_regex, group = 1),
+                               locale = locale(decimal_mark = "."))
+    
+  }
+  
+  return(robustness)
+  
+}
+
+
 
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
@@ -531,22 +579,17 @@ read_seqone_report <- function(file) {
   
   shallow_sample_id <- id_string[[5]]
   
+  # Robustness
+  
+  robustness <- get_robustness(page1, "1.1")
+  
   # Date
   
   date <- get_date(page1)
   
   # User
   
-  user_regex <- regex(
-    r"[
-    User
-    \s{30,32}         # Variable whitespace
-    ([^\s]{10,26})    # Username - any character that isn't space
-    ]",
-    comments = TRUE
-  )
-  
-  user <- str_extract(page1, user_regex, group = 1)
+  user <- get_user(page1)
 
   # Output table
   
@@ -564,6 +607,7 @@ read_seqone_report <- function(file) {
     "seqone_ncc" = seqone_ncc,
     "coverage" = coverage,
     "percent_mapping" = percent_mapping,
+    "robustness" = robustness,
     "date" = date,
     "user" = user,
     "filename" = basename(file)
