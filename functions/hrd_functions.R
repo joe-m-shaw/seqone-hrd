@@ -319,7 +319,40 @@ get_lga <- function(page) {
   
 }
 
+get_lpc <- function(page) {
+  
+  lpc_regex <- regex(
+    r"[
+    LPC\sStatus
+    \s{35,38}            # Variable whitespace between versions
+    (\d{1,2})
+    ]",
+    comments = TRUE
+  )
+  
+  lpc <- parse_number(str_extract(page, lpc_regex, group = 1))
+  
+  return(lpc)
+  
+}
 
+get_ncc <- function(page) {
+  
+  ncc_regex <- regex(
+    r"[
+    %\sof\stumoral\scells
+    \s{23,44}               # Variable whitespace between versions
+    (\d{2})                 # Grouped NCC value
+    %
+    ]",
+    comments = TRUE
+  )
+  
+  seqone_ncc <- parse_number(str_extract(page, ncc_regex, group = 1))
+  
+  return(seqone_ncc)
+  
+}
 
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
@@ -347,16 +380,7 @@ read_seqone_report <- function(file) {
   
   # LPC
   
-  lpc_regex <- regex(
-    r"[
-    LPC\sStatus
-    \s{38}            # Variable whitespace
-    (\d{1,2})
-    ]",
-    comments = TRUE
-  )
-  
-  lpc <- parse_number(str_extract(page1, lpc_regex, group = 1))
+  lpc <- get_lpc(page1)
 
   # CCNE1
   
@@ -387,19 +411,9 @@ read_seqone_report <- function(file) {
                locale = locale(decimal_mark = "."))
 
   # Neoplastic cell content
-  
-  ncc_regex <- regex(
-    r"[
-    %\sof\stumoral\scells
-    \s{23,24}               # Variable whitespace
-    (\d{2})                 # Grouped NCC value
-    %
-    ]",
-    comments = TRUE
-  )
-  
-  seqone_ncc <- parse_number(str_extract(page1, ncc_regex, group = 1))
 
+  seqone_ncc <- get_ncc(page1)
+  
   assert_that(seqone_ncc >= 20, seqone_ncc <= 100)
 
   # Coverage
