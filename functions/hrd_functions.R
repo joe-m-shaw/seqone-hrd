@@ -489,11 +489,14 @@ safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
-plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outcome) {
+plot_qc <- function(df = repeat_results, x_var = surname, yvar, outcome) {
+  
+  sub_df <- df |> 
+    filter(shallow_sample_id == "WS133557_21003549")
   
   #title_label <- rlang::englue("{{ yvar }}")
   
-  ggplot(df, aes(x = {{ x_var }}, y = {{ yvar }})) +
+  ggplot(df, aes(x = as.character({{ x_var }}), y = {{ yvar }})) +
     geom_point(size = 3, alpha = 0.6,
                aes(colour = {{ outcome }})) +
     scale_colour_manual(name = "",
@@ -501,7 +504,12 @@ plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, outc
     theme_bw() +
     theme(axis.text.x = element_blank(),
           panel.grid = element_blank(),
-          legend.position = "bottom")
+          legend.position = "bottom") +
+    geom_point(
+      data = sub_df,
+      aes(x = {{ x_var }}, y = {{ yvar }}),
+      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
+    )
   
 }
 
@@ -519,13 +527,23 @@ plot_lpc_lga <- function(df) {
     geom_point(aes(colour = seqone_hrd_status_amended),
                size = 2, alpha = 0.6) +
     scale_colour_manual(name = "SeqOne HRD Status",
-                        values = c(safe_blue, safe_grey, safe_red)) +
+                        values = c(safe_blue, safe_red, safe_grey)) +
     geom_segment(
       data = line_df,
       mapping = aes(x = x, y = y, xend = xend, yend = yend)
     ) +
     theme_bw() +
     theme(legend.position = "bottom")
+  
+}
+
+plot_variation <- function(df = repeat_variation, yvar) {
+  
+  ggplot(df, aes(x = , y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(axis.text.x = element_blank()) +
+    ylim(0,30)
   
 }
 
