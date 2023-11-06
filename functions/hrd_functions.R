@@ -87,7 +87,7 @@ read_myriad_report <- function(file) {
   r_number_regex <- regex(
     r"[
     Patient\sID:        # Escape space with backslash s
-    \s{6}               # 6 spaces
+    \s+                 # 6 spaces
     (R\d{2}-\w{4})      # R number grouped
     ]",
     comments = TRUE
@@ -117,7 +117,7 @@ read_myriad_report <- function(file) {
   patient_name_regex <- regex(
     r"[
     Patient\sName:
-    \s{10,15}           # Variable whitespace
+    \s+                 # Variable whitespace
     (\D{5,25})          # Names as non-digits with variable lengths
     \n                  # New line marks end of the name
     ]",
@@ -131,7 +131,7 @@ read_myriad_report <- function(file) {
   dob_regex <- regex(
     r"[
     Date\sof\sBirth:
-    \s{10,15}                 # Variable whitespace
+    \s+                       # Variable whitespace
     (\d{2}/\d{2}/\d{4})       # DOB in dd/mm/yyyy format
     \n                        # Mark end of DOB with newline
     ]",
@@ -145,7 +145,7 @@ read_myriad_report <- function(file) {
   path_block_1_regex <- regex(
     r"[
     Pathology\sNo:
-    \s{10,30}         # Variable whitespace
+    \s+               # Variable whitespace
     (.{5,25})         # Path blocks can have various formats from different labs
     \n                # Specify end of block number with new line
     ]",
@@ -248,7 +248,7 @@ get_hrd_score <- function(page, version) {
   hrd_score_regex_1_1 <- regex(
     r"[
     CLASS\n
-    \s{78,83}                     # Variable whitespace
+    \s+                           # Variable whitespace
     ((0\.\d{1,2})|(\d{1}))        # Variable formats: 0.99, 0.9, 1
                                   # Use backslash . to specify decimal point
     ]",
@@ -258,7 +258,7 @@ get_hrd_score <- function(page, version) {
   hrd_score_regex_1_2 <- regex(
     r"[
     HRD\sSummary\n
-    \s{63,67}
+    \s+
     (\d{1}\.\d{1,2} | \d{1})
     ]",
     comments = TRUE
@@ -311,7 +311,7 @@ get_lga <- function(page) {
   lga_regex <- regex(
     r"[
     LGA\sStatus
-    \s{35, 38}      # Variable whitespace - 35 in v1.2
+    \s+             # Variable whitespace - 35 in v1.2
     (\d{1,2})       # Group LGA status
     ]",
     comments = TRUE
@@ -328,7 +328,7 @@ get_lpc <- function(page) {
   lpc_regex <- regex(
     r"[
     LPC\sStatus
-    \s{35,38}            # Variable whitespace between versions
+    \s+              # Variable whitespace between versions
     (\d{1,2})
     ]",
     comments = TRUE
@@ -345,7 +345,7 @@ get_ncc <- function(page) {
   ncc_regex <- regex(
     r"[
     %\sof\stumoral\scells
-    \s{23,45}               # Variable whitespace between versions
+    \s+                     # Variable whitespace between versions
     (\d{2})                 # Grouped NCC value
     %
     ]",
@@ -365,7 +365,7 @@ get_coverage <- function(page) {
   coverage_regex <- regex(
     r"[
     Coverage
-    \s{33,55}                      # Variable whitespace between versions
+    \s+                            # Variable whitespace between versions
     ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
     X
     ]",
@@ -384,7 +384,7 @@ get_percent_mapping <- function(page) {
   percent_map_regex <- regex(
     r"[
     %\scorrect\smapping
-    \s{24,46}                     # Variable whitespace between versions
+    \s+                           # Variable whitespace between versions
     ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
                                   # Assume percent mapping always above 10
     %
@@ -457,7 +457,7 @@ get_user <- function(page) {
   user_regex <- regex(
     r"[
     User
-    \s{30,32}         # Variable whitespace
+    \s+               # Variable whitespace
     ([^\s]{10,26})    # Username - any character that isn't space
     ]",
     comments = TRUE
@@ -506,7 +506,7 @@ get_low_tumour_fraction <- function(page, version) {
   ltf_regex <- regex(
     r"[
     Low\stumor\sfraction
-    \s{43, 44}
+    \s+
     (NORMAL | WARNING)
     ]",
     comments = TRUE
@@ -535,7 +535,7 @@ get_ccne1_rad51b <- function(page, version) {
   ccne1_regex_1_1 <- regex(
     r"[
     CCNE1\sAmplification
-    \s{29}                       # Variable whitespace
+    \s+                          # Variable whitespace
     ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
     ]",
     comments = TRUE
@@ -544,7 +544,7 @@ get_ccne1_rad51b <- function(page, version) {
   rad51b_regex_1_1 <- regex(
     r"[
     RAD51B\sAmplification
-    \s{28}
+    \s+
     ((\d{1}\.\d{1,2})|(\d{1}))
     ]",
     comments = TRUE
@@ -556,7 +556,7 @@ get_ccne1_rad51b <- function(page, version) {
     \n\n
     \s{10}
     (\d{1,2}\.\d{1,2} | \d{1})    # CCNE1 regex
-    \s{86,90}
+    \s+
     (\d{1,2}\.\d{1,2} | \d{1})    # RAD51B regex
     ]",
     comments = TRUE
@@ -597,8 +597,6 @@ read_seqone_report <- function(file, version) {
   # HRD score
   
   hrd_score <- get_hrd_score(page = page1, version = version)
-  
- 
 
   # HRD status
   
