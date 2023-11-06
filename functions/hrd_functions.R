@@ -644,11 +644,6 @@ get_sample_data <- function(sample_vector) {
 
 # Plot functions --------------------------------------------------------------------
 
-safe_colorblind_palette <- c(
-  "#88CCEE", "#CC6677", "#DDCC77", "#117733", "#332288", "#AA4499",
-  "#44AA99", "#999933", "#882255", "#661100", "#6699CC", "#888888"
-)
-
 safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"

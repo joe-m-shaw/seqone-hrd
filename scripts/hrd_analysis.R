@@ -5,20 +5,14 @@
 
 rm(list = ls())
 
-## Functions ------------------------------------------------------------------------
-
-source("functions/hrd_functions.R")
-
-## Packages and filepaths -----------------------------------------------------------
+## Packages -------------------------------------------------------------------------
 
 library("ggpubr")
 library("readxl")
-library("RODBC")
 
-## DLMS connection ------------------------------------------------------------------
+## Functions ------------------------------------------------------------------------
 
-# Connection setup for PC38698
-moldb_connection <- RODBC::odbcConnect(dsn = "moldb")
+source("functions/hrd_functions.R")
 
 # Collate data ----------------------------------------------------------------------
 
@@ -30,7 +24,6 @@ collated_myriad_info <- myriad_report_files |>
   map(read_myriad_report) |>
   list_rbind()
 
-# Check all files included
 stopifnot(setdiff(
   basename(myriad_report_files),
   collated_myriad_info$myriad_filename
@@ -90,62 +83,11 @@ collated_myriad_info_mod <- rbind(
     select(-dlms_dna_number)
 )
 
+## Samples DLMS information ---------------------------------------------------------
+
+seqone_dlms_info <- read_csv(file = str_c(hrd_data_path, "seqone_dlms_info.csv"))
+
 ## Pathology block ID check ---------------------------------------------------------
-
-# Extract data from DLMS via ODBC
-seqone_dlms_info <- get_sample_data(collated_seqone_info$dlms_dna_number) |>
-  rename(
-    dlms_dna_number = labno,
-    nhs_number = nhsno
-  ) |>
-  mutate(
-    ncc_single = sub(
-      x = comments,
-      pattern = ".+(\\W{1}\\d{2}%).+",
-      replacement = "\\1"
-    ),
-    ncc_range = sub(
-      x = comments,
-      pattern = ".+(\\d{2}\\W{1}\\d{2}%).+",
-      replacement = "\\1"
-    ),
-    ncc = ifelse(str_length(ncc_single) == 4 & ncc_range > 6,
-      ncc_single, ifelse(str_length(ncc_range) == 6,
-        ncc_range, NA
-      )
-    )
-  )
-
-stopifnot(setdiff(
-  seqone_dlms_info$dlms_dna_number,
-  collated_seqone_info$dlms_dna_number
-) == 0)
-
-# Enter a fake NHS number for the Seraseq and Biobank controls, to allow
-# Myriad scores to be joined later, and to keep Biobank controls within the
-# dataset
-
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032086, "nhs_number"] <- 1
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23032088, "nhs_number"] <- 2
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23031639, "nhs_number"] <- 3
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033285, "nhs_number"] <- 4
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033279, "nhs_number"] <- 5
-seqone_dlms_info[seqone_dlms_info$dlms_dna_number == 23033288, "nhs_number"] <- 6
-
-export_for_check <- seqone_dlms_info |>
-  filter(dlms_dna_number %in% collated_seqone_info$dlms_dna_number) |>
-  left_join(collated_myriad_info_mod |>
-    select(
-      nhs_number, myriad_pathology_block_pg1,
-      myriad_pathology_block_pg2
-    ), by = "nhs_number") |>
-  select(
-    dlms_dna_number, firstname, surname, nhs_number,
-    pathno, myriad_pathology_block_pg1, myriad_pathology_block_pg2
-  ) |>
-  arrange(nhs_number)
-
-# export_timestamp(hrd_data_path, export_for_check)
 
 # Writing of pathology block IDs is inconsistent, so a manual check is required
 # Seraseq controls classified as "pathology blocks match"
@@ -155,65 +97,7 @@ path_block_check <- read_csv(
     hrd_data_path,
     "2023_10_24_14_10_20_export_for_check_edit.csv"
   ),
-  show_col_types = FALSE
-) |>
-  select(dlms_dna_number, path_block_manual_check)
-
-## Sample extraction information ----------------------------------------------------
-
-# Get tissues
-seqone_tissue_types <- unique(seqone_dlms_info$tissue)
-
-tissue_query <- sqlQuery(
-  channel = moldb_connection,
-  query = paste0(
-    "SELECT * FROM MolecularDB.dbo.TissueTypes WHERE TissueTypeId IN (",
-    paste(seqone_tissue_types, collapse = ", "),
-    ")"
-  )
-) |>
-  janitor::clean_names()
-
-# Get extraction batch IDs
-extraction_batch_id_table <- sqlQuery(
-  channel = moldb_connection,
-  query = paste0(
-    "SELECT * FROM MolecularDB.dbo.MOL_Extractions WHERE LABNO IN (",
-    paste(seqone_dlms_info$dlms_dna_number, collapse = ", "),
-    ")"
-  )
-) |>
-  arrange(LabNo) |>
-  janitor::clean_names() |>
-  dplyr::rename(
-    dlms_dna_number = lab_no,
-    extraction_batch_id = extraction_batch_fk
-  )
-
-extraction_batches <- unique(extraction_batch_id_table$extraction_batch_id)
-
-# Get extraction batch dates
-extraction_batch_date_table <- sqlQuery(
-  channel = moldb_connection,
-  query = paste0(
-    "SELECT * FROM MolecularDB.dbo.MOL_ExtractionBatches WHERE ExtractionBatchId IN (",
-    paste(extraction_batches, collapse = ", "),
-    ")"
-  )
-) |>
-  janitor::clean_names()
-
-extraction_batch_info <- extraction_batch_id_table |>
-  left_join(extraction_batch_date_table, by = "extraction_batch_id") |>
-  # Get only extraction batch IDs used for Cobas extractions
-  filter(extraction_method_fk == 25)
-
-# 1 DNA number (23033279) is on 2 extraction batches
-
-seqone_dlms_extractions <- seqone_dlms_info |>
-  left_join(tissue_query |>
-              dplyr::rename(tissue = tissue_type_id), by = "tissue") |>
-  left_join(extraction_batch_info, by = "dlms_dna_number")
+  show_col_types = FALSE) 
 
 ## Initial DNA concentrations -------------------------------------------------------
 
@@ -411,7 +295,8 @@ seqone_mod <- collated_seqone_info |>
 
 join_tables <- seqone_mod |>
   left_join(collated_myriad_info_mod, by = "nhs_number", keep = FALSE) |>
-  left_join(path_block_check, by = "dlms_dna_number",  keep = FALSE) |>
+  left_join(path_block_check |> 
+              select(dlms_dna_number, path_block_manual_check), by = "dlms_dna_number",  keep = FALSE) |>
   left_join(dna_concentrations_mod |>
     select(dlms_dna_number, dilution_worksheet, qubit_dna_ul, input_ng), 
     by = c("dlms_dna_number", "dilution_worksheet"),
@@ -713,15 +598,64 @@ qc_metrics_v2 <- ggarrange(coverage_plot_v2, readlength_plot_v2,
                            common.legend = TRUE,
                            legend = "bottom")
 
+## LGA and LPC ----------------------------------------------------------------------
+
+lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
+  geom_point(aes(colour = seqone_hrd_status),
+             size = 3
+  ) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed"
+  ) +
+  labs(
+    title = "Original pipeline",
+    subtitle = "CCNE1 and RAD51B included"
+  )
+
+lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
+  labs(
+    x = "Large Genomic Alterations",
+    y = "Loss of Parental Copy",
+    title = "LGA and LPC results for SomaHRD v1.2",
+    subtitle = str_c("Data for ", nrow(compare_results), " samples")
+  )
+
+# save_hrd_plot(lga_vs_lpc_amended)
+
+ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
+          nrow = 1
+)
+
+lga_plot <- ggplot(compare_results, aes(lga_amended, lga)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = "Large genomic alterations") +
+  ylim(0, 45) +
+  xlim(0, 45)
+
+lpc_plot <- ggplot(compare_results, aes(lpc_amended, lpc)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = "Loss of parental copy") +
+  ylim(0, 45) +
+  xlim(0, 45)
+
+ggarrange(lga_plot, lpc_plot, nrow = 1)
+
+# Manchester tBRCA service audit ----------------------------------------------------
+
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
 
-brca_query <- "SELECT * FROM MolecularDB.dbo.Samples WHERE DISEASE IN (204)"
-
-tbrca_data <- sqlQuery(
-  channel = moldb_connection,
-  query = brca_query
-) |>
-  janitor::clean_names()
+tbrca_data <- read.csv(file = str_c(hrd_data_path, "tBRCA_dlms_info.csv"))
 
 dna_qc_threshold <- round(50 / 15, 0)
 
@@ -779,56 +713,3 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
 
 max(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
 min(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
-
-## LGA and LPC ----------------------------------------------------------------------
-
-lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
-  geom_point(aes(colour = seqone_hrd_status),
-    size = 3
-  ) +
-  scale_colour_manual(values = c(safe_blue, safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  geom_segment(
-    data = line_df,
-    mapping = aes(x = x, y = y, xend = xend, yend = yend),
-    linetype = "dashed"
-  ) +
-  labs(
-    title = "Original pipeline",
-    subtitle = "CCNE1 and RAD51B included"
-  )
-
-lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
-  labs(
-    x = "Large Genomic Alterations",
-    y = "Loss of Parental Copy",
-    title = "LGA and LPC results for SomaHRD v1.2",
-    subtitle = str_c("Data for ", nrow(compare_results), " samples")
-  )
-  
-# save_hrd_plot(lga_vs_lpc_amended)
-
-ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
-  nrow = 1
-)
-
-lga_plot <- ggplot(compare_results, aes(lga_amended, lga)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
-  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  labs(title = "Large genomic alterations") +
-  ylim(0, 45) +
-  xlim(0, 45)
-
-lpc_plot <- ggplot(compare_results, aes(lpc_amended, lpc)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
-  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  labs(title = "Loss of parental copy") +
-  ylim(0, 45) +
-  xlim(0, 45)
-
-ggarrange(lga_plot, lpc_plot, nrow = 1)
