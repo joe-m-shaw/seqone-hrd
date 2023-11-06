@@ -224,10 +224,7 @@ tbrca_data_collection_clean <- tbrca_data_collection |>
 
 ## SeqOne QC data -------------------------------------------------------------------
 
-seqone_qc_data <- read_excel(paste0(
-  hrd_data_path,
-  "seqone_qc_metrics/seqone_qc_metrics_2023_10_03.xlsx"
-)) |>
+seqone_qc_data_v1.1 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.1.xlsx")) |>
   janitor::clean_names() |>
   dplyr::rename(
     shallow_sample_id = sample,
@@ -235,6 +232,17 @@ seqone_qc_data <- read_excel(paste0(
     insert_size = ins_size,
     million_reads = m_reads
   )
+
+seqone_qc_data_v1.2 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.2.xlsx")) |>
+  janitor::clean_names() |>
+  dplyr::rename(
+    shallow_sample_id = sample,
+    read_length = read_len,
+    insert_size = ins_size,
+    million_reads = m_reads
+  )
+
+setdiff(seqone_qc_data_v1.1$shallow_sample_id, seqone_qc_data_v1.2$shallow_sample_id)
 
 ## Amended SeqOne scores ------------------------------------------------------------
 
@@ -286,7 +294,7 @@ seqone_mod <- collated_seqone_info |>
     dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
     
   ) |>
-  left_join(seqone_qc_data |> 
+  left_join(seqone_qc_data_v1.1 |> 
               select(-coverage), by = "shallow_sample_id")
 
 ## Join data tables together --------------------------------------------------------
@@ -322,7 +330,7 @@ compare_results <- join_tables |>
   mutate(
     
     # Outome of results from original pipeline
-    outcome_v1 = case_when(
+    outcome = case_when(
       
       seqone_hrd_status == pos_text & myriad_hrd_status == pos_text ~true_pos_text,
       
@@ -334,51 +342,16 @@ compare_results <- join_tables |>
       
       TRUE ~ "other"),
     
-    outcome_v2 = case_when(
+    outcome_binary = case_when(
       
-      seqone_hrd_status_amended == pos_text & myriad_hrd_status == pos_text ~true_pos_text,
+      outcome %in% c(true_pos_text, true_neg_text) ~consistent_text,
       
-      seqone_hrd_status_amended == neg_text & myriad_hrd_status == neg_text ~true_neg_text,
+      outcome %in% c(false_pos_text, false_neg_text) ~inconsistent_text,
       
-      seqone_hrd_status_amended == pos_text & myriad_hrd_status == neg_text ~false_pos_text,
+      outcome %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
       
-      seqone_hrd_status_amended == neg_text & myriad_hrd_status == pos_text ~false_neg_text,
-      
-      seqone_hrd_status_amended == incon_text & myriad_hrd_status == pos_text ~incon_pos_text,
-      
-      seqone_hrd_status_amended == incon_text & myriad_hrd_status == neg_text ~incon_neg_text,
-      
-      TRUE ~ "other"),
-    
-    outcome_binary_v1 = case_when(
-      
-      outcome_v1 %in% c(true_pos_text, true_neg_text) ~consistent_text,
-      
-      outcome_v1 %in% c(false_pos_text, false_neg_text) ~inconsistent_text,
-      
-      outcome_v1 %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
-      
-      TRUE ~ "other"),
-    
-    outcome_binary_v2 = case_when(
-      
-      outcome_v2 %in% c(true_pos_text, true_neg_text) ~consistent_text,
-      
-      outcome_v2 %in% c(false_pos_text, false_neg_text) ~inconsistent_text,
-      
-      outcome_v2 %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
-      
-      TRUE ~ "other"),
-    
-    outcome_binary_v2 = factor(outcome_binary_v2, levels = c(consistent_text,
-                                                            inconsistent_text,
-                                                            inconclusive_text)),
-    
-    
-    seqone_hrd_status_amended =factor(seqone_hrd_status_amended, levels = 
-                                        c(neg_text, pos_text, incon_text))
-    
-    )
+      TRUE ~ "other")
+  )
 
 
 ## Sensitivity and specificity ------------------------------------------------------
@@ -388,22 +361,22 @@ coverage_threshold <- 0.5
 input_threshold <- 47
 
 v1.1_results <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match") |> 
-  compare_tests(outcome_v1)
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.1") |> 
+  compare_tests(outcome)
 
 v1.1_results_filtered <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match" &
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.1" &
            coverage >= coverage_threshold & input_ng >= input_threshold) |> 
-  compare_tests(outcome_v1)
+  compare_tests(outcome)
 
 v1.2_results <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match") |> 
-  compare_tests(outcome_v2)
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.2") |> 
+  compare_tests(outcome)
 
 v1.2_results_filtered <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match" &
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.2" &
            coverage >= coverage_threshold & input_ng >= input_threshold) |> 
-  compare_tests(outcome_v2)
+  compare_tests(outcome)
 
 metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
                       add_version(v1.1_results_filtered[[2]], "SomaHRD v1.1, thresholds applied"),
@@ -418,29 +391,36 @@ metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 
-compare_results |> 
+hrd_score_plot <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & 
-           coverage >= coverage_threshold & input_ng >= input_threshold) |> 
+           version == "1.2" &
+           coverage >= coverage_threshold & 
+           input_ng >= input_threshold) |> 
   ggplot(aes(myriad_gi_score, seqone_hrd_score)) +
-  geom_point(size = 3, alpha = 0.7) +
+  geom_point(size = 3, alpha = 0.7,
+             aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_blue, safe_grey, safe_red)) +
   theme_bw() +
   scale_x_continuous(
     limits = c(0, 100),
     breaks = c(0, 25, 42, 50, 75, 100)
   ) +
   ylim(0, 1) +
-  theme(panel.grid = element_blank()) +
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom") +
   labs(
     x = "Myriad Genome Instability Score",
     y = "SeqOne HRD Score",
     title = "Comparison of Myriad vs SeqOne HRD Scores",
     subtitle = str_c("DNA inputs with coverage >= ", coverage_threshold,
                      "X; DNA input >= ", input_threshold, "ng")) +
-  ggpubr::stat_cor(method = "pearson", label.x = 75, label.y = 0.1)
+  ggpubr::stat_cor(method = "pearson", label.x = 60, label.y = 0.1)
 
 ## Inter run variation --------------------------------------------------------------
 
 repeat_results <- compare_results |>
+  filter(version == "1.2") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
     base::duplicated(dlms_dna_number, fromLast = FALSE)) |>
   mutate(input_category = case_when(
@@ -457,11 +437,11 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results) +
 
 repeat_variation <- repeat_results |> 
   group_by(dlms_dna_number) |> 
-  summarise(max_lga = max(lga_amended),
-            min_lga = min(lga_amended),
+  summarise(max_lga = max(lga),
+            min_lga = min(lga),
             range_lga = max_lga-min_lga,
-            max_lpc = max(lpc_amended),
-            min_lpc = min(lpc_amended),
+            max_lpc = max(lpc),
+            min_lpc = min(lpc),
             range_lpc = max_lpc - min_lpc,
             max_cov = max(coverage),
             min_cov = min(coverage),
@@ -510,7 +490,7 @@ intra_run_table <- compare_results |>
   filter(worksheet == "WS133557") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status_amended, lga_amended, lpc_amended, coverage) |> 
+  select(sample_id, seqone_hrd_status, lga, lpc, coverage) |> 
   arrange(sample_id)
 
 # export_timestamp(input = intra_run_table)
@@ -534,7 +514,7 @@ seraseq_plot <- plot_lpc_lga(seraseq_control_data) +
 
 biobank_control_results <- compare_results |> 
   filter(control_type == "Biobank control") |> 
-  select(dlms_dna_number, seqone_hrd_status_amended, lga_amended, lpc_amended,
+  select(dlms_dna_number, seqone_hrd_status, lga, lpc,
          low_tumor_fraction)
 
 export_timestamp(input = biobank_control_results)
@@ -548,18 +528,18 @@ input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
 filtered_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match") 
 
-cov_v11 <- plot_qc(yvar = coverage, outcome = outcome_binary_v1) +
+cov_v11 <- plot_qc(yvar = coverage, outcome = outcome_binary) +
   labs(x = "", title = "Coverage - SomaHRDv1.1") +
   coverage_line
 
-cov_v12 <- plot_qc(yvar = coverage, outcome = outcome_binary_v2) +
+cov_v12 <- plot_qc(yvar = coverage, outcome = outcome_binary) +
   labs(x = "", title = "Coverage - SomaHRDv1.2") +
   coverage_line
 
-input_v11 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v1) +
+input_v11 <- plot_qc(yvar = input_ng, outcome = outcome_binary) +
   labs(x = "", title = "DNA input - SomaHRDv1.1")
 
-input_v12 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v2) +
+input_v12 <- plot_qc(yvar = input_ng, outcome = outcome_binary) +
   labs(x = "", title = "DNA input - SomaHRDv1.2") 
 
 coverage_input_plot <- ggarrange(cov_v12, input_v12,
@@ -572,21 +552,21 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
 outlier_sample <- compare_results |> 
   filter(dlms_dna_number == 21003549)
 
-coverage_plot_v2 <- plot_qc(yvar = coverage, outcome = outcome_binary_v2)
+coverage_plot_v2 <- plot_qc(yvar = coverage, outcome = outcome_binary)
 
-readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary_v2)
+readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary)
 
-millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary_v2)
+millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary)
 
-insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary_v2)
+insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary)
 
-percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary_v2)
+percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary)
 
-percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary_v2)
+percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary)
 
-percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary_v2)
+percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary)
 
-input_plot_v2 <- plot_qc(yvar = input_ng, outcome = outcome_binary_v2)
+input_plot_v2 <- plot_qc(yvar = input_ng, outcome = outcome_binary)
 
 qc_metrics_v2 <- ggarrange(coverage_plot_v2, readlength_plot_v2, 
                            millreads_plot_v2, insertsize_plot_v2, 
@@ -615,7 +595,7 @@ lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
     subtitle = "CCNE1 and RAD51B included"
   )
 
-lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
+lga_vs_lpc <- plot_lpc_lga(compare_results) +
   labs(
     x = "Large Genomic Alterations",
     y = "Loss of Parental Copy",
@@ -623,14 +603,14 @@ lga_vs_lpc_amended <- plot_lpc_lga(compare_results) +
     subtitle = str_c("Data for ", nrow(compare_results), " samples")
   )
 
-# save_hrd_plot(lga_vs_lpc_amended)
+# save_hrd_plot(lga_vs_lpc)
 
-ggarrange(lga_vs_lpc, lga_vs_lpc_amended,
+ggarrange(lga_vs_lpc, lga_vs_lpc,
           nrow = 1
 )
 
-lga_plot <- ggplot(compare_results, aes(lga_amended, lga)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+lga_plot <- ggplot(compare_results, aes(lga, lga)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status)) +
   scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
   theme(legend.position = "bottom") +
@@ -638,8 +618,8 @@ lga_plot <- ggplot(compare_results, aes(lga_amended, lga)) +
   ylim(0, 45) +
   xlim(0, 45)
 
-lpc_plot <- ggplot(compare_results, aes(lpc_amended, lpc)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status_amended)) +
+lpc_plot <- ggplot(compare_results, aes(lpc, lpc)) +
+  geom_point(size = 3, aes(colour = seqone_hrd_status)) +
   scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
   theme_bw() +
   theme(legend.position = "bottom") +
