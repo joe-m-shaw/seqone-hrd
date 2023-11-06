@@ -345,7 +345,7 @@ get_ncc <- function(page) {
   ncc_regex <- regex(
     r"[
     %\sof\stumoral\scells
-    \s{23,44}               # Variable whitespace between versions
+    \s{23,45}               # Variable whitespace between versions
     (\d{2})                 # Grouped NCC value
     %
     ]",
@@ -365,7 +365,7 @@ get_coverage <- function(page) {
   coverage_regex <- regex(
     r"[
     Coverage
-    \s{33,54}                      # Variable whitespace between versions
+    \s{33,55}                      # Variable whitespace between versions
     ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
     X
     ]",
@@ -384,7 +384,7 @@ get_percent_mapping <- function(page) {
   percent_map_regex <- regex(
     r"[
     %\scorrect\smapping
-    \s{24,45}                     # Variable whitespace between versions
+    \s{24,46}                     # Variable whitespace between versions
     ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
                                   # Assume percent mapping always above 10
     %
@@ -476,7 +476,7 @@ get_robustness <- function(page, version) {
   robustness_regex <- regex(
     r"[
     Robustness\sof\sgenomic\sinstability
-    \s{28,29}
+    \s+
     (\d{1}\.\d{2})
     ]",
     comments = TRUE
@@ -555,9 +555,9 @@ get_ccne1_rad51b <- function(page, version) {
     RAD51B
     \n\n
     \s{10}
-    (\d{1}\.\d{1,2} | \d{1})    # CCNE1 regex
-    \s{87,90}
-    (\d{1}\.\d{1,2} | \d{1})    # RAD51B regex
+    (\d{1,2}\.\d{1,2} | \d{1})    # CCNE1 regex
+    \s{86,90}
+    (\d{1,2}\.\d{1,2} | \d{1})    # RAD51B regex
     ]",
     comments = TRUE
   )
