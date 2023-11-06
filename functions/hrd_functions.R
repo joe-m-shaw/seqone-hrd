@@ -126,6 +126,23 @@ get_name <- function(page) {
   
 }
 
+get_dob <- function(page) {
+  
+  dob_regex <- regex(
+    r"[
+    Date\sof\sBirth:
+    \s+                       # Variable whitespace
+    (\d{2}/\d{2}/\d{4})       # DOB in dd/mm/yyyy format
+    \n                        # Mark end of DOB with newline
+    ]",
+    comments = TRUE
+  )
+  
+  myriad_dob <- str_extract(page, dob_regex, group = 1)
+  
+  return(myriad_dob)
+  
+}
 
 
 read_myriad_report <- function(file) {
@@ -139,20 +156,6 @@ read_myriad_report <- function(file) {
 
   page3 <- myriad_report_text[[3]]
   
-  # Patient date of birth
-  
-  dob_regex <- regex(
-    r"[
-    Date\sof\sBirth:
-    \s+                       # Variable whitespace
-    (\d{2}/\d{2}/\d{4})       # DOB in dd/mm/yyyy format
-    \n                        # Mark end of DOB with newline
-    ]",
-    comments = TRUE
-  )
-  
-  myriad_dob <- str_extract(page1, dob_regex, group = 1)
-
   # Pathology Block
   
   path_block_1_regex <- regex(
@@ -230,7 +233,7 @@ read_myriad_report <- function(file) {
   output <- data.frame(
     "myriad_r_number" = get_rnumber(page2),
     "myriad_patient_name" = get_name(page1),
-    "myriad_dob" = myriad_dob,
+    "myriad_dob" = get_dob(page1),
     "nhs_number" = get_nhs_number(page1),
     "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
     "myriad_pathology_block_pg2" = myriad_pathology_block_pg2,
