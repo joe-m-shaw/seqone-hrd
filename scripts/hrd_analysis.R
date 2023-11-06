@@ -171,10 +171,8 @@ dna_concentrations_mod <- dna_concentrations |>
 
 ## qPCR library QC ------------------------------------------------------------------
 
-tech_team <- "S:/central shared/Genetics/Repository/Technical Teams/"
-
 hs2_library_prep <- read_excel(
-  path = paste0(tech_team, "NGS/SureSelect XT HS2/SSXT HS2 Library Prep 2023.xlsx"),
+  path = str_c(hrd_data_path, "SSXT HS2 Library Prep 2023.xlsx"),
   sheet = "Sheet1",
   col_types = c(
     "text", "guess", "text", "text",
