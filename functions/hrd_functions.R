@@ -71,18 +71,7 @@ check_na <- function(input_table) {
   )
 }
 
-read_myriad_report <- function(file) {
-  # Use pdf_text to read PDF as a single string per page
-
-  myriad_report_text <- pdftools::pdf_text(pdf = file)
-
-  page1 <- myriad_report_text[[1]]
-
-  page2 <- myriad_report_text[[2]]
-
-  page3 <- myriad_report_text[[3]]
-
-  # iGene R Number
+get_rnumber <- function(page) {
   
   r_number_regex <- regex(
     r"[
@@ -93,7 +82,21 @@ read_myriad_report <- function(file) {
     comments = TRUE
   )
   
-  myriad_r_number <- str_extract(page2, r_number_regex, group = 1)
+  myriad_r_number <- str_extract(page, r_number_regex, group = 1)
+  
+  return(myriad_r_number)
+}
+
+read_myriad_report <- function(file) {
+  # Use pdf_text to read PDF as a single string per page
+
+  myriad_report_text <- pdftools::pdf_text(pdf = file)
+
+  page1 <- myriad_report_text[[1]]
+
+  page2 <- myriad_report_text[[2]]
+
+  page3 <- myriad_report_text[[3]]
 
   # NHS Number
   
@@ -215,7 +218,7 @@ read_myriad_report <- function(file) {
   myriad_brca_status <- str_extract(page2, brca_status_regex, group = 1)
 
   output <- data.frame(
-    "myriad_r_number" = myriad_r_number,
+    "myriad_r_number" = get_rnumber(page2),
     "myriad_patient_name" = myriad_patient_name,
     "myriad_dob" = myriad_dob,
     "nhs_number" = nhs_no_double,
