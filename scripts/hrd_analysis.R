@@ -45,7 +45,8 @@ collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", "myriad
 seqone_report_files <- list.files(seqone_report_location, full.names = TRUE)
 
 collated_seqone_info <- seqone_report_files |>
-  map(read_seqone_report) |>
+  map(\(seqone_report_files) read_seqone_report(file = seqone_report_files,
+                                                version = "1.1")) |>
   list_rbind()
 
 # Check all files collated
