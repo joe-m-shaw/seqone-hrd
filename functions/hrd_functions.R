@@ -523,7 +523,49 @@ get_low_tumour_fraction <- function(page, version) {
   return(low_tumour_fraction)
   
 }
+
+get_ccne1 <- function(page, version) {
   
+  check_version(version)
+  
+  ccne1_regex_1_1 <- regex(
+    r"[
+    CCNE1\sAmplification
+    \s{29}                       # Variable whitespace
+    ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
+    ]",
+    comments = TRUE
+  )
+  
+  ccne1_regex_1_2 <- regex(
+    r"[
+    RAD51B
+    \n\n
+    \s{10}
+    (\d{1}\.\d{1,2} | \d{1})
+    ]",
+    comments = TRUE
+  )
+  
+  if (version == "1.1") {
+    
+    ccne1_regex <- ccne1_regex_1_1
+    
+  }
+  
+  if (version == "1.2") {
+    
+    ccne1_regex <- ccne1_regex_1_2
+    
+  }
+  
+  ccne1 <- parse_number(str_extract(page, ccne1_regex, group = 1),
+               locale = locale(decimal_mark = "."))
+  
+  return(ccne1)
+  
+}
+
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -551,20 +593,10 @@ read_seqone_report <- function(file) {
   # LPC
   
   lpc <- get_lpc(page1)
-
+  
   # CCNE1
   
-  ccne1_regex <- regex(
-    r"[
-    CCNE1\sAmplification
-    \s{29}                       # Variable whitespace
-    ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
-    ]",
-    comments = TRUE
-  )
-  
-  ccne1 <- parse_number(str_extract(page1, ccne1_regex, group = 1), 
-                        locale = locale(decimal_mark = "."))
+  ccne1 <- get_ccne1(page1, "1.1")
   
   # RAD51B
   
