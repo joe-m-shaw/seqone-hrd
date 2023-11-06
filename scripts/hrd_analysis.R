@@ -42,7 +42,8 @@ collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", "myriad
 
 ## Collate SeqOne data --------------------------------------------------------------
 
-seqone_report_files <- list.files(seqone_report_location, full.names = TRUE)
+seqone_report_files <- list.files(str_c(hrd_data_path, "seqone_reports_v1_1/"), 
+                                  full.names = TRUE)
 
 collated_seqone_info <- seqone_report_files |>
   map(\(seqone_report_files) read_seqone_report(file = seqone_report_files,

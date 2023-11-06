@@ -48,8 +48,6 @@ hrd_plot_path <- paste0(hrd_project_path, "plots/")
 
 myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
 
-seqone_report_location <- paste0(hrd_data_path, "seqone_reports/")
-
 # CSV timestamp ---------------------------------------------------------------------
 
 export_timestamp <- function(filepath = hrd_output_path, input) {
