@@ -258,8 +258,8 @@ get_hrd_score <- function(page, version) {
   hrd_score_regex_1_2 <- regex(
     r"[
     HRD\sSummary\n
-    \s{67}
-    (\d{1}\.\d{2})
+    \s{63,67}
+    (\d{1}\.\d{1,2} | \d{1})
     ]",
     comments = TRUE
   )
@@ -295,7 +295,7 @@ get_hrd_status <- function(page) {
   hrd_status_regex <- regex(
     r"[
     SeqOne\sHRD\sStatus1\s:\s
-    (NEGATIVE | POSITIVE)
+    (NEGATIVE | POSITIVE | NON-CONCLUSIVE)
     ]",
     comments = TRUE
   )
@@ -556,7 +556,7 @@ get_ccne1_rad51b <- function(page, version) {
     \n\n
     \s{10}
     (\d{1}\.\d{1,2} | \d{1})    # CCNE1 regex
-    \s{87,88}
+    \s{87,90}
     (\d{1}\.\d{1,2} | \d{1})    # RAD51B regex
     ]",
     comments = TRUE
@@ -684,7 +684,7 @@ read_seqone_report <- function(file, version) {
     "version" = version
   )
 
-  check_na(output)
+  #check_na(output)
 
   return(output)
 }
