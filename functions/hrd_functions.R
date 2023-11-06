@@ -594,90 +594,26 @@ read_seqone_report <- function(file, version) {
 
   page1 <- seqone_report_text[[1]]
 
-  # HRD score
-  
-  hrd_score <- get_hrd_score(page = page1, version = version)
-
-  # HRD status
-  
-  seqone_hrd_status <- get_hrd_status(page1)
-
-  # LGA
-  
-  lga <- get_lga(page1)
-  
-  # LPC
-  
-  lpc <- get_lpc(page1)
-  
-  # CCNE1 and RAD51B
-  
-  ccne1 <- get_ccne1_rad51b(page1, version)[[1]]
-  
-  rad51b <- get_ccne1_rad51b(page1, version)[[2]]
-
-  # Neoplastic cell content
-
-  seqone_ncc <- get_ncc(page1)
-  
-  # Coverage
-  
-  coverage <- get_coverage(page1)
-
-  # Percent mapping
-  
-  percent_mapping <- get_percent_mapping(page1)
-
-  # Shallow sample ID
-  
-  id_string <- get_shallow_sample_id(page1)
-  
-  worksheet <- id_string[[1]]
-  
-  dlms_dna_number <- id_string[[2]]
-  
-  modifier <- id_string[[3]]
-  
-  sample_id <- id_string[[4]]
-  
-  shallow_sample_id <- id_string[[5]]
-  
-  # Robustness
-  
-  robustness <- get_robustness(page1, version)
-  
-  # Low tumour fraction
-  
-  low_tumour_fraction <- get_low_tumour_fraction(page1, version)
-  
-  # Date
-  
-  date <- get_date(page1)
-  
-  # User
-  
-  user <- get_user(page1)
-
   # Output table
   
   output <- data.frame(
-    "shallow_sample_id" = shallow_sample_id,
-    "worksheet" = worksheet,
-    "sample_id" = sample_id,
-    "dlms_dna_number" = dlms_dna_number,
-    "seqone_hrd_score" = hrd_score,
-    "seqone_hrd_status" = seqone_hrd_status,
-    "lga" = lga,
-    "lpc" = lpc,
-    "ccne1" = ccne1,
-    "rad51b" = rad51b,
-    "seqone_ncc" = seqone_ncc,
-    "coverage" = coverage,
-    "percent_mapping" = percent_mapping,
-    "robustness" = robustness,
-    "low_tumour_fraction" = low_tumour_fraction,
-    "date" = date,
-    "user" = user,
+    "shallow_sample_id" = get_shallow_sample_id(page1)[[5]],
+    "worksheet" = get_shallow_sample_id(page1)[[1]],
+    "sample_id" = get_shallow_sample_id(page1)[[4]],
+    "dlms_dna_number" = get_shallow_sample_id(page1)[[2]],
+    "seqone_hrd_score" = get_hrd_score(page = page1, version = version),
+    "seqone_hrd_status" = get_hrd_status(page1),
+    "lga" = get_lga(page1),
+    "lpc" = get_lpc(page1),
+    "ccne1" = get_ccne1_rad51b(page1, version)[[1]],
+    "rad51b" = get_ccne1_rad51b(page1, version)[[2]],
+    "seqone_ncc" = get_ncc(page1),
+    "coverage" = get_coverage(page1),
+    "percent_mapping" = get_percent_mapping(page1),
+    "robustness" = get_robustness(page1, version),
+    "low_tumour_fraction" = get_low_tumour_fraction(page1, version),
+    "date" = get_date(page1),
+    "user" = get_user(page1),
     "filename" = basename(file),
     "version" = version
   )
