@@ -524,7 +524,7 @@ get_low_tumour_fraction <- function(page, version) {
   
 }
 
-get_ccne1 <- function(page, version) {
+get_ccne1_rad51b <- function(page, version) {
   
   check_version(version)
   
@@ -537,43 +537,62 @@ get_ccne1 <- function(page, version) {
     comments = TRUE
   )
   
+  rad51b_regex_1_1 <- regex(
+    r"[
+    RAD51B\sAmplification
+    \s{28}
+    ((\d{1}\.\d{1,2})|(\d{1}))
+    ]",
+    comments = TRUE
+  )
+  
   ccne1_regex_1_2 <- regex(
     r"[
     RAD51B
     \n\n
     \s{10}
-    (\d{1}\.\d{1,2} | \d{1})
+    (\d{1}\.\d{1,2} | \d{1})    # CCNE1 regex
+    \s{87}
+    (\d{1}\.\d{1,2} | \d{1})    # RAD51B regex
     ]",
     comments = TRUE
   )
   
   if (version == "1.1") {
     
-    ccne1_regex <- ccne1_regex_1_1
+    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_1, group = 1),
+               locale = locale(decimal_mark = "."))
+    
+    rad51b <-  parse_number(str_extract(page, rad51b_regex_1_1, group = 1),
+                                      locale = locale(decimal_mark = "."))
     
   }
   
   if (version == "1.2") {
     
-    ccne1_regex <- ccne1_regex_1_2
+    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_2, group = 1),
+                          locale = locale(decimal_mark = "."))
+    
+    rad51b <- parse_number(str_extract(page, ccne1_regex_1_2, group = 2),
+                           locale = locale(decimal_mark = "."))
     
   }
   
-  ccne1 <- parse_number(str_extract(page, ccne1_regex, group = 1),
-               locale = locale(decimal_mark = "."))
-  
-  return(ccne1)
+  return(list(ccne1, rad51b))
   
 }
 
-read_seqone_report <- function(file) {
+read_seqone_report <- function(file, version) {
+  
+  check_version(version)
+  
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
   page1 <- seqone_report_text[[1]]
 
   # HRD score
   
-  hrd_score <- get_hrd_score(page = page1, version = "1.1")
+  hrd_score <- get_hrd_score(page = page1, version = version)
   
   assert_that(is.na(hrd_score) == FALSE,
               msg = str_c("Seqone HRD score is NA. File: ", basename(file))
@@ -594,23 +613,11 @@ read_seqone_report <- function(file) {
   
   lpc <- get_lpc(page1)
   
-  # CCNE1
+  # CCNE1 and RAD51B
   
-  ccne1 <- get_ccne1(page1, "1.1")
+  ccne1 <- get_ccne1_rad51b(page1, version)[[1]]
   
-  # RAD51B
-  
-  rad51b_regex <- regex(
-    r"[
-    RAD51B\sAmplification
-    \s{28}
-    ((\d{1}\.\d{1,2})|(\d{1}))
-    ]",
-    comments = TRUE
-  )
-  
-  rad51b <- parse_number(str_extract(page1, rad51b_regex, group =1),
-               locale = locale(decimal_mark = "."))
+  rad51b <- get_ccne1_rad51b(page1, version)[[2]]
 
   # Neoplastic cell content
 
@@ -640,11 +647,11 @@ read_seqone_report <- function(file) {
   
   # Robustness
   
-  robustness <- get_robustness(page1, "1.1")
+  robustness <- get_robustness(page1, version)
   
   # Low tumour fraction
   
-  low_tumour_fraction <- get_low_tumour_fraction(page1, "1.1")
+  low_tumour_fraction <- get_low_tumour_fraction(page1, version)
   
   # Date
   
@@ -677,7 +684,7 @@ read_seqone_report <- function(file) {
     "filename" = basename(file)
   )
 
-  #check_na(output)
+  check_na(output)
 
   return(output)
 }
