@@ -204,19 +204,7 @@ get_gi_score <- function(page) {
 
 }
 
-
-read_myriad_report <- function(file) {
-  # Use pdf_text to read PDF as a single string per page
-
-  myriad_report_text <- pdftools::pdf_text(pdf = file)
-
-  page1 <- myriad_report_text[[1]]
-
-  page2 <- myriad_report_text[[2]]
-
-  page3 <- myriad_report_text[[3]]
-
-  # HRD status
+get_myriad_hrd_status <- function(page) {
   
   hrd_status_regex <- regex(
     r"[
@@ -225,20 +213,38 @@ read_myriad_report <- function(file) {
     ]",
     comments = TRUE
   )
-  
-  myriad_hrd_status <- str_extract(page2, hrd_status_regex, group = 1)
 
-  # BRCA status
+  myriad_hrd_status <- str_extract(page, hrd_status_regex, group = 1)
   
+  return(myriad_hrd_status)
+  
+}
+
+get_myriad_brca_status <- function(page) {
+
   brca_status_regex <- regex(
     r"[
     Tumor\sMutation\sBRCA1/BRCA2\sStatus:\s
     (NEGATIVE | POSITIVE)
     ]",
     comments = TRUE
-  )
+    )
+
+  myriad_brca_status <- str_extract(page, brca_status_regex, group = 1)
   
-  myriad_brca_status <- str_extract(page2, brca_status_regex, group = 1)
+  return(myriad_brca_status)
+  
+}
+
+read_myriad_report <- function(file) {
+  
+  myriad_report_text <- pdftools::pdf_text(pdf = file)
+
+  page1 <- myriad_report_text[[1]]
+
+  page2 <- myriad_report_text[[2]]
+
+  page3 <- myriad_report_text[[3]]
 
   output <- data.frame(
     "myriad_r_number" = get_rnumber(page2),
@@ -248,8 +254,8 @@ read_myriad_report <- function(file) {
     "myriad_pathology_block_pg1" = get_path_no(page1),
     "myriad_pathology_block_pg2" = get_path_block(page2),
     "myriad_gi_score" = get_gi_score(str_c(page2, page3)),
-    "myriad_hrd_status" = myriad_hrd_status,
-    "myriad_brca_status" = myriad_brca_status,
+    "myriad_hrd_status" = get_myriad_hrd_status(page2),
+    "myriad_brca_status" = get_myriad_brca_status(page2),
     "myriad_filename" = basename(file)
   )
 
