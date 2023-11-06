@@ -87,6 +87,27 @@ get_rnumber <- function(page) {
   return(myriad_r_number)
 }
 
+get_nhs_number <- function(page) {
+  
+  nhs_no_regex <- regex(
+  r"[
+  NHS\sNo:        
+  .{10,20}                    # Size of whitespace between No: and number can vary
+                              # Use . instead of backslash s as samples can have a leading
+                              # 0 before NHS number. Example: R22-031L
+  (\d{3}\s\d{3}\s\d{4})       # Grouped NHS number format
+  ]",
+  comments = TRUE
+  )
+
+  nhs_no_char <- str_extract(page, nhs_no_regex, group = 1)
+  
+  nhs_no_double <- parse_number(nhs_no_char, locale = locale(grouping_mark = " "))
+
+  return(nhs_no_double)
+  
+}
+
 read_myriad_report <- function(file) {
   # Use pdf_text to read PDF as a single string per page
 
@@ -98,23 +119,6 @@ read_myriad_report <- function(file) {
 
   page3 <- myriad_report_text[[3]]
 
-  # NHS Number
-  
-  nhs_no_regex <- regex(
-    r"[
-    NHS\sNo:        
-    .{10,20}                    # Size of whitespace between No: and number can vary
-                                # Use . instead of backslash s as samples can have a leading
-                                # 0 before NHS number. Example: R22-031L
-    (\d{3}\s\d{3}\s\d{4})       # Grouped NHS number format
-    ]",
-    comments = TRUE
-  )
-  
-  nhs_no_char <- str_extract(page1, nhs_no_regex, group = 1)
-  
-  nhs_no_double <- parse_number(nhs_no_char, locale = locale(grouping_mark = " "))
-  
   # Patient name
   
   patient_name_regex <- regex(
@@ -221,7 +225,7 @@ read_myriad_report <- function(file) {
     "myriad_r_number" = get_rnumber(page2),
     "myriad_patient_name" = myriad_patient_name,
     "myriad_dob" = myriad_dob,
-    "nhs_number" = nhs_no_double,
+    "nhs_number" = get_nhs_number(page1),
     "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
     "myriad_pathology_block_pg2" = myriad_pathology_block_pg2,
     "myriad_gi_score" = gi_score_double,
