@@ -682,7 +682,7 @@ read_seqone_report <- function(file, version) {
     "version" = version
   )
 
-  #check_na(output)
+  check_na(output)
 
   return(output)
 }

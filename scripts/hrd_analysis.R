@@ -42,17 +42,27 @@ collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", "myriad
 
 ## Collate SeqOne data --------------------------------------------------------------
 
-seqone_report_files <- list.files(str_c(hrd_data_path, "seqone_reports_v1_1/"), 
+seqone_report_files_v1_1 <- list.files(str_c(hrd_data_path, "seqone_reports_v1_1/"), 
                                   full.names = TRUE)
 
-collated_seqone_info <- seqone_report_files |>
-  map(\(seqone_report_files) read_seqone_report(file = seqone_report_files,
+seqone_reports_v1_1 <- seqone_report_files_v1_1 |>
+  map(\(seqone_report_files_v1_1) read_seqone_report(file = seqone_report_files_v1_1,
                                                 version = "1.1")) |>
   list_rbind()
 
+seqone_report_files_v1_2 <- list.files(str_c(hrd_data_path, "seqone_reports_v1_2/"), 
+                                       full.names = TRUE)
+
+seqone_reports_v1_2 <- seqone_report_files_v1_2 |>
+  map(\(seqone_report_files_v1_2) read_seqone_report(file = seqone_report_files_v1_2,
+                                                     version = "1.2")) |>
+  list_rbind()
+
+collated_seqone_info <- rbind(seqone_reports_v1_1, seqone_reports_v1_2)
+
 # Check all files collated
 stopifnot(setdiff(
-  basename(seqone_report_files),
+  c(basename(seqone_report_files_v1_1), basename(seqone_report_files_v1_2)),
   collated_seqone_info$filename
 ) == 0)
 
