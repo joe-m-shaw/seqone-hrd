@@ -108,18 +108,7 @@ get_nhs_number <- function(page) {
   
 }
 
-read_myriad_report <- function(file) {
-  # Use pdf_text to read PDF as a single string per page
-
-  myriad_report_text <- pdftools::pdf_text(pdf = file)
-
-  page1 <- myriad_report_text[[1]]
-
-  page2 <- myriad_report_text[[2]]
-
-  page3 <- myriad_report_text[[3]]
-
-  # Patient name
+get_name <- function(page) {
   
   patient_name_regex <- regex(
     r"[
@@ -130,9 +119,26 @@ read_myriad_report <- function(file) {
     ]",
     comments = TRUE
   )
-  
-  myriad_patient_name <- str_extract(page1, patient_name_regex, group = 1)
 
+  myriad_patient_name <- str_extract(page, patient_name_regex, group = 1)
+
+  return(myriad_patient_name)
+  
+}
+
+
+
+read_myriad_report <- function(file) {
+  # Use pdf_text to read PDF as a single string per page
+
+  myriad_report_text <- pdftools::pdf_text(pdf = file)
+
+  page1 <- myriad_report_text[[1]]
+
+  page2 <- myriad_report_text[[2]]
+
+  page3 <- myriad_report_text[[3]]
+  
   # Patient date of birth
   
   dob_regex <- regex(
@@ -223,7 +229,7 @@ read_myriad_report <- function(file) {
 
   output <- data.frame(
     "myriad_r_number" = get_rnumber(page2),
-    "myriad_patient_name" = myriad_patient_name,
+    "myriad_patient_name" = get_name(page1),
     "myriad_dob" = myriad_dob,
     "nhs_number" = get_nhs_number(page1),
     "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
