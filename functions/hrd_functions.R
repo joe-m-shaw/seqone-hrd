@@ -280,6 +280,12 @@ get_hrd_score <- function(page, version) {
   
   hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
 
+  assert_that(is.na(hrd_score_double) == FALSE,
+              msg = "Seqone HRD score is NA")
+  
+  assert_that(hrd_score_double >= 0, hrd_score_double <= 1,
+              msg = "SeqOne HRD score outside 0-1 range")
+  
   return(hrd_score_double)
   
 }
@@ -592,12 +598,7 @@ read_seqone_report <- function(file, version) {
   
   hrd_score <- get_hrd_score(page = page1, version = version)
   
-  assert_that(is.na(hrd_score) == FALSE,
-              msg = str_c("Seqone HRD score is NA. File: ", basename(file))
-  )
-  
-  assert_that(hrd_score >= 0, hrd_score <= 1,
-              msg = str_c("SeqOne HRD score outside 0-1 range. File: ", basename(file)))
+ 
 
   # HRD status
   
