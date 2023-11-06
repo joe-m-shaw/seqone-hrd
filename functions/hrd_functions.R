@@ -470,7 +470,7 @@ get_robustness <- function(page, version) {
   robustness_regex <- regex(
     r"[
     Robustness\sof\sgenomic\sinstability
-    \s{29}
+    \s{28,29}
     (\d{1}\.\d{2})
     ]",
     comments = TRUE
@@ -500,8 +500,8 @@ get_low_tumour_fraction <- function(page, version) {
   ltf_regex <- regex(
     r"[
     Low\stumor\sfraction
-    \s{44}
-    (NORMAL)
+    \s{43, 44}
+    (NORMAL | WARNING)
     ]",
     comments = TRUE
   )
@@ -550,7 +550,7 @@ get_ccne1_rad51b <- function(page, version) {
     \n\n
     \s{10}
     (\d{1}\.\d{1,2} | \d{1})    # CCNE1 regex
-    \s{87}
+    \s{87,88}
     (\d{1}\.\d{1,2} | \d{1})    # RAD51B regex
     ]",
     comments = TRUE
