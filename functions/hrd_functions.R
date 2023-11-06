@@ -680,7 +680,8 @@ read_seqone_report <- function(file, version) {
     "low_tumour_fraction" = low_tumour_fraction,
     "date" = date,
     "user" = user,
-    "filename" = basename(file)
+    "filename" = basename(file),
+    "version" = version
   )
 
   check_na(output)
