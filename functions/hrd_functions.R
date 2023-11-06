@@ -495,8 +495,35 @@ get_robustness <- function(page, version) {
   
 }
 
-
-
+get_low_tumour_fraction <- function(page, version) {
+  
+  check_version(version)
+  
+  ltf_regex <- regex(
+    r"[
+    Low\stumor\sfraction
+    \s{44}
+    (NORMAL)
+    ]",
+    comments = TRUE
+  )
+  
+  if (version == "1.1") {
+    
+    low_tumour_fraction <- "not calculated"
+    
+  }
+  
+  if (version == "1.2") {
+    
+    low_tumour_fraction <- str_extract(page, ltf_regex, group = 1)
+    
+  }
+  
+  return(low_tumour_fraction)
+  
+}
+  
 read_seqone_report <- function(file) {
   seqone_report_text <- pdftools::pdf_text(pdf = file)
 
@@ -583,6 +610,10 @@ read_seqone_report <- function(file) {
   
   robustness <- get_robustness(page1, "1.1")
   
+  # Low tumour fraction
+  
+  low_tumour_fraction <- get_low_tumour_fraction(page1, "1.1")
+  
   # Date
   
   date <- get_date(page1)
@@ -608,6 +639,7 @@ read_seqone_report <- function(file) {
     "coverage" = coverage,
     "percent_mapping" = percent_mapping,
     "robustness" = robustness,
+    "low_tumour_fraction" = low_tumour_fraction,
     "date" = date,
     "user" = user,
     "filename" = basename(file)
