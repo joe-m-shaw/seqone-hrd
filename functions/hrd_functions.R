@@ -144,21 +144,9 @@ get_dob <- function(page) {
   
 }
 
-
-read_myriad_report <- function(file) {
-  # Use pdf_text to read PDF as a single string per page
-
-  myriad_report_text <- pdftools::pdf_text(pdf = file)
-
-  page1 <- myriad_report_text[[1]]
-
-  page2 <- myriad_report_text[[2]]
-
-  page3 <- myriad_report_text[[3]]
+get_path_no <- function(page) {
   
-  # Pathology Block
-  
-  path_block_1_regex <- regex(
+  path_block_no_regex <- regex(
     r"[
     Pathology\sNo:
     \s+               # Variable whitespace
@@ -168,9 +156,15 @@ read_myriad_report <- function(file) {
     comments = TRUE
   )
   
-  myriad_pathology_block_pg1 <- str_extract(page1, path_block_1_regex, group = 1)
+  myriad_pathology_number <- str_extract(page, path_block_no_regex, group = 1)
   
-  path_block_2_regex <- regex(
+  return(myriad_pathology_number)
+  
+}
+
+get_path_block <- function(page) {
+  
+  path_block_regex <- regex(
     r"[
     (Block\(s\)|Specimen\(s\))  # Some say Block(s) whilst others say Specimen(s)
     \sAnalyzed:\s
@@ -180,9 +174,11 @@ read_myriad_report <- function(file) {
     comments = TRUE
   )
   
-  myriad_pathology_block_pg2 <- str_extract(page2, path_block_2_regex, group = 2)
+  myriad_pathology_block <- str_extract(page, path_block_regex, group = 2)
+  
+}
 
-  # GI score
+get_gi_score <- function(page) {
   
   gi_score_regex <- regex(
     r"[
@@ -194,17 +190,31 @@ read_myriad_report <- function(file) {
     comments = TRUE
   )
   
-  gi_score_char <- str_extract(str_c(page2, page3), gi_score_regex, group = 1)
+  gi_score_char <- str_extract(page, gi_score_regex, group = 1)
   
   gi_score_double <- parse_number(gi_score_char)
-
+  
   assert_that(is.na(gi_score_double) == FALSE,
-    msg = paste0("GI score is NA: file ", basename(file))
-  )
+              msg = "GI score is NA")
+  
+  assert_that(gi_score_double >= 0, gi_score_double <= 100, 
+              msg = "GI score outside 0-100 range ")
+  
+  return(gi_score_double)
 
-  assert_that(gi_score_double >= 0, gi_score_double <= 100, msg = paste0(
-    "GI score outside 0-100 range: file ", basename(file)
-  ))
+}
+
+
+read_myriad_report <- function(file) {
+  # Use pdf_text to read PDF as a single string per page
+
+  myriad_report_text <- pdftools::pdf_text(pdf = file)
+
+  page1 <- myriad_report_text[[1]]
+
+  page2 <- myriad_report_text[[2]]
+
+  page3 <- myriad_report_text[[3]]
 
   # HRD status
   
@@ -235,9 +245,9 @@ read_myriad_report <- function(file) {
     "myriad_patient_name" = get_name(page1),
     "myriad_dob" = get_dob(page1),
     "nhs_number" = get_nhs_number(page1),
-    "myriad_pathology_block_pg1" = myriad_pathology_block_pg1,
-    "myriad_pathology_block_pg2" = myriad_pathology_block_pg2,
-    "myriad_gi_score" = gi_score_double,
+    "myriad_pathology_block_pg1" = get_path_no(page1),
+    "myriad_pathology_block_pg2" = get_path_block(page2),
+    "myriad_gi_score" = get_gi_score(str_c(page2, page3)),
     "myriad_hrd_status" = myriad_hrd_status,
     "myriad_brca_status" = myriad_brca_status,
     "myriad_filename" = basename(file)
