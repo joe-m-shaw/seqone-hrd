@@ -725,55 +725,7 @@ save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi =
   )
 }
 
-make_individual_plot <- function(input_sample) {
-  output_plot <- compare_results |>
-    filter(dlms_dna_number == input_sample) |>
-    ggplot(aes(x = worksheet, y = seqone_hrd_score)) +
-    geom_point(
-      size = 4, alpha = 0.5,
-      aes(shape = seqone_hrd_status)
-    ) +
-    facet_wrap(~dlms_dna_number) +
-    theme_bw() +
-    labs(
-      title = "",
-      x = "",
-      y = "SeqOne HRD score"
-    ) +
-    geom_hline(yintercept = 0.50, linetype = "dashed") +
-    ylim(0, 1)
-
-  return(output_plot)
-}
-
-circle_individual_point <- function(dna_input) {
-  results <- results_for_path_block_plot
-
-  output_plot <- path_block_plot +
-    geom_point(
-      data = results[results$dlms_dna_number == dna_input, ],
-      aes(myriad_gi_score, seqone_hrd_score),
-      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
-    )
-
-  return(output_plot)
-}
-
 # Table functions -------------------------------------------------------------------
-
-get_sample_summary_info <- function(input_dna_no) {
-  output <- compare_results |>
-    filter(dlms_dna_number == input_dna_no) |>
-    select(
-      worksheet, dlms_dna_number, seqone_hrd_score,
-      seqone_hrd_status, lga, lpc, ccne1, rad51b,
-      coverage, percent_mapping, million_reads, read_length,
-      insert_size, percent_q30, percent_aligned, percent_dups,
-      myriad_gi_score, myriad_hrd_status
-    )
-
-  return(output)
-}
 
 extract_kapa_data <- function(worksheet_number, worksheet_length) {
   description <- grep(
