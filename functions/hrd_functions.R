@@ -91,6 +91,8 @@ get_rnumber <- function(page) {
   
   myriad_r_number <- str_extract(page, r_number_regex, group = 1)
   
+  assert_that(!is.na(myriad_r_number))
+  
   return(myriad_r_number)
 }
 
@@ -111,6 +113,8 @@ get_nhs_number <- function(page) {
   
   nhs_no_double <- parse_number(nhs_no_char, locale = locale(grouping_mark = " "))
 
+  assert_that(!is.na(nhs_no_double))
+  
   return(nhs_no_double)
   
 }
@@ -129,6 +133,8 @@ get_name <- function(page) {
 
   myriad_patient_name <- str_extract(page, patient_name_regex, group = 1)
 
+  assert_that(!is.na(myriad_patient_name))
+  
   return(myriad_patient_name)
   
 }
@@ -147,11 +153,15 @@ get_dob <- function(page) {
   
   myriad_dob <- str_extract(page, dob_regex, group = 1)
   
+  assert_that(!is.na(myriad_dob))
+  
   return(myriad_dob)
   
 }
 
-get_path_no <- function(page) {
+get_path_no <- function(page = page1) {
+  
+  # Function for extracting pathology number printed on page 1 of Myriad reports
   
   path_block_no_regex <- regex(
     r"[
@@ -165,11 +175,15 @@ get_path_no <- function(page) {
   
   myriad_pathology_number <- str_extract(page, path_block_no_regex, group = 1)
   
+  assert_that(!is.na(myriad_pathology_number))
+  
   return(myriad_pathology_number)
   
 }
 
 get_path_block <- function(page) {
+  
+  # Function for extracting "pathology block ID" from page 2 of Myriad reports
   
   path_block_regex <- regex(
     r"[
@@ -183,6 +197,10 @@ get_path_block <- function(page) {
   
   myriad_pathology_block <- str_extract(page, path_block_regex, group = 2)
   
+  assert_that(!is.na(myriad_pathology_block))
+  
+  return(myriad_pathology_block)
+  
 }
 
 get_gi_score <- function(page) {
@@ -191,7 +209,7 @@ get_gi_score <- function(page) {
     r"[
     Patient\sGenomic\sInstability\sScore:
     \s
-    (\d{1,2})                               # Score can be 1 digit (i.e. 7) or 2 (73)
+    (\d{1,3})                               # Score can be 1-3 digits - 1, 10, 100
     \n                                      # Mark end of score with newline
     ]",
     comments = TRUE
@@ -223,6 +241,8 @@ get_myriad_hrd_status <- function(page) {
 
   myriad_hrd_status <- str_extract(page, hrd_status_regex, group = 1)
   
+  assert_that(!is.na(myriad_hrd_status))
+  
   return(myriad_hrd_status)
   
 }
@@ -238,6 +258,8 @@ get_myriad_brca_status <- function(page) {
     )
 
   myriad_brca_status <- str_extract(page, brca_status_regex, group = 1)
+  
+  assert_that(!is.na(myriad_brca_status))
   
   return(myriad_brca_status)
   
@@ -288,7 +310,7 @@ get_hrd_score <- function(page, version) {
     r"[
     CLASS\n
     \s+                           # Variable whitespace
-    ((0\.\d{1,2})|(\d{1}))        # Variable formats: 0.99, 0.9, 1
+    (\d{1}\.\d{1,2} | \d{1})      # Variable formats: 0.99, 0.9, 1
                                   # Use backslash . to specify decimal point
     ]",
     comments = TRUE
@@ -342,6 +364,8 @@ get_hrd_status <- function(page) {
   seqone_hrd_status <- fct(str_extract(page, hrd_status_regex, group = 1),
                            levels = seqone_status_levels)
   
+  assert_that(!is.na(seqone_hrd_status))
+  
   return(seqone_hrd_status)
   
 }
@@ -351,13 +375,15 @@ get_lga <- function(page) {
   lga_regex <- regex(
     r"[
     LGA\sStatus
-    \s+             # Variable whitespace - 35 in v1.2
+    \s+             # Variable whitespace
     (\d{1,2})       # Group LGA status
     ]",
     comments = TRUE
   )
   
   lga <- parse_number(str_extract(page, lga_regex, group = 1))
+  
+  assert_that(!is.na(lga))
   
   return(lga)
   
@@ -375,6 +401,8 @@ get_lpc <- function(page) {
   )
   
   lpc <- parse_number(str_extract(page, lpc_regex, group = 1))
+  
+  assert_that(!is.na(lpc))
   
   return(lpc)
   
@@ -405,8 +433,8 @@ get_coverage <- function(page) {
   coverage_regex <- regex(
     r"[
     Coverage
-    \s+                            # Variable whitespace between versions
-    ((\d{1}\.\d{1,2}) | (\d{1}))   # Variable format 1.57, 1.5, 1
+    \s+                           # Variable whitespace between versions
+    (\d{1}\.\d{1,2} | \d{1})      # Variable format 1.57, 1.5, 1
     X
     ]",
     comments = TRUE
@@ -414,6 +442,8 @@ get_coverage <- function(page) {
   
   coverage <- parse_number(str_extract(page, coverage_regex, group = 1),
                            locale = locale(decimal_mark = "."))
+  
+  assert_that(!is.na(coverage))
   
   return(coverage)
   
@@ -425,7 +455,7 @@ get_percent_mapping <- function(page) {
     r"[
     %\scorrect\smapping
     \s+                           # Variable whitespace between versions
-    ((\d{2}\.\d{1})|(\d{2}))      # Format 97.2, 97
+    (\d{2}\.\d{1} | \d{2,3})      # Format 97.2, 97, 100
                                   # Assume percent mapping always above 10
     %
     ]",
@@ -446,13 +476,13 @@ get_shallow_sample_id <- function(page) {
   ss_id_regex <- regex(
     r"{
     Shallow\ssample\sID
-    \s{15,18}             # Variable whitespace
+    \s+                   # Variable whitespace
     (WS\d{6})             # Group 1: worksheet
     _
     (\d{8})               # Group 2: 8 digit DLMS number
     ([^\s]{0,17})         # Group 3: Additional sample info only present for some samples
-    # Select any character after the underscore that isn't a space
-    # String may be 17 characters. Example: b_0.5_downsampled
+                          # Select any character after the underscore that isn't a space
+                          # String may be 17 characters. Example: b_0.5_downsampled
     }",
     comments = TRUE
   )
@@ -476,7 +506,7 @@ get_date <- function(page) {
   date_regex <- regex(
     r"[
     Date
-    \s{32}        # Variable whitespace
+    \s+           # Variable whitespace
     (\w{3,9}      # Month as text. Shortest is May (3), longest September (9)
     \s
     \d{1,2}       # Day (1-31)
@@ -487,6 +517,8 @@ get_date <- function(page) {
   )
   
   date <- mdy(str_extract(page, date_regex, group = 1))
+  
+  assert_that(!is.na(date))
   
   return(date)
   
@@ -505,6 +537,8 @@ get_user <- function(page) {
   
   user <- str_extract(page, user_regex, group = 1)
   
+  assert_that(!is.na(user))
+  
   return(user)
   
 }
@@ -517,7 +551,7 @@ get_robustness <- function(page, version) {
     r"[
     Robustness\sof\sgenomic\sinstability
     \s+
-    (\d{1}\.\d{2})
+    (\d{1}\.\d{1,2} | \d{1})
     ]",
     comments = TRUE
   )
@@ -534,6 +568,8 @@ get_robustness <- function(page, version) {
                                locale = locale(decimal_mark = "."))
     
   }
+  
+  assert_that(!is.na(robustness))
   
   return(robustness)
   
@@ -564,6 +600,8 @@ get_low_tumour_fraction <- function(page, version) {
     
   }
   
+  assert_that(!is.na(low_tumour_fraction))
+  
   return(low_tumour_fraction)
   
 }
@@ -575,8 +613,8 @@ get_ccne1_rad51b <- function(page, version) {
   ccne1_regex_1_1 <- regex(
     r"[
     CCNE1\sAmplification
-    \s+                          # Variable whitespace
-    ((\d{1}\.\d{1,2})|(\d{1}))   # Variable number format
+    \s+                              # Variable whitespace
+    (\d{1,2}\.\d{1,2} | \d{1,2})     # Variable number format
     ]",
     comments = TRUE
   )
@@ -585,7 +623,7 @@ get_ccne1_rad51b <- function(page, version) {
     r"[
     RAD51B\sAmplification
     \s+
-    ((\d{1}\.\d{1,2})|(\d{1}))
+    (\d{1,2}\.\d{1,2} | \d{1,2})
     ]",
     comments = TRUE
   )
@@ -594,10 +632,10 @@ get_ccne1_rad51b <- function(page, version) {
     r"[
     RAD51B
     \n\n
-    \s{10}
-    (\d{1,2}\.\d{1,2} | \d{1})    # CCNE1 regex
     \s+
-    (\d{1,2}\.\d{1,2} | \d{1})    # RAD51B regex
+    (\d{1,2}\.\d{1,2} | \d{1,2})    # CCNE1 regex
+    \s+
+    (\d{1,2}\.\d{1,2} | \d{1,2})    # RAD51B regex
     ]",
     comments = TRUE
   )
@@ -621,6 +659,10 @@ get_ccne1_rad51b <- function(page, version) {
                            locale = locale(decimal_mark = "."))
     
   }
+  
+  assert_that(!is.na(ccne1))
+  
+  assert_that(!is.na(rad51b))
   
   return(list(ccne1, rad51b))
   
@@ -691,8 +733,6 @@ safe_grey <- "#888888"
 plot_qc <- function(df = repeat_results, x_var = shallow_sample_id, yvar, 
                     outcome = outcome_binary) {
   
-  #title_label <- rlang::englue("{{ yvar }}")
-  
   ggplot(df, aes(x = as.character({{ x_var }}), y = {{ yvar }})) +
     geom_point(size = 3, alpha = 0.6,
                aes(colour = {{ outcome }})) +
@@ -702,12 +742,7 @@ plot_qc <- function(df = repeat_results, x_var = shallow_sample_id, yvar,
     theme_bw() +
     theme(axis.text.x = element_blank(),
           panel.grid = element_blank(),
-          legend.position = "bottom") +
-    geom_point(
-      data = sub_df,
-      aes(x = {{ x_var }}, y = {{ yvar }}),
-      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
-    )
+          legend.position = "bottom")
   
 }
 
@@ -745,6 +780,7 @@ plot_variation <- function(df = repeat_variation, yvar) {
 }
 
 save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi = 300) {
+  
   # Default inputs allow for presenting a plot as half an A4 page
 
   ggsave(
