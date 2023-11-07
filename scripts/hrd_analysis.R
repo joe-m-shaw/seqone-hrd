@@ -370,6 +370,10 @@ compare_results <- join_tables |>
       
       seqone_hrd_status == neg_text & myriad_hrd_status == pos_text ~false_neg_text,
       
+      seqone_hrd_status == incon_text & myriad_hrd_status == pos_text ~incon_pos_text,
+      
+      seqone_hrd_status == incon_text & myriad_hrd_status == neg_text ~incon_neg_text,
+      
       TRUE ~ "other"),
     
     outcome_binary = case_when(
@@ -380,9 +384,14 @@ compare_results <- join_tables |>
       
       outcome %in% c(incon_pos_text, incon_neg_text) ~inconclusive_text,
       
-      TRUE ~ "other")
+      TRUE ~ "other"),
+    
+    outcome_binary = fct(outcome_binary, levels = c(consistent_text,
+                                                    inconsistent_text,
+                                                    inconclusive_text,
+                                                    "other"))
+    
   )
-
 
 ## Sensitivity and specificity ------------------------------------------------------
 
@@ -570,21 +579,16 @@ coverage_line <- geom_hline(yintercept = coverage_threshold, linetype = "dashed"
 input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
 
 filtered_results <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match") 
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.2") 
 
-cov_v11 <- plot_qc(yvar = coverage, outcome = outcome_binary) +
-  labs(x = "", title = "Coverage - SomaHRDv1.1") +
-  coverage_line
-
-cov_v12 <- plot_qc(yvar = coverage, outcome = outcome_binary) +
+cov_v12 <- plot_qc(df = filtered_results, yvar = coverage, outcome = outcome_binary) +
   labs(x = "", title = "Coverage - SomaHRDv1.2") +
-  coverage_line
+  coverage_line +
+  ylim(0, 2.2)
 
-input_v11 <- plot_qc(yvar = input_ng, outcome = outcome_binary) +
-  labs(x = "", title = "DNA input - SomaHRDv1.1")
-
-input_v12 <- plot_qc(yvar = input_ng, outcome = outcome_binary) +
-  labs(x = "", title = "DNA input - SomaHRDv1.2") 
+input_v12 <- plot_qc(df = filtered_results, yvar = input_ng, outcome = outcome_binary) +
+  labs(x = "", title = "DNA input - SomaHRDv1.2")  +
+  ylim(0, 52)
 
 coverage_input_plot <- ggarrange(cov_v12, input_v12,
           nrow = 2, ncol = 1,
