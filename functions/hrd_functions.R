@@ -30,6 +30,9 @@ inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
 
 inconclusive_text <- "SeqOne HRD status inconclusive"
 
+seqone_status_levels <- c(neg_text, pos_text, incon_text)
+
+consistency_levels <- c(consistent_text, inconsistent_text, inconclusive_text)
 
 # Filepaths -------------------------------------------------------------------------
 
@@ -332,7 +335,8 @@ get_hrd_status <- function(page) {
     comments = TRUE
   )
   
-  seqone_hrd_status <- str_extract(page, hrd_status_regex, group = 1)
+  seqone_hrd_status <- fct(str_extract(page, hrd_status_regex, group = 1),
+                           levels = seqone_status_levels)
   
   return(seqone_hrd_status)
   
@@ -733,8 +737,7 @@ plot_variation <- function(df = repeat_variation, yvar) {
   ggplot(df, aes(x = , y = {{ yvar }})) +
     geom_boxplot() +
     theme_bw() +
-    theme(axis.text.x = element_blank()) +
-    ylim(0,30)
+    theme(axis.text.x = element_blank()) 
   
 }
 
