@@ -688,10 +688,8 @@ safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
-plot_qc <- function(df = repeat_results, x_var = surname, yvar, outcome) {
-  
-  sub_df <- df |> 
-    filter(shallow_sample_id == "WS133557_21003549")
+plot_qc <- function(df = repeat_results, x_var = shallow_sample_id, yvar, 
+                    outcome = outcome_binary) {
   
   #title_label <- rlang::englue("{{ yvar }}")
   
@@ -699,7 +697,8 @@ plot_qc <- function(df = repeat_results, x_var = surname, yvar, outcome) {
     geom_point(size = 3, alpha = 0.6,
                aes(colour = {{ outcome }})) +
     scale_colour_manual(name = "",
-                        values = c(safe_blue, safe_red, safe_grey)) +
+                        values = c(safe_blue, safe_red, safe_grey,
+                                   safe_grey)) +
     theme_bw() +
     theme(axis.text.x = element_blank(),
           panel.grid = element_blank(),
