@@ -69,7 +69,6 @@ export_timestamp <- function(filepath = hrd_output_path, input) {
   )
 }
 
-
 # Reading Myriad PDFs ---------------------------------------------------------------
 
 check_na <- function(input_table) {
