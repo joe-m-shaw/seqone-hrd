@@ -279,17 +279,6 @@ seqone_mod <- collated_seqone_info |>
   ) |>
   mutate(
     downsampled = ifelse(grepl(pattern = "downsampl", x = sample_id), "Yes", "No"),
-    identity = ifelse(grepl(
-      pattern = "Biobank|seraseq", x = surname,
-      ignore.case = TRUE
-    ),
-    "Control", "Patient"
-    ),
-    control_type = case_when(
-      grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) ~ "Biobank control",
-      grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) ~ "Seraseq control",
-      TRUE ~ "patient"
-    ),
     
     dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
     
@@ -319,9 +308,50 @@ join_tables <- seqone_mod |>
         lga_amended, lpc_amended, low_tumor_fraction
       ),
     by = "shallow_sample_id",  keep = FALSE
-  ) 
+  ) |> 
+  # Add identities for validation table
+  mutate(
+    sample_type = case_when(
+      
+      grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) ~ "Biobank control",
+      
+      grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) ~ "Seraseq control",
+      
+      !grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) &
+        !grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) &
+        path_block_manual_check == path_block_match_text ~"Patient - same pathology block",
+      
+      !grepl(pattern = "Biobank", x = surname, ignore.case = TRUE) &
+        !grepl(pattern = "seraseq", x = surname, ignore.case = TRUE) &
+        path_block_manual_check == path_block_no_match_text ~"Patient - different pathology block",
+      
+      TRUE ~ "other"
+      
+    )
+  )
 
 # Analyse Data ----------------------------------------------------------------------
+
+# Worksheets
+worksheet_summary <- join_tables |> 
+  filter(version == "1.1" & downsampled == "No") |> 
+  group_by(worksheet) |> 
+  count()
+
+sum(worksheet_summary$n)
+
+# DNA inputs
+dna_input_summary <- join_tables |> 
+  filter(version == "1.1" & downsampled == "No") |> 
+  count(sample_type) |> 
+  arrange(desc(n))
+
+# Samples
+sample_summary <- join_tables |>
+  filter(version == "1.1" & downsampled == "No") |>
+  filter(!duplicated(dlms_dna_number)) |> 
+  count(sample_type) |> 
+  arrange(n)
 
 ## Compare SeqOne and Myriad results ------------------------------------------------
 
@@ -400,7 +430,7 @@ hrd_score_plot <- compare_results |>
   geom_point(size = 3, alpha = 0.7,
              aes(colour = seqone_hrd_status)) +
   scale_colour_manual(name = "SeqOne HRD Status",
-                      values = c(safe_blue, safe_grey, safe_red)) +
+                      values = c(safe_blue, safe_red, safe_grey)) +
   theme_bw() +
   scale_x_continuous(
     limits = c(0, 100),
@@ -415,7 +445,9 @@ hrd_score_plot <- compare_results |>
     title = "Comparison of Myriad vs SeqOne HRD Scores",
     subtitle = str_c("DNA inputs with coverage >= ", coverage_threshold,
                      "X; DNA input >= ", input_threshold, "ng")) +
-  ggpubr::stat_cor(method = "pearson", label.x = 60, label.y = 0.1)
+  ggpubr::stat_cor(method = "pearson", label.x = 60, label.y = 0.1) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 42, linetype = "dashed")
 
 ## Inter run variation --------------------------------------------------------------
 
@@ -445,16 +477,27 @@ repeat_variation <- repeat_results |>
             range_lpc = max_lpc - min_lpc,
             max_cov = max(coverage),
             min_cov = min(coverage),
-            range_cov = max_cov - min_cov)
+            range_cov = max_cov - min_cov,
+            max_score = max(seqone_hrd_score),
+            min_score = min(seqone_hrd_score),
+            range_score = max_score - min_score)
 
 
 lga_variation <- plot_variation(yvar = range_lga) +
-  labs(y = "Difference in LGA between sample repeats", title = "LGA variation")
+  labs(y = "Difference in LGA between sample repeats", title = "LGA variation") +
+  ylim(0,30)
 
 lpc_variation <- plot_variation(yvar = range_lpc) +
-  labs(y = "Difference in LPC between sample repeats", title = "LPC variation")
+  labs(y = "Difference in LPC between sample repeats", title = "LPC variation") +
+  ylim(0,30)
 
-lga_lpc_variation <- ggarrange(lga_variation, lpc_variation, ncol = 2, nrow = 1)
+score_variation <- plot_variation(yvar = range_score) +
+  labs(y = "Difference in HRD score between sample repeats", 
+       title = "HRD score variation") +
+  ylim(0, 1)
+
+lga_lpc_variation <- ggarrange(lga_variation, lpc_variation, 
+                               score_variation, ncol = 3, nrow = 1)
 
 # save_hrd_plot(lga_lpc_variation)
 
@@ -464,10 +507,11 @@ repeat_facet_plot <- ggplot(repeat_results, aes(
 )) +
   geom_point(
     alpha = 0.5, size = 2,
-    aes(
-      shape = seqone_hrd_status
+    aes(colour = seqone_hrd_status
     )
   ) +
+  scale_colour_manual(name = "SeqOne HRD Status", 
+                      values = c(safe_blue, safe_red, safe_grey)) +
   facet_wrap(~dlms_dna_number) +
   theme_bw() +
   theme(
@@ -490,7 +534,7 @@ intra_run_table <- compare_results |>
   filter(worksheet == "WS133557") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status, lga, lpc, coverage) |> 
+  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage) |> 
   arrange(sample_id)
 
 # export_timestamp(input = intra_run_table)
@@ -640,6 +684,11 @@ dna_qc_threshold <- round(50 / 15, 0)
 tbrca_data_mod <- tbrca_data |>
   filter(!is.na(concentration)) |>
   mutate(pass_qc = ifelse(concentration >= dna_qc_threshold, "Yes", "No"))
+
+tbrca_data_mod |> 
+  group_by(pass_qc) |> 
+  summarise(total = n(),
+    proportion = total / sum(total))
 
 samples_passing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "Yes", ])
 
