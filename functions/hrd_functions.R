@@ -24,11 +24,11 @@ incon_pos_text <- "inconclusive_positive"
 
 incon_neg_text <- "inconclusive_negative"
 
-consistent_text <- "Seqone HRD status consistent with Myriad"
+consistent_text <- "Seqone consistent with Myriad"
 
-inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
+inconsistent_text <- "Seqone NOT consistent with Myriad"
 
-inconclusive_text <- "SeqOne HRD status inconclusive"
+inconclusive_text <- "SeqOne inconclusive"
 
 path_block_match_text <- "pathology blocks match" 
 
@@ -729,7 +729,7 @@ safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
-plot_qc <- function(df = repeat_results, x_var = shallow_sample_id, yvar, 
+plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, 
                     outcome = outcome_binary) {
   
   ggplot(df, aes(x = as.character({{ x_var }}), y = {{ yvar }})) +
@@ -741,7 +741,8 @@ plot_qc <- function(df = repeat_results, x_var = shallow_sample_id, yvar,
     theme_bw() +
     theme(axis.text.x = element_blank(),
           panel.grid = element_blank(),
-          legend.position = "bottom")
+          legend.position = "bottom") +
+    labs(x = "")
   
 }
 
@@ -770,7 +771,7 @@ plot_lpc_lga <- function(df) {
 }
 
 plot_variation <- function(df = repeat_variation, yvar) {
-  
+
   ggplot(df, aes(x = , y = {{ yvar }})) +
     geom_boxplot() +
     theme_bw() +
