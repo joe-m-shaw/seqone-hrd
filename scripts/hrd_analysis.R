@@ -458,18 +458,42 @@ hrd_score_plot <- compare_results |>
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   geom_vline(xintercept = 42, linetype = "dashed")
 
+save_hrd_plot(input_height = 14, input_plot = hrd_score_plot)
+
+# save_hrd_plot(input_plot = hrd_score_plot)
+
+## Robustness and low tumour content ------------------------------------------------
+
+compare_results |> 
+  filter(version == "1.2" & robustness <= 0.85) |> 
+  select(shallow_sample_id, dlms_dna_number, seqone_hrd_status,
+         myriad_hrd_status, robustness,
+         path_block_manual_check, low_tumour_fraction) |> 
+  arrange(dlms_dna_number)
+
+compare_results |> 
+  filter(version == "1.2" & seqone_hrd_status == incon_text) |> 
+  select(shallow_sample_id, dlms_dna_number, seqone_hrd_status,
+         myriad_hrd_status, robustness,
+         path_block_manual_check, low_tumour_fraction) |> 
+  arrange(dlms_dna_number)
+
+
 ## Inter run variation --------------------------------------------------------------
 
-repeat_results <- compare_results |>
+repeat_results_1_1 <- compare_results |>
+  filter(version == "1.1") |> 
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE))
+
+repeat_results_1_2 <- compare_results |>
   filter(version == "1.2") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-    base::duplicated(dlms_dna_number, fromLast = FALSE)) |>
-  mutate(input_category = case_when(
-    input_ng >= input_threshold ~ "50ng input",
-    input_ng < input_threshold ~ "lower than 50ng input"
-  ))
+    base::duplicated(dlms_dna_number, fromLast = FALSE))
 
-lpc_lga_facet_plot <- plot_lpc_lga(repeat_results) +
+repeat_results <- rbind(repeat_results_1_1, repeat_results_1_2)
+
+lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
   labs(title = "Inter-run variation with SomaHRDv1.2",
        x = "LGA", y = "LPC") +
   facet_wrap(~dlms_dna_number)
@@ -477,6 +501,7 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results) +
 #save_hrd_plot(lpc_lga_facet_plot)
 
 repeat_variation <- repeat_results |> 
+  filter(version == "1.2") |> 
   group_by(dlms_dna_number) |> 
   summarise(max_lga = max(lga),
             min_lga = min(lga),
@@ -491,24 +516,22 @@ repeat_variation <- repeat_results |>
             min_score = min(seqone_hrd_score),
             range_score = max_score - min_score)
 
-
-lga_variation <- plot_variation(yvar = range_lga) +
-  labs(y = "Difference in LGA between sample repeats", title = "LGA variation") +
+lga_var <- plot_variation(yvar = range_lga) +
+  labs(y = "Difference in LGA") +
   ylim(0,30)
 
-lpc_variation <- plot_variation(yvar = range_lpc) +
-  labs(y = "Difference in LPC between sample repeats", title = "LPC variation") +
+lpc_var <- plot_variation(yvar = range_lpc) +
+  labs(y = "Difference in LPC") +
   ylim(0,30)
 
-score_variation <- plot_variation(yvar = range_score) +
-  labs(y = "Difference in HRD score between sample repeats", 
-       title = "HRD score variation") +
+score_var <- plot_variation(yvar = range_score) +
+  labs(y = "Difference in HRD score") +
   ylim(0, 1)
 
-lga_lpc_variation <- ggarrange(lga_variation, lpc_variation, 
-                               score_variation, ncol = 3, nrow = 1)
+lga_lpc_variation <- ggarrange(lga_var, lpc_var, score_var, 
+                               ncol = 3, nrow = 1)
 
-# save_hrd_plot(lga_lpc_variation)
+# save_hrd_plot(lga_lpc_variation, input_height = 10)
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -540,10 +563,11 @@ repeat_facet_plot <- ggplot(repeat_results, aes(
 ## Intra-run variation --------------------------------------------------------------
 
 intra_run_table <- compare_results |> 
-  filter(worksheet == "WS133557") |> 
+  filter(worksheet == "WS133557" & version == "1.2") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage) |> 
+  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
+         robustness) |> 
   arrange(sample_id)
 
 # export_timestamp(input = intra_run_table)
@@ -551,14 +575,29 @@ intra_run_table <- compare_results |>
 ## Seraseq controls -----------------------------------------------------------------
 
 seraseq_control_data <- compare_results |>
-  filter(control_type == "Seraseq control") |>
+  filter(sample_type == "Seraseq control") |>
   mutate(firstname_factor = factor(firstname, levels = c(
     "FFPE HRD Negative",
     "Low-Positive FFPE HRD",
     "High-Positive FFPE HRD"
   )))
 
-seraseq_plot <- plot_lpc_lga(seraseq_control_data) +
+seraseq_plot <- seraseq_control_data |> 
+  filter(version == "1.2") |> 
+  ggplot(aes(x = myriad_gi_score, 
+                                 y = seqone_hrd_score)) +
+  geom_point(aes(colour = seqone_hrd_status),
+             size = 2, alpha = 0.6) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_blue, safe_red, safe_grey)) +
+  
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_vline(xintercept = 42, linetype = "dashed") +
+  ylim(0, 1) +
+  xlim(0, 80) +
+  labs(x = "SeqOne HRD score", y = "Myriad GI score") +
   facet_wrap(~firstname_factor)
 
 # save_hrd_plot(seraseq_plot)
@@ -566,9 +605,9 @@ seraseq_plot <- plot_lpc_lga(seraseq_control_data) +
 ## Biobank controls -----------------------------------------------------------------
 
 biobank_control_results <- compare_results |> 
-  filter(control_type == "Biobank control") |> 
+  filter(sample_type == "Biobank control" & version == "1.2") |> 
   select(dlms_dna_number, seqone_hrd_status, lga, lpc,
-         low_tumor_fraction)
+         low_tumor_fraction, robustness)
 
 export_timestamp(input = biobank_control_results)
 
@@ -584,11 +623,14 @@ filtered_results <- compare_results |>
 cov_v12 <- plot_qc(df = filtered_results, yvar = coverage, outcome = outcome_binary) +
   labs(x = "", title = "Coverage - SomaHRDv1.2") +
   coverage_line +
-  ylim(0, 2.2)
+  ylim(0, 2.5) +
+  labs(x = "DNA input", y = "Coverage (X)")
 
 input_v12 <- plot_qc(df = filtered_results, yvar = input_ng, outcome = outcome_binary) +
   labs(x = "", title = "DNA input - SomaHRDv1.2")  +
-  ylim(0, 52)
+  ylim(0, 52) +
+  input_line +
+  labs(x = "DNA input", y = "DNA input (ng)")
 
 coverage_input_plot <- ggarrange(cov_v12, input_v12,
           nrow = 2, ncol = 1,
@@ -600,82 +642,45 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
 outlier_sample <- compare_results |> 
   filter(dlms_dna_number == 21003549)
 
-coverage_plot_v2 <- plot_qc(yvar = coverage, outcome = outcome_binary)
+readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary) +
+  ylim(50, 150)
 
-readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary)
+millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary) +
+  ylim(0, 80)
 
-millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary)
+insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary) +
+  ylim(0, 200)
 
-insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary)
+percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary) +
+  ylim(80, 100)
 
-percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary)
+percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary) +
+  ylim(99, 101)
 
-percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary)
+percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary) +
+  ylim(0, 8)
 
-percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary)
-
-input_plot_v2 <- plot_qc(yvar = input_ng, outcome = outcome_binary)
-
-qc_metrics_v2 <- ggarrange(coverage_plot_v2, readlength_plot_v2, 
+qc_metrics_v2 <- ggarrange(readlength_plot_v2, 
                            millreads_plot_v2, insertsize_plot_v2, 
                            percentq30_plot_v2, percentaligned_plot_v2,
-                           percentdups_plot_v2, input_plot_v2,
-                           ncol = 4, nrow = 2,
+                           percentdups_plot_v2,
+                           ncol = 2, nrow = 3,
                            common.legend = TRUE,
                            legend = "bottom")
 
+save_hrd_plot(qc_metrics_v2, input_height = 20, input_width = 16)
+
 ## LGA and LPC ----------------------------------------------------------------------
 
-lga_vs_lpc <- ggplot(compare_results, aes(lga, lpc)) +
-  geom_point(aes(colour = seqone_hrd_status),
-             size = 3
-  ) +
-  scale_colour_manual(values = c(safe_blue, safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  geom_segment(
-    data = line_df,
-    mapping = aes(x = x, y = y, xend = xend, yend = yend),
-    linetype = "dashed"
-  ) +
-  labs(
-    title = "Original pipeline",
-    subtitle = "CCNE1 and RAD51B included"
-  )
-
-lga_vs_lpc <- plot_lpc_lga(compare_results) +
+lga_vs_lpc <- compare_results |> 
+  filter(version == "1.2") |> 
+  plot_lpc_lga() +
   labs(
     x = "Large Genomic Alterations",
     y = "Loss of Parental Copy",
-    title = "LGA and LPC results for SomaHRD v1.2",
-    subtitle = str_c("Data for ", nrow(compare_results), " samples")
-  )
+    title = "LGA and LPC results for SomaHRD v1.2")
 
 # save_hrd_plot(lga_vs_lpc)
-
-ggarrange(lga_vs_lpc, lga_vs_lpc,
-          nrow = 1
-)
-
-lga_plot <- ggplot(compare_results, aes(lga, lga)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status)) +
-  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  labs(title = "Large genomic alterations") +
-  ylim(0, 45) +
-  xlim(0, 45)
-
-lpc_plot <- ggplot(compare_results, aes(lpc, lpc)) +
-  geom_point(size = 3, aes(colour = seqone_hrd_status)) +
-  scale_colour_manual(values = c(safe_blue, "#CCCCCC", safe_red)) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  labs(title = "Loss of parental copy") +
-  ylim(0, 45) +
-  xlim(0, 45)
-
-ggarrange(lga_plot, lpc_plot, nrow = 1)
 
 # Manchester tBRCA service audit ----------------------------------------------------
 
