@@ -30,6 +30,10 @@ inconsistent_text <- "Seqone HRD status NOT consistent with Myriad"
 
 inconclusive_text <- "SeqOne HRD status inconclusive"
 
+path_block_match_text <- "pathology blocks match" 
+
+path_block_no_match_text <- "pathology blocks DO NOT match"
+
 seqone_status_levels <- c(neg_text, pos_text, incon_text)
 
 consistency_levels <- c(consistent_text, inconsistent_text, inconclusive_text)
