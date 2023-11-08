@@ -333,6 +333,8 @@ dna_input_summary <- join_tables |>
   count(sample_type) |> 
   arrange(desc(n))
 
+total_input_number <- sum(dna_input_summary$n)
+
 Description <- c("Seraseq controls (Myriad GI scores available online)",
                        "MCRC biobank normal controls (no Myriad GI scores)",
                        "DNA samples from patients with DNA from a different pathology 
@@ -391,6 +393,9 @@ compare_results <- join_tables |>
                                                     "other"))
     
   )
+
+# Every DNA input should have 2 rows: 1 for each pipeline version
+assert_that(nrow(compare_results) == (total_input_number*2))
 
 ## Sensitivity and specificity ------------------------------------------------------
 
