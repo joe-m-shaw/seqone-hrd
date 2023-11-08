@@ -802,6 +802,7 @@ save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi =
 # Table functions -------------------------------------------------------------------
 
 extract_kapa_data <- function(worksheet_number, worksheet_length) {
+  
   description <- grep(
     pattern = worksheet_number,
     x = hs2_library_prep$plate_position,
@@ -822,6 +823,26 @@ extract_kapa_data <- function(worksheet_number, worksheet_length) {
   return(output)
 }
 
+make_robustness_table <- function(filtered_df) {
+  
+  output <- compare_results |> 
+    filter(shallow_sample_id %in% filtered_df$shallow_sample_id) |> 
+    select(dlms_dna_number, seqone_hrd_status,
+           myriad_hrd_status, robustness,
+           path_block_manual_check, version) |> 
+    pivot_wider(id_cols = c(dlms_dna_number, myriad_hrd_status,
+                            path_block_manual_check),
+                names_from = version,
+                values_from = c(seqone_hrd_status, robustness)) |> 
+    select(dlms_dna_number, robustness_1.2,
+           seqone_hrd_status_1.2, seqone_hrd_status_1.1, 
+           myriad_hrd_status, 
+           path_block_manual_check) |> 
+    arrange(path_block_manual_check)
+  
+  return(output)
+  
+}
 
 # Test metric functions -------------------------------------------------------------
 
@@ -873,9 +894,9 @@ compare_tests <- function(input_table, outcome_column) {
     )
   
   confusion_matrix <- tribble(
-  ~"x",      ~"x",   ~"HRD",          ~"HRP",           ~"Inconclusive",
-  "Myriad", "HRD",   true_positives,  false_negatives,  incon_positives,
-  "x",      "HRP",   false_positives, true_negatives,   incon_negatives
+  ~"x",      ~"x",       ~"HRD (+)",      ~"HRP (-)",        ~"Inconclusive",
+  "Myriad", "HRD (+)",   true_positives,  false_negatives,  incon_positives,
+  "x",      "HRP (-)",   false_positives, true_negatives,   incon_negatives
   )
   
   return(list(confusion_matrix, metrics, check))
