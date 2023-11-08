@@ -271,23 +271,33 @@ seqone_mod <- collated_seqone_info |>
     
   ) |>
   left_join(seqone_qc_data |> 
-              select(-coverage), by = "shallow_sample_id")
+              select(-coverage), by = c("shallow_sample_id", "version"))
 
 ## Join data tables together --------------------------------------------------------
 
 join_tables <- seqone_mod |>
+  
+  # Add Myriad results
   left_join(collated_myriad_info_mod, by = "nhs_number", keep = FALSE) |>
+  
+  # Add pathology block check
   left_join(path_block_check |> 
-              select(dlms_dna_number, path_block_manual_check), by = "dlms_dna_number",  keep = FALSE) |>
+              select(dlms_dna_number, path_block_manual_check), 
+            by = "dlms_dna_number",  keep = FALSE) |>
+  
+  # Add DNA concentrations
   left_join(dna_concentrations_mod |>
     select(dlms_dna_number, dilution_worksheet, qubit_dna_ul, input_ng), 
     by = c("dlms_dna_number", "dilution_worksheet"),
     keep = FALSE) |>
+  
+  # Add qPCR data
   left_join(
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
     by = "shallow_sample_id",  keep = FALSE
   ) |> 
+  
   # Add identities for validation table
   mutate(
     sample_type = case_when(
@@ -317,20 +327,30 @@ worksheet_summary <- join_tables |>
   group_by(worksheet) |> 
   count()
 
-sum(worksheet_summary$n)
-
 # DNA inputs
 dna_input_summary <- join_tables |> 
-  filter(version == "1.1" & downsampled == "No") |> 
+  filter(version == "1.2" & downsampled == "No") |> 
   count(sample_type) |> 
   arrange(desc(n))
 
+Description <- c("Seraseq controls (Myriad GI scores available online)",
+                       "MCRC biobank normal controls (no Myriad GI scores)",
+                       "DNA samples from patients with DNA from a different pathology 
+                       block tested by Myriad",
+                       "DNA samples from patients with DNA from the same pathology 
+                       block tested by Myriad")
+
 # Samples
 sample_summary <- join_tables |>
-  filter(version == "1.1" & downsampled == "No") |>
+  filter(version == "1.2" & downsampled == "No") |>
   filter(!duplicated(dlms_dna_number)) |> 
   count(sample_type) |> 
-  arrange(n)
+  arrange(n) |> 
+  cbind(Description) |> 
+  select(Description, n) |> 
+  rename("Number of samples" = n)
+
+export_timestamp(input = sample_summary)
 
 ## Compare SeqOne and Myriad results ------------------------------------------------
 
@@ -401,11 +421,11 @@ metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
                       add_version(v1.2_results[[2]], "SomaHRD v1.2"),
                       add_version(v1.2_results_filtered[[2]], "SomaHRD v1.2, thresholds applied"))
 
-# export_timestamp(hrd_output_path, metric_table)
+export_timestamp(hrd_output_path, metric_table)
 
-# export_timestamp(hrd_output_path, v1.1_results[[1]])
+export_timestamp(hrd_output_path, v1.1_results[[1]])
 
-# export_timestamp(hrd_output_path, v1.2_results[[1]])
+export_timestamp(hrd_output_path, v1.2_results[[1]])
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 
@@ -438,8 +458,6 @@ hrd_score_plot <- compare_results |>
   geom_vline(xintercept = 42, linetype = "dashed")
 
 save_hrd_plot(input_height = 14, input_plot = hrd_score_plot)
-
-# save_hrd_plot(input_plot = hrd_score_plot)
 
 ## Robustness and low tumour content ------------------------------------------------
 
@@ -477,7 +495,7 @@ intra_run_table <- compare_results |>
   select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
          robustness)
 
-# export_timestamp(input = intra_run_table)
+export_timestamp(input = intra_run_table)
 
 ## Inter run variation --------------------------------------------------------------
 
@@ -494,7 +512,7 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
        x = "LGA", y = "LPC") +
   facet_wrap(~dlms_dna_number)
 
-#save_hrd_plot(lpc_lga_facet_plot)
+save_hrd_plot(lpc_lga_facet_plot)
 
 repeat_variation <- repeat_results_1_2 |> 
   group_by(dlms_dna_number) |> 
@@ -526,34 +544,7 @@ score_var <- plot_variation(yvar = range_score) +
 lga_lpc_variation <- ggarrange(lga_var, lpc_var, score_var, 
                                ncol = 3, nrow = 1)
 
-# save_hrd_plot(lga_lpc_variation, input_height = 6)
-
-repeat_facet_plot <- ggplot(repeat_results, aes(
-  x = worksheet,
-  y = seqone_hrd_score
-)) +
-  geom_point(
-    alpha = 0.5, size = 2,
-    aes(colour = seqone_hrd_status
-    )
-  ) +
-  scale_colour_manual(name = "SeqOne HRD Status", 
-                      values = c(safe_blue, safe_red, safe_grey)) +
-  facet_wrap(~dlms_dna_number) +
-  theme_bw() +
-  theme(
-    axis.text.x = element_text(angle = 90),
-    legend.position = "bottom"
-  ) +
-  labs(
-    title = "SeqOne results for repeated samples",
-    x = "",
-    y = "SeqOne HRD score",
-    caption = "Plot name: repeat_facet_plot"
-  ) +
-  geom_hline(yintercept = 0.50, linetype = "dashed")
-
-# save_hrd_plot(repeat_facet_plot, input_width = 15, input_height = 15)
+save_hrd_plot(lga_lpc_variation, input_height = 6)
 
 ## Seraseq controls -----------------------------------------------------------------
 
