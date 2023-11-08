@@ -278,7 +278,8 @@ seqone_mod <- collated_seqone_info |>
     by = "dlms_dna_number"
   ) |>
   mutate(
-    downsampled = ifelse(grepl(pattern = "downsampl", x = sample_id), "Yes", "No"),
+    downsampled = ifelse(grepl(pattern = c("downsampl|_0.5"), 
+                         x = sample_id), "Yes", "No"),
     
     dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
     
@@ -464,20 +465,51 @@ save_hrd_plot(input_height = 14, input_plot = hrd_score_plot)
 
 ## Robustness and low tumour content ------------------------------------------------
 
-compare_results |> 
-  filter(version == "1.2" & robustness <= 0.85) |> 
-  select(shallow_sample_id, dlms_dna_number, seqone_hrd_status,
-         myriad_hrd_status, robustness,
-         path_block_manual_check, low_tumour_fraction) |> 
+ltc_table <- compare_results |> 
+  filter(version == "1.2" & low_tumour_fraction == "WARNING") |> 
+  filter(!duplicated(dlms_dna_number)) |> 
+  select(dlms_dna_number, low_tumour_fraction, seqone_hrd_status,
+         myriad_hrd_status,
+         path_block_manual_check, ncc, robustness) |> 
   arrange(dlms_dna_number)
 
-compare_results |> 
-  filter(version == "1.2" & seqone_hrd_status == incon_text) |> 
-  select(shallow_sample_id, dlms_dna_number, seqone_hrd_status,
-         myriad_hrd_status, robustness,
-         path_block_manual_check, low_tumour_fraction) |> 
-  arrange(dlms_dna_number)
+export_timestamp(input = ltc_table)
 
+robustness_fail_samples <- compare_results |> 
+  filter(version == "1.2" & robustness <= 0.85) 
+
+robustness_warning_samples <- compare_results |> 
+  filter(version == "1.2" & robustness < 0.93 &
+           robustness > 0.85)
+
+make_robustness_table <- function(filtered_df) {
+  
+  output <- compare_results |> 
+    filter(shallow_sample_id %in% filtered_df$shallow_sample_id) |> 
+    select(dlms_dna_number, seqone_hrd_status,
+           myriad_hrd_status, robustness,
+           path_block_manual_check, version) |> 
+    pivot_wider(id_cols = c(dlms_dna_number, myriad_hrd_status,
+                            path_block_manual_check),
+                names_from = version,
+                values_from = c(seqone_hrd_status, robustness)) |> 
+    select(dlms_dna_number, robustness_1.2,
+           seqone_hrd_status_1.2, seqone_hrd_status_1.1, 
+           myriad_hrd_status, 
+           path_block_manual_check) |> 
+    arrange(path_block_manual_check)
+  
+  return(output)
+  
+}
+
+robustness_fail_table <- make_robustness_table(robustness_fail_samples)
+
+robustness_warning_table <- make_robustness_table(robustness_warning_samples)
+
+export_timestamp(input = robustness_fail_table)
+
+export_timestamp(input = robustness_warning_table)
 
 ## Inter run variation --------------------------------------------------------------
 
