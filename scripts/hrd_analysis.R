@@ -248,30 +248,12 @@ seqone_qc_data_v1.2 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.2.x
   ) |> 
   mutate(version = "1.2")
 
-## Amended SeqOne scores ------------------------------------------------------------
-
-seqone_amended <- read_excel(
-  path =
-    paste0(
-      hrd_data_path,
-      "SeqOne_Manchester Amended Results 241023.xlsx"
-    )
-) |>
-  janitor::clean_names() |>
-  rename(
-    shallow_sample_id = sample,
-    seqone_hrd_status_amended = amended_seq_one_hrd_status,
-    lga_amended = lga,
-    lpc_amended = lpc,
-    low_tumor_fraction = low_tumor_fraction_returns_a_warning_only
-  )
-
+seqone_qc_data <- rbind(seqone_qc_data_v1.1, seqone_qc_data_v1.2)
 
 ## Edit SeqOne information ----------------------------------------------------------
 
 seqone_mod <- collated_seqone_info |>
-  # Analysis on September 1st and before was previous pipeline version
-
+  # Analysis on September 1st and before was previous pipeline version (1.0)
   filter(date > "2023-09-01") |>
   left_join(
     seqone_dlms_info |>
@@ -288,7 +270,7 @@ seqone_mod <- collated_seqone_info |>
     dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
     
   ) |>
-  left_join(seqone_qc_data_v1.1 |> 
+  left_join(seqone_qc_data |> 
               select(-coverage), by = "shallow_sample_id")
 
 ## Join data tables together --------------------------------------------------------
@@ -304,14 +286,6 @@ join_tables <- seqone_mod |>
   left_join(
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
-    by = "shallow_sample_id",  keep = FALSE
-  ) |>
-  left_join(
-    seqone_amended |>
-      select(
-        shallow_sample_id, seqone_hrd_status_amended,
-        lga_amended, lpc_amended, low_tumor_fraction
-      ),
     by = "shallow_sample_id",  keep = FALSE
   ) |> 
   # Add identities for validation table
