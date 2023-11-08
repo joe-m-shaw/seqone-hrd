@@ -645,7 +645,7 @@ percentdups_plot_v2 <- plot_qc(yvar = percent_dups) +
 
 total_yield_plot_v2 <- plot_qc(yvar = total_yield) +
   ylim(0, 2500) +
-  labs(y = "qPCR total yeld (ng)")
+  labs(y = "qPCR total yield (ng)")
 
 robustness_plot_v2 <- plot_qc(yvar = robustness) +
   ylim(0.5, 1) +
