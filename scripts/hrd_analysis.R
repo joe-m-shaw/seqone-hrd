@@ -138,6 +138,7 @@ dna_concentrations <- read_excel(
   )
 
 dna_concentrations_mod <- dna_concentrations |>
+  # Remove duplicated incomplete data
   slice(-(1:28)) |> 
   mutate(
     dilution_concentration = ifelse(
@@ -154,7 +155,7 @@ dna_concentrations_mod <- dna_concentrations |>
     # 15ul of diluted or neat (undiluted) DNA used in fragmentation reaction
     input_ng = dilution_concentration * 15,
     
-    # Worksheet not added to spreadsheet - add by date
+    # Sequencing worksheet was not included on spreadsheet - add by date
     dilution_worksheet = case_when(
       
       as.character(date_submitted) %in% c("2023-07-21",
@@ -170,6 +171,9 @@ dna_concentrations_mod <- dna_concentrations |>
   )
 
 ## qPCR library QC ------------------------------------------------------------------
+
+# Copy of technologist spreadsheet originally saved at:
+# S:/central shared/Genetics/Repository/Technical Teams/NGS/SureSelect XT HS2/
 
 hs2_library_prep <- read_excel(
   path = str_c(hrd_data_path, "SSXT HS2 Library Prep 2023.xlsx"),
@@ -231,7 +235,8 @@ seqone_qc_data_v1.1 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.1.x
     read_length = read_len,
     insert_size = ins_size,
     million_reads = m_reads
-  )
+  ) |> 
+  mutate(version = "1.1")
 
 seqone_qc_data_v1.2 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.2.xlsx")) |>
   janitor::clean_names() |>
@@ -240,9 +245,8 @@ seqone_qc_data_v1.2 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.2.x
     read_length = read_len,
     insert_size = ins_size,
     million_reads = m_reads
-  )
-
-setdiff(seqone_qc_data_v1.1$shallow_sample_id, seqone_qc_data_v1.2$shallow_sample_id)
+  ) |> 
+  mutate(version = "1.2")
 
 ## Amended SeqOne scores ------------------------------------------------------------
 
@@ -482,27 +486,6 @@ robustness_warning_samples <- compare_results |>
   filter(version == "1.2" & robustness < 0.93 &
            robustness > 0.85)
 
-make_robustness_table <- function(filtered_df) {
-  
-  output <- compare_results |> 
-    filter(shallow_sample_id %in% filtered_df$shallow_sample_id) |> 
-    select(dlms_dna_number, seqone_hrd_status,
-           myriad_hrd_status, robustness,
-           path_block_manual_check, version) |> 
-    pivot_wider(id_cols = c(dlms_dna_number, myriad_hrd_status,
-                            path_block_manual_check),
-                names_from = version,
-                values_from = c(seqone_hrd_status, robustness)) |> 
-    select(dlms_dna_number, robustness_1.2,
-           seqone_hrd_status_1.2, seqone_hrd_status_1.1, 
-           myriad_hrd_status, 
-           path_block_manual_check) |> 
-    arrange(path_block_manual_check)
-  
-  return(output)
-  
-}
-
 robustness_fail_table <- make_robustness_table(robustness_fail_samples)
 
 robustness_warning_table <- make_robustness_table(robustness_warning_samples)
@@ -554,9 +537,6 @@ repeat_variation <- repeat_results_1_2 |>
             min_score = min(seqone_hrd_score),
             range_score = max_score - min_score)
 
-length(unique(repeat_results_1_2$shallow_sample_id))
-
-
 lga_var <- plot_variation(yvar = range_lga) +
   labs(y = "Difference in LGA") +
   ylim(0,30)
@@ -572,9 +552,7 @@ score_var <- plot_variation(yvar = range_score) +
 lga_lpc_variation <- ggarrange(lga_var, lpc_var, score_var, 
                                ncol = 3, nrow = 1)
 
-median(repeat_variation$range_score)
-
-# save_hrd_plot(lga_lpc_variation, input_height = 8)
+# save_hrd_plot(lga_lpc_variation, input_height = 6)
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -631,7 +609,7 @@ seraseq_plot <- seraseq_control_data |>
   labs(x = "SeqOne HRD score", y = "Myriad GI score") +
   facet_wrap(~firstname_factor)
 
-# save_hrd_plot(seraseq_plot)
+# save_hrd_plot(seraseq_plot, input_height = 10)
 
 ## Biobank controls -----------------------------------------------------------------
 
