@@ -511,19 +511,26 @@ export_timestamp(input = robustness_fail_table)
 
 export_timestamp(input = robustness_warning_table)
 
+## Intra-run variation --------------------------------------------------------------
+
+intra_run_table <- compare_results |> 
+  filter(worksheet == "WS133557" & version == "1.2") |> 
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
+         robustness)
+
+# export_timestamp(input = intra_run_table)
+
 ## Inter run variation --------------------------------------------------------------
 
-repeat_results_1_1 <- compare_results |>
-  filter(version == "1.1") |> 
-  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-           base::duplicated(dlms_dna_number, fromLast = FALSE))
-
 repeat_results_1_2 <- compare_results |>
-  filter(version == "1.2") |> 
+  filter(version == "1.2" &
+           # Remove intra-run replicates
+           !sample_id %in% grep(x = compare_results$sample_id, pattern = "b|c",
+                                value = TRUE)) |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
     base::duplicated(dlms_dna_number, fromLast = FALSE))
-
-repeat_results <- rbind(repeat_results_1_1, repeat_results_1_2)
 
 lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
   labs(title = "Inter-run variation with SomaHRDv1.2",
@@ -532,8 +539,7 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
 
 #save_hrd_plot(lpc_lga_facet_plot)
 
-repeat_variation <- repeat_results |> 
-  filter(version == "1.2") |> 
+repeat_variation <- repeat_results_1_2 |> 
   group_by(dlms_dna_number) |> 
   summarise(max_lga = max(lga),
             min_lga = min(lga),
@@ -547,6 +553,9 @@ repeat_variation <- repeat_results |>
             max_score = max(seqone_hrd_score),
             min_score = min(seqone_hrd_score),
             range_score = max_score - min_score)
+
+length(unique(repeat_results_1_2$shallow_sample_id))
+
 
 lga_var <- plot_variation(yvar = range_lga) +
   labs(y = "Difference in LGA") +
@@ -563,7 +572,9 @@ score_var <- plot_variation(yvar = range_score) +
 lga_lpc_variation <- ggarrange(lga_var, lpc_var, score_var, 
                                ncol = 3, nrow = 1)
 
-# save_hrd_plot(lga_lpc_variation, input_height = 10)
+median(repeat_variation$range_score)
+
+# save_hrd_plot(lga_lpc_variation, input_height = 8)
 
 repeat_facet_plot <- ggplot(repeat_results, aes(
   x = worksheet,
@@ -591,18 +602,6 @@ repeat_facet_plot <- ggplot(repeat_results, aes(
   geom_hline(yintercept = 0.50, linetype = "dashed")
 
 # save_hrd_plot(repeat_facet_plot, input_width = 15, input_height = 15)
-
-## Intra-run variation --------------------------------------------------------------
-
-intra_run_table <- compare_results |> 
-  filter(worksheet == "WS133557" & version == "1.2") |> 
-  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-           base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
-         robustness) |> 
-  arrange(sample_id)
-
-# export_timestamp(input = intra_run_table)
 
 ## Seraseq controls -----------------------------------------------------------------
 
@@ -650,7 +649,8 @@ coverage_line <- geom_hline(yintercept = coverage_threshold, linetype = "dashed"
 input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
 
 filtered_results <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match" & version == "1.2") 
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.2") |> 
+  mutate(robustness = as.numeric(robustness))
 
 cov_v12 <- plot_qc(df = filtered_results, yvar = coverage, outcome = outcome_binary) +
   labs(x = "", title = "Coverage - SomaHRDv1.2") +
@@ -671,36 +671,47 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
 
 # save_hrd_plot(coverage_input_plot)
 
-outlier_sample <- compare_results |> 
-  filter(dlms_dna_number == 21003549)
+readlength_plot_v2 <- plot_qc(yvar = read_length) +
+  ylim(50, 150) +
+  labs(y = "Read length (bp)")
 
-readlength_plot_v2 <- plot_qc(yvar = read_length, outcome = outcome_binary) +
-  ylim(50, 150)
+millreads_plot_v2 <- plot_qc(yvar = million_reads) +
+  ylim(0, 80) +
+  labs(y = "Millions of reads")
 
-millreads_plot_v2 <- plot_qc(yvar = million_reads, outcome = outcome_binary) +
-  ylim(0, 80)
+insertsize_plot_v2 <- plot_qc(yvar = insert_size) +
+  ylim(0, 200) +
+  labs(y = "Insert size (bp)")
 
-insertsize_plot_v2 <- plot_qc(yvar = insert_size, outcome = outcome_binary) +
-  ylim(0, 200)
+percentq30_plot_v2 <- plot_qc(yvar = percent_q30) +
+  ylim(80, 100) +
+  labs(y = "Percentage reads Q30 (%)")
 
-percentq30_plot_v2 <- plot_qc(yvar = percent_q30, outcome = outcome_binary) +
-  ylim(80, 100)
+percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned) +
+  ylim(99, 101) +
+  labs(y = "Percentage reads aligned (%)")
 
-percentaligned_plot_v2 <- plot_qc(yvar = percent_aligned, outcome = outcome_binary) +
-  ylim(99, 101)
+percentdups_plot_v2 <- plot_qc(yvar = percent_dups) +
+  ylim(0, 8) +
+  labs(y = "Percentage duplicate reads (%)")
 
-percentdups_plot_v2 <- plot_qc(yvar = percent_dups, outcome = outcome_binary) +
-  ylim(0, 8)
+total_yield_plot_v2 <- plot_qc(yvar = total_yield) +
+  ylim(0, 2500) +
+  labs(y = "qPCR total yeld (ng)")
 
-qc_metrics_v2 <- ggarrange(readlength_plot_v2, 
-                           millreads_plot_v2, insertsize_plot_v2, 
-                           percentq30_plot_v2, percentaligned_plot_v2,
-                           percentdups_plot_v2,
-                           ncol = 2, nrow = 3,
+robustness_plot_v2 <- plot_qc(yvar = robustness) +
+  ylim(0.5, 1) +
+  labs(y = "Robustness")
+
+qc_metrics_v2 <- ggarrange(readlength_plot_v2, millreads_plot_v2, 
+                           insertsize_plot_v2, percentq30_plot_v2, 
+                           percentaligned_plot_v2, percentdups_plot_v2,
+                           total_yield_plot_v2, robustness_plot_v2,
+                           ncol = 2, nrow = 4,
                            common.legend = TRUE,
                            legend = "bottom")
 
-save_hrd_plot(qc_metrics_v2, input_height = 20, input_width = 16)
+save_hrd_plot(qc_metrics_v2, input_height = 24, input_width = 16)
 
 ## LGA and LPC ----------------------------------------------------------------------
 
@@ -778,6 +789,3 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
     gi_score >=0 & gi_score <= 100 ~"Conclusive result"
   )) |> 
   count(result_type)
-
-max(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
-min(tbrca_data_collection_clean$date_test_received, na.rm = TRUE)
