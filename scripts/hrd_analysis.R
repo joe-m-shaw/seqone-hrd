@@ -574,7 +574,7 @@ seraseq_plot <- seraseq_control_data |>
   labs(x = "SeqOne HRD score", y = "Myriad GI score") +
   facet_wrap(~firstname_factor)
 
-# save_hrd_plot(seraseq_plot, input_height = 10)
+save_hrd_plot(seraseq_plot, input_height = 10)
 
 ## Biobank controls -----------------------------------------------------------------
 
@@ -612,7 +612,7 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
           common.legend = TRUE,
           legend = "bottom")
 
-# save_hrd_plot(coverage_input_plot)
+save_hrd_plot(coverage_input_plot)
 
 readlength_plot_v2 <- plot_qc(yvar = read_length) +
   ylim(50, 150) +
@@ -666,7 +666,7 @@ lga_vs_lpc <- compare_results |>
     y = "Loss of Parental Copy",
     title = "LGA and LPC results for SomaHRD v1.2")
 
-# save_hrd_plot(lga_vs_lpc)
+save_hrd_plot(lga_vs_lpc)
 
 # Manchester tBRCA service audit ----------------------------------------------------
 
@@ -717,7 +717,7 @@ myriad_gi_profile_plot <- tbrca_gi_scores |>
     subtitle = paste0("Data for ", nrow(tbrca_gi_scores), " samples shown")
   )
 
-# save_hrd_plot(myriad_gi_profile_plot)
+save_hrd_plot(myriad_gi_profile_plot)
 
 ## Manchester tBRCA inconclusive rate -----------------------------------------------
 
