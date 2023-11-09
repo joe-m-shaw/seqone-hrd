@@ -323,6 +323,17 @@ join_tables <- seqone_mod |>
     )
   )
 
+# Check all samples have a path block ID check and join information
+
+samples_to_check <- join_tables |> 
+  # Controls won't have all Myriad information - so remove before checking for NAs
+  filter(!sample_type %in% c("Biobank control", "Seraseq control") &
+           downsampled == "No") |> 
+  # NCC column has NA values due 
+  select(-ncc)
+
+assert_that(anyNA.data.frame(samples_to_check) == FALSE)
+
 # Analyse Data ----------------------------------------------------------------------
 
 # Worksheets
