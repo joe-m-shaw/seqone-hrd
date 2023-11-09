@@ -423,6 +423,8 @@ coverage_threshold <- 0.5
 
 input_threshold <- 47
 
+# Initial format - all DNA replicates included
+
 v1.1_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & version == "1.1") |> 
   compare_tests()
@@ -441,16 +443,42 @@ v1.2_results_filtered <- compare_results |>
            coverage >= coverage_threshold & input_ng >= input_threshold) |> 
   compare_tests()
 
-metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
+metric_table_inputs <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
                       add_version(v1.1_results_filtered[[2]], "SomaHRD v1.1, thresholds applied"),
                       add_version(v1.2_results[[2]], "SomaHRD v1.2"),
                       add_version(v1.2_results_filtered[[2]], "SomaHRD v1.2, thresholds applied"))
 
-export_timestamp(hrd_output_path, metric_table)
+export_timestamp(input = metric_table_inputs)
 
-export_timestamp(hrd_output_path, v1.1_results[[1]])
+export_timestamp(input = v1.1_results[[1]])
 
-export_timestamp(hrd_output_path, v1.2_results[[1]])
+export_timestamp(input = v1.2_results[[1]])
+
+# New format - only 1 replicate per sample
+
+v1.2_unique_sample_results <- compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match" & 
+           version == "1.2") |> 
+  filter(!duplicated(dlms_dna_number)) |> 
+  compare_tests()
+
+v1.2_unique_sample_results_filtered <- compare_results |> 
+  filter(path_block_manual_check == "pathology blocks match" & 
+           version == "1.2" &
+           coverage >= coverage_threshold & 
+           input_ng >= input_threshold) |> 
+  filter(!duplicated(dlms_dna_number)) |> 
+  compare_tests()
+
+export_timestamp(input = v1.2_unique_sample_results[[1]])
+
+metric_table_samples <- rbind(add_version(v1.2_unique_sample_results[[2]], 
+                                          "SomaHRD v1.2"),
+                        add_version(v1.2_unique_sample_results_filtered[[2]], 
+                                    "SomaHRD v1.2, thresholds applied")) |> 
+  select(-`DNA inputs`)
+
+export_timestamp(input = metric_table_samples)
 
 ## Myriad and SeqOne score correlation ----------------------------------------------
 
@@ -563,6 +591,9 @@ hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet,
   facet_wrap(~dlms_dna_number) 
 
 save_hrd_plot(hrd_score_facet_plot)
+
+
+## Intra-run variation boxplots -----------------------------------------------------
 
 repeat_variation <- repeat_results_1_2 |> 
   group_by(dlms_dna_number) |> 
@@ -777,6 +808,13 @@ myriad_gi_profile_plot <- tbrca_gi_scores |>
     fill = "Myriad GI Status")
 
 save_hrd_plot(myriad_gi_profile_plot)
+
+tbrca_gi_scores |> 
+  mutate(borderline = ifelse(gi_score <= 47 & gi_score >=37, "Yes", "No")) |> 
+  count(borderline) |> 
+  mutate(percentage = round((n / sum(n))*100, 1))
+
+
 
 ## Manchester tBRCA inconclusive rate -----------------------------------------------
 
