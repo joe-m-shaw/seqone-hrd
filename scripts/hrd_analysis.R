@@ -474,7 +474,7 @@ hrd_score_plot <- compare_results |>
         legend.position = "bottom") +
   labs(
     x = "Myriad Genome Instability Score",
-    y = "SeqOne HRD Score") +
+    y = "SeqOne HRD Probability (v1.2)") +
   ggpubr::stat_cor(method = "pearson", label.x = 60, label.y = 0.1) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   geom_vline(xintercept = 42, linetype = "dashed")
@@ -522,7 +522,14 @@ intra_run_table <- compare_results |>
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
            base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
   select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
-         robustness)
+         robustness) |> 
+  rename("Sample ID" = sample_id,
+         "SeqOne HRD status (v1.2)" = seqone_hrd_status,
+         "SeqOne HRD score (v1.2)"= seqone_hrd_score,
+         "LGA" = lga,
+         "LPC" = lpc,
+         "Coverage (X)" = coverage,
+         "Robustness" = robustness)
 
 export_timestamp(input = intra_run_table)
 
@@ -620,7 +627,13 @@ save_hrd_plot(seraseq_plot, input_height = 10)
 biobank_control_results <- compare_results |> 
   filter(sample_type == "Biobank control" & version == "1.2") |> 
   select(dlms_dna_number, seqone_hrd_status, lga, lpc,
-         low_tumor_fraction, robustness)
+         low_tumour_fraction, robustness) |> 
+  rename("DNA number" = dlms_dna_number,
+         "SeqOne HRD status (v1.2)" = seqone_hrd_status,
+         "LGA" = lga,
+         "LPC" = lpc,
+         "Low tumour fraction status" = low_tumour_fraction,
+         "Robustness" = robustness)
 
 export_timestamp(input = biobank_control_results)
 
@@ -704,7 +717,6 @@ lga_vs_lpc <- compare_results |>
 
 save_hrd_plot(lga_vs_lpc)
 
-
 ## Downsampling ---------------------------------------------------------------------
 
 downsampled_samples <- grep(pattern = "20103853b|20112141b",
@@ -714,7 +726,14 @@ downsampled_samples <- grep(pattern = "20103853b|20112141b",
 downsampled_table <- join_tables |> 
   filter(sample_id %in% downsampled_samples & version == "1.2") |> 
   select(dlms_dna_number, downsampled, seqone_hrd_score, seqone_hrd_status, 
-         myriad_hrd_status, million_reads, coverage)
+         myriad_hrd_status, million_reads, coverage) |> 
+  rename("DNA number" = dlms_dna_number,
+         "Downsampled" = downsampled,
+         "SeqOne HRD score (v1.2)" = seqone_hrd_score,
+         "SeqOne HRD status (v1.2)" = seqone_hrd_status,
+         "Myriad HRD status" = myriad_hrd_status,
+         "Reads (millions)" = million_reads,
+         "Coverage" = coverage)
 
 export_timestamp(input = downsampled_table)
 
