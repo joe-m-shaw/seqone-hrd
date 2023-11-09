@@ -846,28 +846,25 @@ make_robustness_table <- function(filtered_df) {
 
 # Test metric functions -------------------------------------------------------------
 
-count_category <- function(input_table, outcome_column, match_text) {
+compare_tests <- function(input_table) {
   
-  nrow(input_table |> 
-         filter( {{outcome_column }}  == {{ match_text }}))
+  assert_that("outcome" %in% colnames(input_table))
   
-}
+  assert_that(anyNA(input_table$outcome) == FALSE)
+  
+  assert_that(!"other" %in% input_table$outcome)
+  
+  true_positives <- nrow(input_table[input_table$outcome == true_pos_text, ])
+  
+  true_negatives <- nrow(input_table[input_table$outcome == true_neg_text, ])
 
-compare_tests <- function(input_table, outcome_column) {
+  false_positives <- nrow(input_table[input_table$outcome == false_pos_text, ])
   
-  assert_that(anyNA(input_table$outcome_column) == FALSE)
-  
-  true_positives <- count_category(input_table, {{ outcome_column }} , true_pos_text)
-  
-  true_negatives <- count_category(input_table, {{ outcome_column }} , true_neg_text)
-  
-  false_positives <- count_category(input_table, {{ outcome_column }} , false_pos_text)
-  
-  false_negatives <- count_category(input_table, {{ outcome_column }} , false_neg_text)
+  false_negatives <- nrow(input_table[input_table$outcome == false_neg_text, ])
 
-  incon_positives <- count_category(input_table, {{ outcome_column }} , incon_pos_text)
+  incon_positives <- nrow(input_table[input_table$outcome == incon_pos_text, ])
   
-  incon_negatives <- count_category(input_table, {{ outcome_column }} , incon_neg_text)
+  incon_negatives <- nrow(input_table[input_table$outcome == incon_neg_text, ])
   
   opa = round(((true_positives + true_negatives) / sum(true_positives, false_positives,
                                                      true_negatives, false_negatives)) * 100, 1)

@@ -410,21 +410,21 @@ input_threshold <- 47
 
 v1.1_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & version == "1.1") |> 
-  compare_tests(outcome)
+  compare_tests()
 
 v1.1_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & version == "1.1" &
            coverage >= coverage_threshold & input_ng >= input_threshold) |> 
-  compare_tests(outcome)
+  compare_tests()
 
 v1.2_results <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & version == "1.2") |> 
-  compare_tests(outcome)
+  compare_tests()
 
 v1.2_results_filtered <- compare_results |> 
   filter(path_block_manual_check == "pathology blocks match" & version == "1.2" &
            coverage >= coverage_threshold & input_ng >= input_threshold) |> 
-  compare_tests(outcome)
+  compare_tests()
 
 metric_table <- rbind(add_version(v1.1_results[[2]], "SomaHRD v1.1"),
                       add_version(v1.1_results_filtered[[2]], "SomaHRD v1.1, thresholds applied"),
