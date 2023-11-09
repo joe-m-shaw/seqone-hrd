@@ -483,15 +483,22 @@ save_hrd_plot(input_height = 14, input_plot = hrd_score_plot)
 
 ## Robustness and low tumour content ------------------------------------------------
 
-ltc_table <- compare_results |> 
+low_tumour_content_table <- compare_results |> 
   filter(version == "1.2" & low_tumour_fraction == "WARNING") |> 
   filter(!duplicated(dlms_dna_number)) |> 
-  select(dlms_dna_number, low_tumour_fraction, seqone_hrd_status,
-         myriad_hrd_status,
+  select(dlms_dna_number, low_tumour_fraction,
+         seqone_hrd_status, myriad_hrd_status,
          path_block_manual_check, ncc, robustness) |> 
-  arrange(dlms_dna_number)
-
-export_timestamp(input = ltc_table)
+  arrange(dlms_dna_number) |> 
+  rename("DNA Number" = dlms_dna_number,
+         "Low tumour fraction status" = low_tumour_fraction, 
+         "SeqOne HRD status (v1.2)" = seqone_hrd_status,
+         "Myriad HRD status" = myriad_hrd_status,
+         "Pathology block check" = path_block_manual_check,
+         "NCC" = ncc,
+         "Robustness" = robustness)
+         
+export_timestamp(input = low_tumour_content_table)
 
 robustness_fail_samples <- compare_results |> 
   filter(version == "1.2" & robustness <= 0.85) 
@@ -642,7 +649,7 @@ coverage_input_plot <- ggarrange(cov_v12, input_v12,
           common.legend = TRUE,
           legend = "bottom")
 
-save_hrd_plot(coverage_input_plot)
+save_hrd_plot(coverage_input_plot, input_width = 16)
 
 readlength_plot_v2 <- plot_qc(yvar = read_length) +
   ylim(50, 150) +
