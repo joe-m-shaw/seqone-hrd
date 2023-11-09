@@ -730,10 +730,10 @@ safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
 plot_qc <- function(df = filtered_results, x_var = shallow_sample_id, yvar, 
-                    outcome = outcome_binary) {
+                    outcome = outcome_binary, alpha_number = 0.6) {
   
   ggplot(df, aes(x = as.character({{ x_var }}), y = {{ yvar }})) +
-    geom_point(size = 3, alpha = 0.6,
+    geom_point(size = 3, alpha = alpha_number,
                aes(colour = {{ outcome }})) +
     scale_colour_manual(name = "",
                         values = c(safe_blue, safe_red, safe_grey,
