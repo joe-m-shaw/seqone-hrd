@@ -838,7 +838,14 @@ make_robustness_table <- function(filtered_df) {
            seqone_hrd_status_1.2, seqone_hrd_status_1.1, 
            myriad_hrd_status, 
            path_block_manual_check) |> 
-    arrange(path_block_manual_check)
+    arrange(path_block_manual_check) |> 
+    rename("DNA Number" = dlms_dna_number,
+           "Robustness" = robustness_1.2,
+           "SeqOne HRD status (v1.2)" = seqone_hrd_status_1.2,
+           "SeqOne HRD status (v1.1)" = seqone_hrd_status_1.1,
+           "Myriad HRD status" = myriad_hrd_status,
+           "Pathology block check" = path_block_manual_check
+           )
   
   return(output)
   
