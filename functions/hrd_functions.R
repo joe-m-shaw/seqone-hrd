@@ -855,17 +855,19 @@ count_category <- function(input_table, outcome_column, match_text) {
 
 compare_tests <- function(input_table, outcome_column) {
   
-  true_positives <- count_category(input_table, {{ outcome_column}} , true_pos_text)
+  assert_that(anyNA(input_table$outcome_column) == FALSE)
   
-  true_negatives <- count_category(input_table, {{ outcome_column}} , true_neg_text)
+  true_positives <- count_category(input_table, {{ outcome_column }} , true_pos_text)
   
-  false_positives <- count_category(input_table, {{ outcome_column}} , false_pos_text)
+  true_negatives <- count_category(input_table, {{ outcome_column }} , true_neg_text)
   
-  false_negatives <- count_category(input_table, {{ outcome_column}} , false_neg_text)
+  false_positives <- count_category(input_table, {{ outcome_column }} , false_pos_text)
+  
+  false_negatives <- count_category(input_table, {{ outcome_column }} , false_neg_text)
 
-  incon_positives <- count_category(input_table, {{ outcome_column}} , incon_pos_text)
+  incon_positives <- count_category(input_table, {{ outcome_column }} , incon_pos_text)
   
-  incon_negatives <- count_category(input_table, {{ outcome_column}} , incon_neg_text)
+  incon_negatives <- count_category(input_table, {{ outcome_column }} , incon_neg_text)
   
   opa = round(((true_positives + true_negatives) / sum(true_positives, false_positives,
                                                      true_negatives, false_negatives)) * 100, 1)
@@ -873,9 +875,9 @@ compare_tests <- function(input_table, outcome_column) {
   all_samples = sum(true_positives, true_negatives, false_positives, false_negatives,
                     incon_positives, incon_negatives)
   
-  sensitivity = round((true_positives / sum(true_positives, false_positives)) * 100, 1)
+  sensitivity = round((true_positives / sum(true_positives, false_negatives)) * 100, 1)
   
-  specificity = round((true_negatives / sum(true_negatives, false_negatives)) * 100, 1)
+  specificity = round((true_negatives / sum(true_negatives, false_positives)) * 100, 1)
   
   inconclusive_rate  = round(((incon_positives + incon_negatives) / all_samples) * 100, 1)
   
@@ -890,7 +892,7 @@ compare_tests <- function(input_table, outcome_column) {
   
   metrics <- tribble(
     ~"OPA (%)", ~"Sensitivity (%)", ~"Specificity (%)", ~"Unique samples", ~"DNA inputs", ~"Inconclusive rate (%)",
-    opa,        sensitivity,       specificity,         unique_samples,    dna_inputs, inconclusive_rate
+    opa,        sensitivity,       specificity,         unique_samples,    dna_inputs,     inconclusive_rate
     )
   
   confusion_matrix <- tribble(
