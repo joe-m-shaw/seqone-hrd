@@ -520,7 +520,8 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
 
 save_hrd_plot(lpc_lga_facet_plot)
 
-hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet, y = seqone_hrd_score)) +
+hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet, 
+                                                       y = seqone_hrd_score)) +
   geom_point(size = 2, 
              aes(colour = seqone_hrd_status)) +
   scale_colour_manual(name = "SeqOne HRD status",
@@ -542,9 +543,6 @@ repeat_variation <- repeat_results_1_2 |>
             max_lpc = max(lpc),
             min_lpc = min(lpc),
             range_lpc = max_lpc - min_lpc,
-            max_cov = max(coverage),
-            min_cov = min(coverage),
-            range_cov = max_cov - min_cov,
             max_score = max(seqone_hrd_score),
             min_score = min(seqone_hrd_score),
             range_score = max_score - min_score)
@@ -578,8 +576,7 @@ seraseq_control_data <- compare_results |>
 
 seraseq_plot <- seraseq_control_data |> 
   filter(version == "1.2") |> 
-  ggplot(aes(x = myriad_gi_score, 
-                                 y = seqone_hrd_score)) +
+  ggplot(aes(x = myriad_gi_score, y = seqone_hrd_score)) +
   geom_point(aes(colour = seqone_hrd_status),
              size = 2, alpha = 0.6) +
   scale_colour_manual(name = "SeqOne HRD Status",
@@ -615,12 +612,12 @@ filtered_results <- compare_results |>
   filter(path_block_manual_check == "pathology blocks match" & version == "1.2") |> 
   mutate(robustness = as.numeric(robustness))
 
-cov_v12 <- plot_qc(df = filtered_results, yvar = coverage, outcome = outcome_binary) +
+cov_v12 <- plot_qc(yvar = coverage, alpha_number = 1) +
   coverage_line +
   ylim(0, 2.5) +
   labs(x = "DNA input", y = "Coverage (X)")
 
-input_v12 <- plot_qc(df = filtered_results, yvar = input_ng, outcome = outcome_binary) +
+input_v12 <- plot_qc(yvar = input_ng, alpha_number = 1) +
   ylim(0, 52) +
   input_line +
   labs(x = "DNA input", y = "DNA input (ng)")
@@ -692,7 +689,6 @@ downsampled_samples <- grep(pattern = "20103853b|20112141b",
                       x = join_tables$sample_id,
                       value = TRUE)
 
-
 downsampled_table <- join_tables |> 
   filter(sample_id %in% downsampled_samples & version == "1.2") |> 
   select(dlms_dna_number, downsampled, seqone_hrd_score, seqone_hrd_status, 
@@ -714,15 +710,8 @@ tbrca_data_mod <- tbrca_data |>
 
 tbrca_data_mod |> 
   group_by(pass_qc) |> 
-  summarise(total = n(),
-    proportion = total / sum(total))
-
-samples_passing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "Yes", ])
-
-samples_failing_qc <- nrow(tbrca_data_mod[tbrca_data_mod$pass_qc == "No", ])
-
-fail_rate <- round((samples_failing_qc /
-  (samples_passing_qc + samples_failing_qc)) * 100, 1)
+  summarise(total = n()) |> 
+  mutate(proportion = round((total / sum(total))*100, 1))
 
 ## Manchester tBRCA GI scores -------------------------------------------------------
 
@@ -759,8 +748,11 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
   mutate(result_type = case_when(
     gis_score_numerical_value_or_fail_not_tested == "Inconclusive" ~"Inconclusive",
     gi_score >=0 & gi_score <= 100 ~"Conclusive result"
-  )) |> 
-  count(result_type)
+  ))
+  
+tbrca_inconclusive_summary <- tbrca_inconclusive_data |> 
+  count(result_type) |> 
+  mutate(rate = round((n/sum(n))*100, 1))
 
 # Export combined tables ------------------------------------------------------------
 
