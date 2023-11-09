@@ -96,15 +96,15 @@ seqone_dlms_info <- read_csv(file = str_c(hrd_data_path, "seqone_dlms_info.csv")
 path_block_check <- read_csv(
   paste0(
     hrd_data_path,
-    "2023_10_24_14_10_20_export_for_check_edit.csv"
+    "pathology_block_id_check.csv"
   ),
   show_col_types = FALSE) 
 
 ## Initial DNA concentrations -------------------------------------------------------
 
-# Exported from Sharepoint
+# Exported from Sharepoint (HS2 Sample Prep 2023 - NEW.xlsx)
 dna_concentrations <- read_excel(
-  path = paste0(hrd_data_path, "HS2 Sample Prep 2023 - NEW.xlsx"),
+  path = paste0(hrd_data_path, "dna_concentrations.xlsx"),
   col_types = c(
     "date",    "numeric", "text",    "text",
     "date",    "numeric", "numeric", "numeric", 
@@ -174,9 +174,10 @@ dna_concentrations_mod <- dna_concentrations |>
 
 # Copy of technologist spreadsheet originally saved at:
 # S:/central shared/Genetics/Repository/Technical Teams/NGS/SureSelect XT HS2/
+# SSXT HS2 Library Prep 2023.xlsx
 
 hs2_library_prep <- read_excel(
-  path = str_c(hrd_data_path, "SSXT HS2 Library Prep 2023.xlsx"),
+  path = str_c(hrd_data_path, "qpcr_qc.xlsx"),
   sheet = "Sheet1",
   col_types = c(
     "text",    "guess",   "text",    "text",
@@ -201,10 +202,13 @@ kapa_data_collated <- rbind(
 
 ## tBRCA data -----------------------------------------------------------------------
 
+# Spreadsheet sent by Katie Sadler
+# "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"
+
 tbrca_data_collection <- read_excel(
   paste0(
     hrd_data_path,
-    "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"
+    "tbrca_data_collection.xlsx"
   ),
   skip = 1
 ) |>
@@ -700,7 +704,7 @@ export_timestamp(input = downsampled_table)
 
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
 
-tbrca_data <- read.csv(file = str_c(hrd_data_path, "tBRCA_dlms_info.csv"))
+tbrca_data <- read.csv(file = str_c(hrd_data_path, "tbrca_dlms_info.csv"))
 
 dna_qc_threshold <- round(50 / 15, 0)
 
