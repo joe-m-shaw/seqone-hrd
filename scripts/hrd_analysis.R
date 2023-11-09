@@ -592,6 +592,25 @@ hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet,
 
 save_hrd_plot(hrd_score_facet_plot)
 
+hrd_score_reads_facet_plot <- ggplot(repeat_results_1_2, aes(x = million_reads,
+                                                               y = seqone_hrd_score)) +
+  geom_point(size = 2, alpha = 0.6,
+             aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(name = "SeqOne HRD status",
+                      values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  xlim(0, 70) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  theme(legend.position = "bottom") +
+  labs(x = "Millions of reads", y = "SeqOne HRD probability (v1.2)") +
+  facet_wrap(~dlms_dna_number)
+
+save_hrd_plot(hrd_score_reads_facet_plot)
+
+min(repeat_results_1_2$coverage)
+max(repeat_results_1_2$coverage)
+min(repeat_results_1_2$million_reads)
+max(repeat_results_1_2$million_reads)
 
 ## Intra-run variation boxplots -----------------------------------------------------
 
@@ -813,8 +832,6 @@ tbrca_gi_scores |>
   mutate(borderline = ifelse(gi_score <= 47 & gi_score >=37, "Yes", "No")) |> 
   count(borderline) |> 
   mutate(percentage = round((n / sum(n))*100, 1))
-
-
 
 ## Manchester tBRCA inconclusive rate -----------------------------------------------
 
