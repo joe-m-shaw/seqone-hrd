@@ -31,7 +31,8 @@ stopifnot(setdiff(
 
 # Change HRD status for BRCA positive sample with GIS of 5 (for SeqOne comparison later)
 
-collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", "myriad_hrd_status"] <- "NEGATIVE"
+collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4", 
+                     "myriad_hrd_status"] <- "NEGATIVE"
 
 ## Collate SeqOne data --------------------------------------------------------------
 
@@ -101,17 +102,16 @@ path_block_check <- read_csv(
 
 ## Initial DNA concentrations -------------------------------------------------------
 
-# Export from Sharepoint
+# Exported from Sharepoint
 dna_concentrations <- read_excel(
   path = paste0(hrd_data_path, "HS2 Sample Prep 2023 - NEW.xlsx"),
   col_types = c(
-    "date", "numeric", "text", "text",
-    "date", "numeric", "numeric",
-    "numeric", "numeric", "numeric",
-    "date", "numeric", "numeric", "numeric", "numeric","numeric",
-    "date", "text", "numeric",
-    "numeric", "text", "text",
-    "text","text"
+    "date",    "numeric", "text",    "text",
+    "date",    "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "date",    "numeric", 
+    "numeric", "numeric", "numeric", "numeric",
+    "date",    "text",    "numeric", "numeric", 
+    "text",    "text",    "text",    "text"
   ),
   sheet = "HRD_SeqOne"
 ) |>
@@ -179,14 +179,13 @@ hs2_library_prep <- read_excel(
   path = str_c(hrd_data_path, "SSXT HS2 Library Prep 2023.xlsx"),
   sheet = "Sheet1",
   col_types = c(
-    "text", "guess", "text", "text",
-    "text", "numeric", "numeric",
-    "numeric", "numeric", "numeric",
-    "numeric", "numeric", "numeric",
-    "numeric", "numeric", "numeric",
-    "numeric", "numeric", "text",
-    "guess", "guess", "guess", "guess",
-    "guess", "guess", "guess", "guess"
+    "text",    "guess",   "text",    "text",
+    "text",    "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "numeric", "numeric", 
+    "numeric", "numeric", "text",    "guess", 
+    "guess",   "guess",   "guess",   "guess", 
+    "guess",   "guess",   "guess"
   )
 ) |>
   janitor::clean_names() |>
@@ -267,6 +266,7 @@ seqone_mod <- collated_seqone_info |>
     downsampled = ifelse(grepl(pattern = c("downsampl|_0.5"), 
                          x = sample_id), "Yes", "No"),
     
+    # WS134928 used the same libraries prepared on WS134687
     dilution_worksheet = ifelse(worksheet == "WS134928", "WS134687", worksheet)
     
   ) |>
@@ -323,7 +323,7 @@ join_tables <- seqone_mod |>
 
 # Worksheets
 worksheet_summary <- join_tables |> 
-  filter(version == "1.1" & downsampled == "No") |> 
+  filter(version == "1.2" & downsampled == "No") |> 
   group_by(worksheet) |> 
   count()
 
@@ -360,7 +360,6 @@ compare_results <- join_tables |>
   filter(downsampled == "No") |>
   mutate(
     
-    # Outome of results from original pipeline
     outcome = case_when(
       
       seqone_hrd_status == pos_text & myriad_hrd_status == pos_text ~true_pos_text,
@@ -396,6 +395,12 @@ compare_results <- join_tables |>
 
 # Every DNA input should have 2 rows: 1 for each pipeline version
 assert_that(nrow(compare_results) == (total_input_number*2))
+
+samples_without_myriad_results <- compare_results |> 
+  filter(outcome == "other" | outcome_binary == "other")
+
+# Only MCRC biobank controls should be without Myriad results
+assert_that(unique(samples_without_myriad_results$sample_type) == "Biobank control")
 
 ## Sensitivity and specificity ------------------------------------------------------
 
