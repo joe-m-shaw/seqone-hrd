@@ -1,5 +1,5 @@
 # Homologous Recombination Deficiency Validation: Analysis
-# joseph.shaw3@nhs.net
+# joseph.shaw3@nhs.net; joseph.shaw2@mft.nhs.uk
 
 # Setup -----------------------------------------------------------------------------
 
