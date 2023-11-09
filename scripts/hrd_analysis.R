@@ -519,6 +519,20 @@ lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
 
 save_hrd_plot(lpc_lga_facet_plot)
 
+hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet, y = seqone_hrd_score)) +
+  geom_point(size = 2, 
+             aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(name = "SeqOne HRD status",
+                      values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom") +
+  labs(x = "", y = "SeqOne HRD probability") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  facet_wrap(~dlms_dna_number) 
+
+save_hrd_plot(hrd_score_facet_plot)
+
 repeat_variation <- repeat_results_1_2 |> 
   group_by(dlms_dna_number) |> 
   summarise(max_lga = max(lga),
@@ -673,6 +687,21 @@ lga_vs_lpc <- compare_results |>
 
 save_hrd_plot(lga_vs_lpc)
 
+
+## Downsampling ---------------------------------------------------------------------
+
+downsampled_samples <- grep(pattern = "20103853b|20112141b",
+                      x = join_tables$sample_id,
+                      value = TRUE)
+
+
+downsampled_table <- join_tables |> 
+  filter(sample_id %in% downsampled_samples & version == "1.2") |> 
+  select(dlms_dna_number, downsampled, seqone_hrd_score, seqone_hrd_status, 
+         myriad_hrd_status, million_reads, coverage)
+
+export_timestamp(input = downsampled_table)
+
 # Manchester tBRCA service audit ----------------------------------------------------
 
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
@@ -737,3 +766,7 @@ tbrca_inconclusive_data <- tbrca_data_collection_clean |>
     gi_score >=0 & gi_score <= 100 ~"Conclusive result"
   )) |> 
   count(result_type)
+
+# Export combined tables ------------------------------------------------------------
+
+export_timestamp(input = compare_results)
