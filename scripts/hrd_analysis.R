@@ -454,10 +454,7 @@ hrd_score_plot <- compare_results |>
         legend.position = "bottom") +
   labs(
     x = "Myriad Genome Instability Score",
-    y = "SeqOne HRD Score",
-    title = "Comparison of Myriad vs SeqOne HRD Scores",
-    subtitle = str_c("DNA inputs with coverage >= ", coverage_threshold,
-                     "X; DNA input >= ", input_threshold, "ng")) +
+    y = "SeqOne HRD Score") +
   ggpubr::stat_cor(method = "pearson", label.x = 60, label.y = 0.1) +
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   geom_vline(xintercept = 42, linetype = "dashed")
@@ -513,8 +510,7 @@ repeat_results_1_2 <- compare_results |>
     base::duplicated(dlms_dna_number, fromLast = FALSE))
 
 lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
-  labs(title = "Inter-run variation with SomaHRDv1.2",
-       x = "LGA", y = "LPC") +
+  labs(x = "LGA", y = "LPC") +
   facet_wrap(~dlms_dna_number)
 
 save_hrd_plot(lpc_lga_facet_plot)
@@ -615,13 +611,11 @@ filtered_results <- compare_results |>
   mutate(robustness = as.numeric(robustness))
 
 cov_v12 <- plot_qc(df = filtered_results, yvar = coverage, outcome = outcome_binary) +
-  labs(x = "", title = "Coverage - SomaHRDv1.2") +
   coverage_line +
   ylim(0, 2.5) +
   labs(x = "DNA input", y = "Coverage (X)")
 
 input_v12 <- plot_qc(df = filtered_results, yvar = input_ng, outcome = outcome_binary) +
-  labs(x = "", title = "DNA input - SomaHRDv1.2")  +
   ylim(0, 52) +
   input_line +
   labs(x = "DNA input", y = "DNA input (ng)")
@@ -682,8 +676,7 @@ lga_vs_lpc <- compare_results |>
   plot_lpc_lga() +
   labs(
     x = "Large Genomic Alterations",
-    y = "Loss of Parental Copy",
-    title = "LGA and LPC results for SomaHRD v1.2")
+    y = "Loss of Parental Copy")
 
 save_hrd_plot(lga_vs_lpc)
 
@@ -746,10 +739,7 @@ myriad_gi_profile_plot <- tbrca_gi_scores |>
   labs(
     y = "Number of samples",
     x = "Myriad GI score",
-    fill = "Myriad GI Status",
-    title = "Myriad GI Scores for North West GLH Samples",
-    subtitle = paste0("Data for ", nrow(tbrca_gi_scores), " samples shown")
-  )
+    fill = "Myriad GI Status")
 
 save_hrd_plot(myriad_gi_profile_plot)
 
