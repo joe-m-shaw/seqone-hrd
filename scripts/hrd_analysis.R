@@ -555,10 +555,12 @@ compare_results |>
 
 ## Intra-run variation --------------------------------------------------------------
 
-intra_run_table <- compare_results |> 
+intra_run_samples <- compare_results |> 
   filter(worksheet == "WS133557" & version == "1.2") |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-           base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+           base::duplicated(dlms_dna_number, fromLast = FALSE)) 
+
+intra_run_table <- intra_run_samples |> 
   select(sample_id, seqone_hrd_status, seqone_hrd_score, lga, lpc, coverage,
          robustness) |> 
   rename("Sample ID" = sample_id,
@@ -571,9 +573,15 @@ intra_run_table <- compare_results |>
 
 export_timestamp(input = intra_run_table)
 
+intra_run_variation <- calculate_variation(intra_run_samples)
+
+range(intra_run_variation$range_lpc)
+range(intra_run_variation$range_lga)
+range(intra_run_variation$range_score)
+
 ## Inter run variation --------------------------------------------------------------
 
-repeat_results_1_2 <- compare_results |>
+inter_run_samples <- compare_results |>
   filter(version == "1.2" &
            # Remove intra-run replicates
            !sample_id %in% grep(x = compare_results$sample_id, pattern = "b|c",
@@ -581,13 +589,13 @@ repeat_results_1_2 <- compare_results |>
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
     base::duplicated(dlms_dna_number, fromLast = FALSE))
 
-lpc_lga_facet_plot <- plot_lpc_lga(repeat_results_1_2) +
+lpc_lga_facet_plot <- plot_lpc_lga(inter_run_samples) +
   labs(x = "LGA", y = "LPC") +
   facet_wrap(~dlms_dna_number)
 
 save_hrd_plot(lpc_lga_facet_plot)
 
-hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet, 
+hrd_score_facet_plot <- ggplot(inter_run_samples, aes(x = worksheet, 
                                                        y = seqone_hrd_score)) +
   geom_point(size = 2, 
              aes(colour = seqone_hrd_status)) +
@@ -602,7 +610,7 @@ hrd_score_facet_plot <- ggplot(repeat_results_1_2, aes(x = worksheet,
 
 save_hrd_plot(hrd_score_facet_plot)
 
-hrd_score_reads_facet_plot <- ggplot(repeat_results_1_2, aes(x = million_reads,
+hrd_score_reads_facet_plot <- ggplot(inter_run_samples, aes(x = million_reads,
                                                                y = seqone_hrd_score)) +
   geom_point(size = 2, alpha = 0.6,
              aes(colour = seqone_hrd_status)) +
@@ -617,25 +625,15 @@ hrd_score_reads_facet_plot <- ggplot(repeat_results_1_2, aes(x = million_reads,
 
 save_hrd_plot(hrd_score_reads_facet_plot)
 
-min(repeat_results_1_2$coverage)
-max(repeat_results_1_2$coverage)
-min(repeat_results_1_2$million_reads)
-max(repeat_results_1_2$million_reads)
+min(inter_run_samples$coverage)
+max(inter_run_samples$coverage)
+min(inter_run_samples$million_reads)
+max(inter_run_samples$million_reads)
 
 ## Intra-run variation boxplots -----------------------------------------------------
 
-repeat_variation <- repeat_results_1_2 |> 
-  group_by(dlms_dna_number) |> 
-  summarise(max_lga = max(lga),
-            min_lga = min(lga),
-            range_lga = max_lga-min_lga,
-            max_lpc = max(lpc),
-            min_lpc = min(lpc),
-            range_lpc = max_lpc - min_lpc,
-            max_score = max(seqone_hrd_score),
-            min_score = min(seqone_hrd_score),
-            range_score = max_score - min_score)
-
+repeat_variation <- calculate_variation(inter_run_samples)
+  
 lga_var <- plot_variation(yvar = range_lga) +
   labs(y = "Difference in LGA") +
   ylim(0,30)
@@ -796,7 +794,6 @@ downsampled_table <- join_tables |>
          "Coverage" = coverage)
 
 export_timestamp(input = downsampled_table)
-
 
 ## Impact of SomaHRD version on HRD status ------------------------------------------
 
