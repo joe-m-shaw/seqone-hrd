@@ -860,6 +860,23 @@ make_robustness_table <- function(filtered_df) {
   
 }
 
+calculate_variation <- function(input_table) {
+  
+  output <- input_table |> 
+    group_by(dlms_dna_number) |> 
+    summarise(max_lga = max(lga),
+              min_lga = min(lga),
+              range_lga = max_lga-min_lga,
+              max_lpc = max(lpc),
+              min_lpc = min(lpc),
+              range_lpc = max_lpc - min_lpc,
+              max_score = max(seqone_hrd_score),
+              min_score = min(seqone_hrd_score),
+              range_score = max_score - min_score)
+  
+  return(output)
+}
+
 # Test metric functions -------------------------------------------------------------
 
 compare_tests <- function(input_table) {
