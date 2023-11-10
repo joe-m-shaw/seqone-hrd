@@ -787,6 +787,26 @@ downsampled_table <- join_tables |>
 
 export_timestamp(input = downsampled_table)
 
+
+## Impact of SomaHRD version on HRD status ------------------------------------------
+
+check_version_statuses <- compare_results |> 
+  filter(downsampled == "No") |> 
+  select(shallow_sample_id, seqone_hrd_status, version) |> 
+  pivot_wider(id_cols = shallow_sample_id,
+              names_from = version,
+              values_from = seqone_hrd_status) |> 
+  mutate(version_check = case_when(
+    
+    `1.1` == `1.2` ~"HRD statuses are the same",
+    
+    `1.1` != `1.2` ~"HRD statuses are NOT the same"
+    
+  ))
+
+check_version_statuses |> 
+  count(version_check)
+
 # Manchester tBRCA service audit ----------------------------------------------------
 
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
