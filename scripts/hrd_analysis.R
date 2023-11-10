@@ -543,6 +543,16 @@ export_timestamp(input = robustness_fail_table)
 
 export_timestamp(input = robustness_warning_table)
 
+# Proportion of all samples with inconclusive results after input and coverage 
+# filters applied
+compare_results |> 
+  filter(version == "1.2") |> 
+  filter(!duplicated(dlms_dna_number)) |> 
+  filter(coverage >= coverage_threshold & 
+           input_ng >= input_threshold) |> 
+  count(seqone_hrd_status) |> 
+  mutate(percentage = round((n / sum(n))*100, 1))
+
 ## Intra-run variation --------------------------------------------------------------
 
 intra_run_table <- compare_results |> 
