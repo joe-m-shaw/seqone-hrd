@@ -825,27 +825,36 @@ extract_kapa_data <- function(worksheet_number, worksheet_length) {
 
 make_robustness_table <- function(filtered_df) {
   
-  output <- compare_results |> 
-    filter(shallow_sample_id %in% filtered_df$shallow_sample_id) |> 
-    select(dlms_dna_number, seqone_hrd_status,
+  v1.2_samples <- filtered_df |> 
+    select(worksheet, shallow_sample_id, dlms_dna_number, seqone_hrd_status,
            myriad_hrd_status, robustness,
-           path_block_manual_check, version) |> 
-    pivot_wider(id_cols = c(dlms_dna_number, myriad_hrd_status,
-                            path_block_manual_check),
-                names_from = version,
-                values_from = c(seqone_hrd_status, robustness)) |> 
-    select(dlms_dna_number, robustness_1.2,
-           seqone_hrd_status_1.2, seqone_hrd_status_1.1, 
-           myriad_hrd_status, 
-           path_block_manual_check) |> 
+           path_block_manual_check, input_ng, coverage) |> 
+    # Make text shorter for presentation in table
+    mutate(path_block_manual_check = sub(pattern = "pathology blocks ",
+                                         replacement = "",
+                                         x = path_block_manual_check),
+           input_ng = round(input_ng, 1))
+  
+  v1.1_samples <- compare_results |> 
+    filter(version == "1.1" & shallow_sample_id %in% filtered_df$shallow_sample_id) |> 
+    select(shallow_sample_id, seqone_hrd_status) |> 
+    rename("SeqOne HRD status (v1.1)" = seqone_hrd_status)
+  
+  output <- v1.2_samples |> 
+    left_join(v1.1_samples, by = "shallow_sample_id") |> 
     arrange(path_block_manual_check) |> 
-    rename("DNA Number" = dlms_dna_number,
-           "Robustness" = robustness_1.2,
-           "SeqOne HRD status (v1.2)" = seqone_hrd_status_1.2,
-           "SeqOne HRD status (v1.1)" = seqone_hrd_status_1.1,
+    rename("Worksheet" = worksheet,
+           "DNA Number" = dlms_dna_number,
+           "Robustness" = robustness,
+           "SeqOne HRD status (v1.2)" = seqone_hrd_status,
            "Myriad HRD status" = myriad_hrd_status,
-           "Pathology block check" = path_block_manual_check
-           )
+           "Pathology block check" = path_block_manual_check,
+           "DNA input (ng)" = input_ng,
+           "Coverage (X)" = coverage
+           ) |> 
+    select("Worksheet", "DNA Number", "Robustness", "SeqOne HRD status (v1.2)", 
+           "SeqOne HRD status (v1.1)", "Myriad HRD status", 
+           "Pathology block check", "DNA input (ng)", "Coverage (X)")
   
   return(output)
   
