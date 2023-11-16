@@ -298,7 +298,8 @@ join_tables <- seqone_mod |>
   # Add qPCR data
   left_join(
     kapa_data_collated |>
-      select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m),
+      select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m,
+             index, d1000_ts_size, ts_ng_ul, d1000_hs_ts, d1000_hs_ts_p_m_1_in_5, d1000_hs_ts_n_m),
     by = "shallow_sample_id",  keep = FALSE
   ) |> 
   
@@ -880,3 +881,69 @@ tbrca_inconclusive_summary <- tbrca_inconclusive_data |>
 # Export combined tables ------------------------------------------------------------
 
 export_timestamp(input = compare_results)
+
+
+# Inter-run variability investigation -----------------------------------------------
+
+ggplot(inter_run_samples, aes(x = coverage,
+                              y = lpc)) +
+  geom_point(size = 2, alpha = 0.6,
+             aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(name = "SeqOne HRD status",
+                      values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~dlms_dna_number)
+
+inter_run_mod <- inter_run_samples |> 
+  mutate(total_bp = (million_reads*1000000) * read_length,
+         coverage_calc = total_bp / (3.2 * 1000000000)) 
+
+investigate_plot <- function(variable1, variable2) {
+  
+  ggplot(inter_run_mod, aes(x = {{ variable1 }},
+                                y = {{ variable2 }})) +
+    geom_point(size = 2, alpha = 0.6) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id == "WS133557_21003549", ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
+    ) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id %in% c("WS134687_21003549", 
+                                                                  "WS135001_21003549"), ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_blue, stroke = 3
+    ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+  
+}
+
+investigate_plot(lga, lpc)
+
+investigate_plot(read_length, seqone_hrd_score)
+
+investigate_plot(percent_aligned, percent_q30)
+
+investigate_plot(index, million_reads)
+
+investigate_plot(d1000_ts_size, lpc)
+
+investigate_plot(percent_dups, million_reads)
+
+investigate_plot(coverage_calc, coverage)
+
+## Standard deviation ----------------------------------------------------------------
+
+# The Pooled Standard Deviation is a weighted average of standard deviations for two or 
+# more groups, assumed to have equal variance. 
+
+inter_run_sd <- inter_run_samples |> 
+  select(shallow_sample_id, dlms_dna_number, seqone_hrd_score, lga, lpc) |>
+  group_by(dlms_dna_number) |> 
+  summarise(sd_score = sd(seqone_hrd_score),
+            sd_lga = sd(lga),
+            sd_lpc = sd(lpc),
+            n = n()) |> 
+  arrange(desc(sd_score))
