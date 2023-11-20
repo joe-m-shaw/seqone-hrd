@@ -299,7 +299,7 @@ join_tables <- seqone_mod |>
   left_join(
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m,
-             index, d1000_ts_size, ts_ng_ul, d1000_hs_ts, d1000_hs_ts_p_m_1_in_5, d1000_hs_ts_n_m),
+             index, d1000_ts_size, ts_ng_ul),
     by = "shallow_sample_id",  keep = FALSE
   ) |> 
   
@@ -947,3 +947,27 @@ inter_run_sd <- inter_run_samples |>
             sd_lpc = sd(lpc),
             n = n()) |> 
   arrange(desc(sd_score))
+
+
+## Genome profile check -------------------------------------------------------------
+
+profile_check <- read_excel(path = str_c(hrd_data_path, 
+                                         "2023_11_20_08_22_11_genomic_profile_check.xlsx"))
+
+results_and_profile <- compare_results |>
+  filter(version == "1.2") |> 
+  left_join(profile_check, by = "shallow_sample_id")
+
+results_and_profile |> 
+  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes"|
+           dlms_dna_number %in% inter_run_samples$dlms_dna_number) |> 
+  select(shallow_sample_id, dlms_dna_number,
+         lga, lpc, telomeric_copy_similar_to_WS133557_21003549) |> 
+  arrange(dlms_dna_number)
+
+results_and_profile |> 
+  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes") |> 
+  select(shallow_sample_id, dlms_dna_number,
+         lga, lpc, telomeric_copy_similar_to_WS133557_21003549,
+         seqone_hrd_status, myriad_hrd_status, path_block_manual_check) |> 
+  arrange(dlms_dna_number) |>  view()
