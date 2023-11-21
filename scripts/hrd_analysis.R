@@ -899,27 +899,6 @@ inter_run_mod <- inter_run_samples |>
   mutate(total_bp = (million_reads*1000000) * read_length,
          coverage_calc = total_bp / (3.2 * 1000000000)) 
 
-investigate_plot <- function(variable1, variable2) {
-  
-  ggplot(inter_run_mod, aes(x = {{ variable1 }},
-                                y = {{ variable2 }})) +
-    geom_point(size = 2, alpha = 0.6) +
-    geom_point(
-      data = inter_run_mod[inter_run_mod$shallow_sample_id == "WS133557_21003549", ],
-      aes({{ variable1 }}, {{ variable2 }}),
-      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
-    ) +
-    geom_point(
-      data = inter_run_mod[inter_run_mod$shallow_sample_id %in% c("WS134687_21003549", 
-                                                                  "WS135001_21003549"), ],
-      aes({{ variable1 }}, {{ variable2 }}),
-      pch = 21, fill = NA, size = 5, colour = safe_blue, stroke = 3
-    ) +
-    theme_bw() +
-    theme(legend.position = "bottom")
-  
-}
-
 investigate_plot(lga, lpc)
 
 investigate_plot(read_length, seqone_hrd_score)
@@ -936,18 +915,11 @@ investigate_plot(coverage_calc, coverage)
 
 ## Standard deviation ----------------------------------------------------------------
 
-# The Pooled Standard Deviation is a weighted average of standard deviations for two or 
-# more groups, assumed to have equal variance. 
+calculate_pooled_sd(inter_run_samples, seqone_hrd_score)
 
-inter_run_sd <- inter_run_samples |> 
-  select(shallow_sample_id, dlms_dna_number, seqone_hrd_score, lga, lpc) |>
-  group_by(dlms_dna_number) |> 
-  summarise(sd_score = sd(seqone_hrd_score),
-            sd_lga = sd(lga),
-            sd_lpc = sd(lpc),
-            n = n()) |> 
-  arrange(desc(sd_score))
+calculate_pooled_sd(inter_run_samples, lga)
 
+calculate_pooled_sd(inter_run_samples, lpc)
 
 ## Genome profile check -------------------------------------------------------------
 
@@ -979,7 +951,8 @@ results_and_profile |>
   select(shallow_sample_id, dlms_dna_number,
          lga, lpc, coverage, robustness, telomeric_copy_similar_to_WS133557_21003549,
          degree_of_telomere_copy_increase, notes, seqone_hrd_score,
-         seqone_hrd_status, myriad_hrd_status, path_block_manual_check) |> 
+         seqone_hrd_status, myriad_hrd_status, myriad_brca_status, path_block_manual_check,
+         input_ng) |> 
   arrange(dlms_dna_number) |>  view()
 
 # Repeated samples with high HRD scores
