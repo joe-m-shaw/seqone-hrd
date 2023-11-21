@@ -958,16 +958,56 @@ results_and_profile <- compare_results |>
   filter(version == "1.2") |> 
   left_join(profile_check, by = "shallow_sample_id")
 
-results_and_profile |> 
-  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes"|
-           dlms_dna_number %in% inter_run_samples$dlms_dna_number) |> 
-  select(shallow_sample_id, dlms_dna_number,
-         lga, lpc, telomeric_copy_similar_to_WS133557_21003549) |> 
-  arrange(dlms_dna_number)
+repeated_results_with_telomeric_imbalances <- results_and_profile |> 
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes")
 
+# Are any other repeated samples affected?
 results_and_profile |> 
-  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes") |> 
+  filter(dlms_dna_number %in% repeated_results_with_telomeric_imbalances$dlms_dna_number) |> 
   select(shallow_sample_id, dlms_dna_number,
          lga, lpc, telomeric_copy_similar_to_WS133557_21003549,
+         degree_of_telomere_copy_increase,
+          notes) |> 
+  arrange(dlms_dna_number) |>  view()
+
+# 5 samples with high telomeric imbalance have a range of coverage levels
+results_and_profile |> 
+  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes" &
+           degree_of_telomere_copy_increase == "High") |> 
+  select(shallow_sample_id, dlms_dna_number,
+         lga, lpc, coverage, robustness, telomeric_copy_similar_to_WS133557_21003549,
+         degree_of_telomere_copy_increase, notes, seqone_hrd_score,
          seqone_hrd_status, myriad_hrd_status, path_block_manual_check) |> 
   arrange(dlms_dna_number) |>  view()
+
+# Repeated samples with high HRD scores
+# 21003549 is the only repeated sample with high telomeric imbalance
+
+high_scores <- c(20127786, 20112141, 21003549, 21006928, 21012359, 21013520, 23032086)
+
+results_and_profile |> 
+  filter(dlms_dna_number %in% high_scores) |> 
+  select(shallow_sample_id, dlms_dna_number,
+         lga, lpc, coverage, robustness, telomeric_copy_similar_to_WS133557_21003549,
+         degree_of_telomere_copy_increase, notes) |> 
+  arrange(dlms_dna_number) |>  view()
+
+ggplot(results_and_profile, aes(x = robustness, y = input_ng)) +
+  geom_point(aes(colour = degree_of_telomere_copy_increase)) 
+
+## Sample 21003549 ------------------------------------------------------------------
+
+sample_21003549 <- read_excel(str_c(hrd_data_path, "21003549_lga_lpc_counts.xlsx"),
+                              col_types = c("text", "numeric", "numeric", "numeric"))
+
+ggplot(sample_21003549, aes(x = shallow_sample_id, y = lga, fill = shallow_sample_id)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~chromosome)
+
+ggplot(sample_21003549, aes(x = shallow_sample_id, y = lpc, fill = shallow_sample_id)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~chromosome)
