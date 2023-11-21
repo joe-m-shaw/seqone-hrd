@@ -757,7 +757,7 @@ line_df <- data.frame(
 plot_lpc_lga <- function(df) {
   
   ggplot(df, aes(x = lga, y = lpc)) +
-    geom_point(aes(colour = seqone_hrd_status),
+    geom_jitter(aes(colour = seqone_hrd_status),
                size = 2, alpha = 0.6) +
     scale_colour_manual(name = "SeqOne HRD Status",
                         values = c(safe_blue, safe_red, safe_grey)) +
