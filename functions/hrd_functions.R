@@ -799,6 +799,27 @@ save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi =
   )
 }
 
+investigate_plot <- function(variable1, variable2) {
+  
+  ggplot(inter_run_mod, aes(x = {{ variable1 }},
+                            y = {{ variable2 }})) +
+    geom_point(size = 2, alpha = 0.6) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id == "WS133557_21003549", ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
+    ) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id %in% c("WS134687_21003549", 
+                                                                  "WS135001_21003549"), ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_blue, stroke = 3
+    ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+  
+}
+
 # Table functions -------------------------------------------------------------------
 
 extract_kapa_data <- function(worksheet_number, worksheet_length) {
@@ -940,5 +961,22 @@ add_version <- function(input_table, version_text) {
   input_table |> 
     mutate(Analysis = version_text) |> 
     relocate(Analysis)
+  
+}
+
+# The Pooled Standard Deviation is a weighted average of standard deviations for two or 
+# more groups, assumed to have equal variance. 
+
+calculate_pooled_sd <- function(df, x) {
+  
+  output_table <- df |> 
+    group_by(dlms_dna_number) |> 
+    summarise(sd = sd( {{ x }} ),
+              n = n(),
+              z = (n-1)*sd^2)
+  
+  pooled_sd <- sqrt(sum(output_table$z) / (sum(output_table$n) - nrow(output_table)))
+  
+  return(list(output_table, pooled_sd))
   
 }
