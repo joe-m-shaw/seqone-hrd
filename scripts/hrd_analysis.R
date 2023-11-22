@@ -592,6 +592,9 @@ inter_run_samples <- compare_results |>
 
 lpc_lga_facet_plot <- plot_lpc_lga(inter_run_samples) +
   labs(x = "LGA", y = "LPC") +
+  geom_point(data = inter_run_samples |>  
+               filter(shallow_sample_id == "WS133557_21003549"),
+             shape = 21, colour = safe_red, fill = NA, size = 4, stroke = 1) +
   facet_wrap(~dlms_dna_number)
 
 save_hrd_plot(lpc_lga_facet_plot)
@@ -920,6 +923,12 @@ calculate_pooled_sd(inter_run_samples, seqone_hrd_score)
 calculate_pooled_sd(inter_run_samples, lga)
 
 calculate_pooled_sd(inter_run_samples, lpc)
+
+calculate_pooled_sd(inter_run_samples, ccne1)
+
+calculate_pooled_sd(inter_run_samples, rad51b)
+
+calculate_pooled_sd(inter_run_samples, robustness)
 
 ## Genome profile check -------------------------------------------------------------
 
