@@ -946,6 +946,8 @@ profile_check <- read_excel(path = str_c(hrd_data_path,
                                         levels = c("Normal", "Increased low",
                                                    "Increased high", "Decreased")))
 
+telomere_colours = c("#CCCCCC", "#FF3366", "#CC0000", "#3300FF" )
+
 telomere_profile_summary <- profile_check |> 
   count(telomere_copy_profile) 
 
@@ -955,81 +957,154 @@ results_and_profile <- compare_results |>
   filter(version == "1.2") |> 
   left_join(profile_check, by = "shallow_sample_id")
 
-colnames(results_and_profile)
+# Q: Are the strange telomere profiles seen on each worksheet?
 
-# Are sample indexes involved?
+# A: Decreased and increased high patterns are not seen on mid-output runs. But
+# this may be due to smaller sample numbers.
 
 ggplot(results_and_profile, aes(x = worksheet, 
                                 y = )) +
-  geom_bar(aes(fill = telomere_copy_profile), position = "dodge")
+  geom_bar(aes(fill = telomere_copy_profile), position = "dodge") +
+  scale_fill_manual(values = telomere_colours)
 
+# Q: are the strange telomere profiles caused by low coverage?
 
-repeated_results_with_telomeric_imbalances <- results_and_profile |> 
-  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
-           base::duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes")
-
-# Are any other repeated samples affected?
-results_and_profile |> 
-  filter(dlms_dna_number %in% repeated_results_with_telomeric_imbalances$dlms_dna_number) |> 
-  select(shallow_sample_id, dlms_dna_number,
-         lga, lpc, telomeric_copy_similar_to_WS133557_21003549,
-         degree_of_telomere_copy_increase,
-          notes) |> 
-  arrange(dlms_dna_number) |>  view()
-
-# 5 samples with high telomeric imbalance have a range of coverage levels
-results_and_profile |> 
-  filter(telomeric_copy_similar_to_WS133557_21003549 == "Yes" &
-           degree_of_telomere_copy_increase == "High") |> 
-  select(shallow_sample_id, dlms_dna_number,
-         lga, lpc, coverage, robustness, telomeric_copy_similar_to_WS133557_21003549,
-         degree_of_telomere_copy_increase, notes, seqone_hrd_score,
-         seqone_hrd_status, myriad_hrd_status, myriad_brca_status, path_block_manual_check,
-         input_ng) |> 
-  arrange(dlms_dna_number) |>  view()
-
-# Repeated samples with high HRD scores
-# 21003549 is the only repeated sample with high telomeric imbalance
-
-high_scores <- c(20127786, 20112141, 21003549, 21006928, 21012359, 21013520, 23032086)
-
-results_and_profile |> 
-  filter(dlms_dna_number %in% high_scores) |> 
-  select(shallow_sample_id, dlms_dna_number,
-         lga, lpc, coverage, robustness, telomeric_copy_similar_to_WS133557_21003549,
-         degree_of_telomere_copy_increase, notes) |> 
-  arrange(dlms_dna_number) |>  view()
-
-ggplot(results_and_profile, aes(x = robustness, y = input_ng)) +
-  geom_point(aes(colour = degree_of_telomere_copy_increase)) 
-
-
-WS134928_samples <- results_and_profile |> 
-  filter(worksheet == "WS134928")
-
-results_and_profile |> 
-  filter(dlms_dna_number %in% WS134928_samples$dlms_dna_number) |> 
-  select(shallow_sample_id, dlms_dna_number, telomere_copy_profile,
-         coverage, input_ng) |> 
-  arrange(dlms_dna_number) |>  view()
-
-ggplot(results_and_profile, aes(x = million_reads, y = input_ng)) +
-  geom_point(aes(colour = telomere_copy_profile))
-
+# A: there is no correlation with low coverage in repeated samples.
 
 results_and_profile |> 
   filter(duplicated(dlms_dna_number, fromLast = TRUE) |
            duplicated(dlms_dna_number, fromLast = FALSE)) |> 
-  ggplot(aes(x = million_reads, y = lpc)) +
-  geom_point(aes(colour = telomere_copy_profile)) +
+  ggplot(aes(x = worksheet, y = coverage)) +
+  geom_jitter(aes(colour = telomere_copy_profile), size = 3, alpha = 0.6) +
+  scale_colour_manual(values = telomere_colours) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "") +
   facet_wrap(~dlms_dna_number)
+
+# A: there is no correlation with coverage in the full cohort.
+
+ggplot(results_and_profile, aes(x = reorder(shallow_sample_id, 
+                                            coverage), y = coverage)) +
+  geom_jitter(aes(colour = telomere_copy_profile), size = 3, alpha = 0.6) +
+  scale_colour_manual(values = telomere_colours) +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "")
+
+# Q: are sample indexes involved?
+
+# A: the same indexes have different telomere copy profiles, so it is unlikely
+# to be indexes.
+
+results_and_profile |> 
+  select(shallow_sample_id, index, telomere_copy_profile) |> 
+  arrange(index) |> 
+  view()
+
+# Q: are strange telomere copy profiles linked to:
+#     - robustness
+#     - read length
+#     - input
+#     - insert size
+#     - percentage bases with quality over 30
+
+# A: no, nothing obvious.
+
+make_telomere_plot <- function(x) {
+  
+  ggplot(results_and_profile, aes(x = reorder(shallow_sample_id, {{ x }}),
+                                y = {{ x }})) +
+  geom_point(aes(colour = telomere_copy_profile)) +
+  scale_colour_manual(values = telomere_colours) +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "")
+  
+}
+
+make_telomere_plot(robustness)
+
+make_telomere_plot(read_length)
+
+make_telomere_plot(input_ng)
+
+make_telomere_plot(insert_size)
+
+make_telomere_plot(percent_q30)
+
+make_telomere_plot(percent_dups)
+
+# Q: do we have a case where the same library had different telomere profiles?
+
+# A: yes - sample 20112141
 
 results_and_profile |> 
   filter(dlms_dna_number == 20112141) |> 
   select(worksheet, sample_id, telomere_copy_profile,
          coverage, input_ng, lga, lpc) |>  view()
 
+# Q: if we ignore LPC and just look at LGA, is sample 21003549 still an outlier?
+
+# A: yes.
+
+results_and_profile |> 
+  filter(duplicated(dlms_dna_number, fromLast = TRUE) |
+  duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  mutate(dlms_dna_number = as.character(dlms_dna_number)) |> 
+  ggplot(aes(x = dlms_dna_number, y = lga)) +
+  geom_point(size = 3, aes(colour = telomere_copy_profile), alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "")
+
+# Q: Were the samples that changed LGA and LPC results from v1.1 to v1.2 also the 
+# ones with weird telomere results?
+
+# A: No.
+
+version_comparison <- compare_results |> 
+  select(shallow_sample_id, dlms_dna_number, lga, lpc, version,
+         seqone_hrd_score, seqone_hrd_status) |> 
+  pivot_wider(id_cols = c(shallow_sample_id, dlms_dna_number),
+              names_from = version,
+              values_from = c(lga, lpc, seqone_hrd_score, seqone_hrd_status)) |> 
+  mutate(lga_change = lga_1.2 - lga_1.1,
+         lpc_change = lpc_1.2 - lpc_1.1,
+         score_change = seqone_hrd_score_1.2 - seqone_hrd_score_1.1,
+         status_change = ifelse(seqone_hrd_status_1.2 == seqone_hrd_status_1.1,
+                                "Same", "Change")) |> 
+  left_join(profile_check, by = "shallow_sample_id")
+              
+ggplot(version_comparison, aes(x = seqone_hrd_score_1.1, 
+                    y = seqone_hrd_score_1.2)) +
+  geom_jitter(aes(colour = telomere_copy_profile),
+              size = 2, alpha = 0.6)
+
+# Q: What were the inter-run results for v1.1 like?
+
+# A: WS133557_21003549 was an outlier on v1.1 as well.
+
+inter_run_1.1 <- compare_results |>
+  filter(version == "1.1" &
+           # Remove intra-run replicates
+           !sample_id %in% grep(x = compare_results$sample_id, pattern = "b|c",
+                                value = TRUE)) |> 
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE))
+
+plot_lpc_lga(inter_run_1.1) +
+  labs(x = "LGA", y = "LPC") +
+  geom_point(data = inter_run_1.1 |>  
+               filter(shallow_sample_id == "WS133557_21003549"),
+             shape = 21, colour = safe_red, fill = NA, size = 4, stroke = 1) +
+  facet_wrap(~dlms_dna_number)
+
+# Q: what were the v1.1 results for 21003549?
+
+# A: no change in LGA, LPC or score.
+
+version_comparison |> 
+  filter(dlms_dna_number == 21003549) |>  view()
 
 ## Sample 21003549 ------------------------------------------------------------------
 
