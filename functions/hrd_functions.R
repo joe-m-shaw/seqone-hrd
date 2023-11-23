@@ -972,11 +972,17 @@ calculate_pooled_sd <- function(df, x) {
   output_table <- df |> 
     group_by(dlms_dna_number) |> 
     summarise(sd = sd( {{ x }} ),
+              max = max( {{ x }} ),
+              min = min( {{ x }} ),
+              range = max - min,
               n = n(),
               z = (n-1)*sd^2)
   
-  pooled_sd <- sqrt(sum(output_table$z) / (sum(output_table$n) - nrow(output_table)))
+  pooled_sd <- round(sqrt(sum(output_table$z) / 
+                            (sum(output_table$n) - nrow(output_table))), 2)
   
-  return(list(output_table, pooled_sd))
+  range <- str_c(min(output_table$range), "-", max(output_table$range))
+  
+  return(list(output_table, pooled_sd, range))
   
 }
