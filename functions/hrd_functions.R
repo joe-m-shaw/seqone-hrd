@@ -967,7 +967,7 @@ add_version <- function(input_table, version_text) {
 # The Pooled Standard Deviation is a weighted average of standard deviations for two or 
 # more groups, assumed to have equal variance. 
 
-calculate_pooled_sd <- function(df, x) {
+calculate_pooled_sd <- function(df, x, round_places = 2) {
   
   output_table <- df |> 
     group_by(dlms_dna_number) |> 
@@ -979,7 +979,7 @@ calculate_pooled_sd <- function(df, x) {
               z = (n-1)*sd^2)
   
   pooled_sd <- round(sqrt(sum(output_table$z) / 
-                            (sum(output_table$n) - nrow(output_table))), 2)
+                            (sum(output_table$n) - nrow(output_table))), round_places)
   
   range <- str_c(min(output_table$range), "-", max(output_table$range))
   
