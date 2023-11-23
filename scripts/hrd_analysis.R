@@ -918,26 +918,51 @@ investigate_plot(coverage_calc, coverage)
 
 ## Standard deviation ----------------------------------------------------------------
 
-calculate_pooled_sd(inter_run_samples, seqone_hrd_score)
+repeated_samples <- compare_results |>
+  filter(version == "1.2") |> 
+  filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
+           base::duplicated(dlms_dna_number, fromLast = FALSE))
 
-calculate_pooled_sd(inter_run_samples, lga)
+sd_score <- calculate_pooled_sd(repeated_samples, seqone_hrd_score)
 
-calculate_pooled_sd(inter_run_samples, lpc)
+sd_lga <- calculate_pooled_sd(repeated_samples, lga)
 
-calculate_pooled_sd(inter_run_samples, ccne1)
+sd_lpc <- calculate_pooled_sd(repeated_samples, lpc)
 
-calculate_pooled_sd(inter_run_samples, rad51b)
+sd_table <- tribble(
+  ~Metric,     ~`Pooled standard deviation`, ~`Range of variation`,
+  "HRD score", sd_score[[2]],                sd_score[[3]], 
+  "LGA",       sd_lga[[2]],                  sd_lga[[3]],
+  "LPC",       sd_lpc[[2]],                  sd_lpc[[3]]
+)
 
-calculate_pooled_sd(inter_run_samples, robustness)
+export_timestamp(input = sd_table)
 
 ## Genome profile check -------------------------------------------------------------
 
 profile_check <- read_excel(path = str_c(hrd_data_path, 
-                                         "2023_11_20_08_22_11_genomic_profile_check.xlsx"))
+                                         "2023_11_20_08_22_11_genomic_profile_check.xlsx")) |> 
+  mutate(telomere_copy_profile = factor(telomere_copy_profile,
+                                        levels = c("Normal", "Increased low",
+                                                   "Increased high", "Decreased")))
+
+telomere_profile_summary <- profile_check |> 
+  count(telomere_copy_profile) 
+
+export_timestamp(input = telomere_profile_summary)
 
 results_and_profile <- compare_results |>
   filter(version == "1.2") |> 
   left_join(profile_check, by = "shallow_sample_id")
+
+colnames(results_and_profile)
+
+# Are sample indexes involved?
+
+ggplot(results_and_profile, aes(x = worksheet, 
+                                y = )) +
+  geom_bar(aes(fill = telomere_copy_profile), position = "dodge")
+
 
 repeated_results_with_telomeric_imbalances <- results_and_profile |> 
   filter(base::duplicated(dlms_dna_number, fromLast = TRUE) |
@@ -978,6 +1003,33 @@ results_and_profile |>
 
 ggplot(results_and_profile, aes(x = robustness, y = input_ng)) +
   geom_point(aes(colour = degree_of_telomere_copy_increase)) 
+
+
+WS134928_samples <- results_and_profile |> 
+  filter(worksheet == "WS134928")
+
+results_and_profile |> 
+  filter(dlms_dna_number %in% WS134928_samples$dlms_dna_number) |> 
+  select(shallow_sample_id, dlms_dna_number, telomere_copy_profile,
+         coverage, input_ng) |> 
+  arrange(dlms_dna_number) |>  view()
+
+ggplot(results_and_profile, aes(x = million_reads, y = input_ng)) +
+  geom_point(aes(colour = telomere_copy_profile))
+
+
+results_and_profile |> 
+  filter(duplicated(dlms_dna_number, fromLast = TRUE) |
+           duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  ggplot(aes(x = million_reads, y = lpc)) +
+  geom_point(aes(colour = telomere_copy_profile)) +
+  facet_wrap(~dlms_dna_number)
+
+results_and_profile |> 
+  filter(dlms_dna_number == 20112141) |> 
+  select(worksheet, sample_id, telomere_copy_profile,
+         coverage, input_ng, lga, lpc) |>  view()
+
 
 ## Sample 21003549 ------------------------------------------------------------------
 
