@@ -405,9 +405,11 @@ compare_results <- join_tables |>
     outcome_binary = fct(outcome_binary, levels = c(consistent_text,
                                                     inconsistent_text,
                                                     inconclusive_text,
-                                                    "other"))
+                                                    "other")),
     
-  )
+    robustness = as.numeric(robustness)
+    
+    )
 
 # Every DNA input should have 2 rows: 1 for each pipeline version
 assert_that(nrow(compare_results) == (total_input_number*2))
@@ -706,8 +708,7 @@ coverage_line <- geom_hline(yintercept = coverage_threshold, linetype = "dashed"
 input_line <- geom_hline(yintercept = input_threshold, linetype = "dashed")
 
 filtered_results <- compare_results |> 
-  filter(path_block_manual_check == "pathology blocks match" & version == "1.2") |> 
-  mutate(robustness = as.numeric(robustness))
+  filter(path_block_manual_check == "pathology blocks match" & version == "1.2")
 
 cov_v12 <- plot_qc(yvar = coverage, alpha_number = 1) +
   coverage_line +
@@ -938,6 +939,15 @@ sd_table <- tribble(
 
 export_timestamp(input = sd_table)
 
+# Remove outlier sample
+calculate_pooled_sd(repeated_samples |>  filter(dlms_dna_number != "21003549"),
+                    seqone_hrd_score,
+                    round_places = 4)
+
+calculate_pooled_sd(repeated_samples,
+                    seqone_hrd_score,
+                    round_places = 4)
+
 ## Genome profile check -------------------------------------------------------------
 
 profile_check <- read_excel(path = str_c(hrd_data_path, 
@@ -1105,6 +1115,54 @@ plot_lpc_lga(inter_run_1.1) +
 
 version_comparison |> 
   filter(dlms_dna_number == 21003549) |>  view()
+
+# Q: how many samples would adding a "telomere check" affect?
+
+lga_frequency <- compare_results |> 
+  filter(version == "1.2") |> 
+  filter(!duplicated(dlms_dna_number)) |> 
+  count(lga)
+
+window <- lga_frequency |> 
+  filter(lga >= 10 & lga <= 18)
+
+lga_10_18_prop <- sum(window$n) / sum(lga_frequency$n)
+
+# Proportion of cases with high or low telomere profiles
+highlow_prop <- 10/98
+
+# Predicted percentage of cases which would need repeating
+(lga_10_18_prop * highlow_prop) * 100
+
+# Q: Does robustness correlate with telomere profile for sample 21003549?
+
+# A: no.
+
+results_and_profile |> 
+  filter(dlms_dna_number == 21003549) |> 
+  ggplot(aes(x = robustness, y = telomere_copy_profile)) +
+  geom_point(aes(colour = telomere_copy_profile),
+              size = 2, alpha = 0.6)
+
+# Q: was a sample with a high telomere copy profile ever run on a mid-output run?
+
+# A: no.
+
+results_and_profile |> 
+  filter(telomere_copy_profile == "Increased high" & worksheet %in% c("WS135498",
+                                                                      "WS134928"))
+# Q: which samples had either increased or decreased telomere profiles?
+
+# A: these ones
+
+results_and_profile |> 
+  filter(telomere_copy_profile %in% c("Increased high", "Decreased")) |> 
+  select(telomere_copy_profile,
+         shallow_sample_id, lga, lpc, seqone_hrd_status, myriad_hrd_status,
+         myriad_gi_score, 
+         myriad_brca_status, myriad_patient_name,
+         input_ng, coverage, path_block_manual_check) |>  
+  arrange(telomere_copy_profile) |> view()
 
 ## Sample 21003549 ------------------------------------------------------------------
 
