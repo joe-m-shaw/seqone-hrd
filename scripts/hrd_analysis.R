@@ -299,7 +299,7 @@ join_tables <- seqone_mod |>
   left_join(
     kapa_data_collated |>
       select(shallow_sample_id, q_pcr_n_m, ts_ng_ul, total_yield, q_pcr_n_m,
-             index, d1000_ts_size, ts_ng_ul),
+             index, d1000_ts_size, ts_ng_ul, plate_position),
     by = "shallow_sample_id",  keep = FALSE
   ) |> 
   
@@ -865,6 +865,18 @@ tbrca_gi_scores |>
   count(borderline) |> 
   mutate(percentage = round((n / sum(n))*100, 1))
 
+myriad_sd <- 2.2
+
+tbrca_gi_scores |> 
+  ggplot(aes(x = gi_score, y = )) +
+  geom_density() +
+  geom_density(data = tbrca_gi_scores, aes(x = gi_score + myriad_sd, y = )) +
+  geom_density(data = tbrca_gi_scores, aes(x = gi_score - myriad_sd, y = )) +
+  theme_bw() +
+  scale_x_continuous(
+    breaks = c(0, 25, 42, 50, 75, 100)
+  )
+
 ## Manchester tBRCA inconclusive rate -----------------------------------------------
 
 exclude <- c("Fail", "Not tested", "Awaiting result")
@@ -947,6 +959,45 @@ calculate_pooled_sd(repeated_samples |>  filter(dlms_dna_number != "21003549"),
 calculate_pooled_sd(repeated_samples,
                     seqone_hrd_score,
                     round_places = 4)
+
+## Sample 21003549 ------------------------------------------------------------------
+
+sample_21003549 <- read_excel(str_c(hrd_data_path, "21003549_lga_lpc_counts.xlsx"),
+                              col_types = c("text", "numeric", "numeric", "numeric"))
+
+ggplot(sample_21003549, aes(x = shallow_sample_id, y = lga, fill = shallow_sample_id)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~chromosome)
+
+ggplot(sample_21003549, aes(x = shallow_sample_id, y = lpc, fill = shallow_sample_id)) +
+  geom_col(position = "dodge") +
+  theme_bw() +
+  facet_wrap(~chromosome)
+
+compare_results |> 
+  filter(version == "1.2" & dlms_dna_number == 21003549) |> 
+  select(shallow_sample_id, lga, lpc, seqone_hrd_score, robustness)
+
+# Q: do samples with lower robustness tend to have lower LGA and LPC scores?
+
+# A: no.
+
+compare_results |> 
+  filter(version == "1.2") |> 
+  filter(duplicated(dlms_dna_number, fromLast = TRUE) |
+           duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  ggplot(aes(x = robustness, y = lga)) +
+  geom_point() +
+  facet_wrap(~dlms_dna_number)
+
+compare_results |> 
+  filter(version == "1.2") |> 
+  filter(duplicated(dlms_dna_number, fromLast = TRUE) |
+           duplicated(dlms_dna_number, fromLast = FALSE)) |> 
+  ggplot(aes(x = robustness, y = lpc)) +
+  geom_point() +
+  facet_wrap(~dlms_dna_number)
 
 ## Genome profile check -------------------------------------------------------------
 
@@ -1182,17 +1233,22 @@ tbrca_data_collection_clean |>
            duplicated(lab_number_id, fromLast = FALSE)) |>  
   filter(!is.na(lab_number_id)) |>  view()
 
-## Sample 21003549 ------------------------------------------------------------------
+# Q: were the high telomere profile samples all in a similar plate location?
 
-sample_21003549 <- read_excel(str_c(hrd_data_path, "21003549_lga_lpc_counts.xlsx"),
-                              col_types = c("text", "numeric", "numeric", "numeric"))
+# A: no.
 
-ggplot(sample_21003549, aes(x = shallow_sample_id, y = lga, fill = shallow_sample_id)) +
-  geom_col(position = "dodge") +
-  theme_bw() +
-  facet_wrap(~chromosome)
+results_and_profile |> 
+  mutate(plate_y =sub(x = plate_position, pattern = "\\d", replacement = ""),
+         plate_x = parse_number(plate_position)) |> 
+  select(plate_position, telomere_copy_profile, shallow_sample_id) |> 
+  arrange(plate_position) |> 
+  view()
 
-ggplot(sample_21003549, aes(x = shallow_sample_id, y = lpc, fill = shallow_sample_id)) +
-  geom_col(position = "dodge") +
-  theme_bw() +
-  facet_wrap(~chromosome)
+# Are any of the biobank or seracare controls impacted?
+
+results_and_profile |> 
+  filter(sample_type %in% c("Seraseq control", "Biobank control")) |> 
+  select(shallow_sample_id, dlms_dna_number, 
+         surname, telomere_copy_profile, seqone_hrd_status,
+         lga, lpc) |> 
+  arrange(dlms_dna_number)
