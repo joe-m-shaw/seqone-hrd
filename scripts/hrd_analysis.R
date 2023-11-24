@@ -1045,6 +1045,11 @@ make_telomere_plot(percent_q30)
 
 make_telomere_plot(percent_dups)
 
+ggplot(results_and_profile, aes(x = percent_dups, y = percent_q30)) +
+  geom_point(aes(colour = telomere_copy_profile)) +
+  scale_colour_manual(values = telomere_colours) +
+  theme_bw()
+
 # Q: do we have a case where the same library had different telomere profiles?
 
 # A: yes - sample 20112141
@@ -1064,6 +1069,8 @@ results_and_profile |>
   mutate(dlms_dna_number = as.character(dlms_dna_number)) |> 
   ggplot(aes(x = dlms_dna_number, y = lga)) +
   geom_point(size = 3, aes(colour = telomere_copy_profile), alpha = 0.5) +
+  scale_colour_manual(values = telomere_colours) +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 90)) +
   labs(x = "")
 
@@ -1151,6 +1158,7 @@ results_and_profile |>
 results_and_profile |> 
   filter(telomere_copy_profile == "Increased high" & worksheet %in% c("WS135498",
                                                                       "WS134928"))
+
 # Q: which samples had either increased or decreased telomere profiles?
 
 # A: these ones
@@ -1163,6 +1171,16 @@ results_and_profile |>
          myriad_brca_status, myriad_patient_name,
          input_ng, coverage, path_block_manual_check) |>  
   arrange(telomere_copy_profile) |> view()
+
+# Q: do we have any evidence of Myriad samples being repeat tested with different
+# results?
+
+# A: no. Only one sample with 2 Myriad results.
+
+tbrca_data_collection_clean |> 
+  filter(duplicated(lab_number_id, fromLast = TRUE) |
+           duplicated(lab_number_id, fromLast = FALSE)) |>  
+  filter(!is.na(lab_number_id)) |>  view()
 
 ## Sample 21003549 ------------------------------------------------------------------
 
