@@ -960,6 +960,24 @@ calculate_pooled_sd(repeated_samples,
                     seqone_hrd_score,
                     round_places = 4)
 
+hrd_score_repeat_plot <- repeated_samples |> 
+  mutate(dlms_dna_number = factor(dlms_dna_number)) |> 
+  mutate(dlms_dna_number = (fct_reorder(.f = dlms_dna_number, .x = seqone_hrd_score, 
+                                        .fun = median))) |> 
+  ggplot(aes(x = dlms_dna_number, y = seqone_hrd_score)) +
+  geom_jitter(size = 4, alpha = 0.5, aes(colour = dlms_dna_number)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "Sample", y = "SeqOne HRD Score")
+
+repeated_samples |> 
+  mutate(dlms_dna_number = factor(dlms_dna_number)) |> 
+  mutate(dlms_dna_number = (fct_reorder(.f = dlms_dna_number, .x = seqone_hrd_score, 
+                                        .fun = median))) |> 
+  ggplot(aes(x = dlms_dna_number, y = seqone_hrd_score)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "Sample", y = "SeqOne HRD Score")
+
 ## Sample 21003549 ------------------------------------------------------------------
 
 sample_21003549 <- read_excel(str_c(hrd_data_path, "21003549_lga_lpc_counts.xlsx"),
