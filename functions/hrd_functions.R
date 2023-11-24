@@ -979,7 +979,7 @@ calculate_pooled_sd <- function(df, x, round_places = 2) {
               z = (n-1)*sd^2)
   
   pooled_sd <- round(sqrt(sum(output_table$z) / 
-                            (sum(output_table$n) - nrow(output_table))), round_places)
+                            (sum(output_table$n))), round_places)
   
   range <- str_c(min(output_table$range), "-", max(output_table$range))
   
