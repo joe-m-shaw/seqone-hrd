@@ -18,7 +18,7 @@ source("functions/hrd_functions.R")
 
 ## Collate Myriad data --------------------------------------------------------------
 
-myriad_report_files <- list.files(myriad_reports_location, full.names = TRUE)
+myriad_report_files <- list.files("data/myriad_reports/", full.names = TRUE)
 
 collated_myriad_info <- myriad_report_files |>
   map(read_myriad_report) |>
@@ -36,7 +36,7 @@ collated_myriad_info[collated_myriad_info$myriad_r_number == "R22-0LW4",
 
 ## Collate SeqOne data --------------------------------------------------------------
 
-seqone_report_files_v1_1 <- list.files(str_c(hrd_data_path, "seqone_reports_v1_1/"), 
+seqone_report_files_v1_1 <- list.files("data/seqone_reports_v1_1/", 
                                   full.names = TRUE)
 
 seqone_reports_v1_1 <- seqone_report_files_v1_1 |>
@@ -44,7 +44,7 @@ seqone_reports_v1_1 <- seqone_report_files_v1_1 |>
                                                 version = "1.1")) |>
   list_rbind()
 
-seqone_report_files_v1_2 <- list.files(str_c(hrd_data_path, "seqone_reports_v1_2/"), 
+seqone_report_files_v1_2 <- list.files("data/seqone_reports_v1_2/", 
                                        full.names = TRUE)
 
 seqone_reports_v1_2 <- seqone_report_files_v1_2 |>
@@ -70,13 +70,11 @@ stopifnot(nrow(collated_seqone_info |>
 
 # pdf_text doesn't work on these reports as resolution is too low.
 # I had to collate data manually in an Excel
-low_res_myriad_results <- read_excel(path = paste0(
-  hrd_data_path,
-  "myriad_reports_low_res/myriad_low_res_report_data.xlsx"
-)) |>
+low_res_myriad_results <- read_excel(path =
+  "data/myriad_reports_low_res/myriad_low_res_report_data.xlsx") |>
   mutate(nhs_number = as.numeric(gsub(pattern = "(\\D)", "", nhs_number)))
 
-seraseq_gi_scores <- read_excel(paste0(hrd_data_path, "seraseq_gi_scores.xlsx"))
+seraseq_gi_scores <- read_excel("data/seraseq_gi_scores.xlsx")
 
 collated_myriad_info_mod <- rbind(
   collated_myriad_info, low_res_myriad_results,
@@ -86,7 +84,7 @@ collated_myriad_info_mod <- rbind(
 
 ## Samples DLMS information ---------------------------------------------------------
 
-seqone_dlms_info <- read_csv(file = str_c(hrd_data_path, "seqone_dlms_info.csv"))
+seqone_dlms_info <- read_csv(file = "data/seqone_dlms_info.csv")
 
 ## Pathology block ID check ---------------------------------------------------------
 
@@ -94,17 +92,14 @@ seqone_dlms_info <- read_csv(file = str_c(hrd_data_path, "seqone_dlms_info.csv")
 # Seraseq controls classified as "pathology blocks match"
 
 path_block_check <- read_csv(
-  paste0(
-    hrd_data_path,
-    "pathology_block_id_check.csv"
-  ),
+  "data/pathology_block_id_check.csv",
   show_col_types = FALSE) 
 
 ## Initial DNA concentrations -------------------------------------------------------
 
 # Exported from Sharepoint (HS2 Sample Prep 2023 - NEW.xlsx)
 dna_concentrations <- read_excel(
-  path = paste0(hrd_data_path, "dna_concentrations.xlsx"),
+  path = "data/dna_concentrations.xlsx",
   col_types = c(
     "date",    "numeric", "text",    "text",
     "date",    "numeric", "numeric", "numeric", 
@@ -177,7 +172,7 @@ dna_concentrations_mod <- dna_concentrations |>
 # SSXT HS2 Library Prep 2023.xlsx
 
 hs2_library_prep <- read_excel(
-  path = str_c(hrd_data_path, "qpcr_qc.xlsx"),
+  path = "data/qpcr_qc.xlsx",
   sheet = "Sheet1",
   col_types = c(
     "text",    "guess",   "text",    "text",
@@ -206,10 +201,7 @@ kapa_data_collated <- rbind(
 # "HRD TBRCA data collection Manchester_NEW_from Oct2022_2023.xlsx"
 
 tbrca_data_collection <- read_excel(
-  paste0(
-    hrd_data_path,
-    "tbrca_data_collection.xlsx"
-  ),
+    "data/tbrca_data_collection.xlsx",
   skip = 1
 ) |>
   janitor::clean_names()
@@ -231,7 +223,7 @@ tbrca_data_collection_clean <- tbrca_data_collection |>
 
 ## SeqOne QC data -------------------------------------------------------------------
 
-seqone_qc_data_v1.1 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.1.xlsx")) |>
+seqone_qc_data_v1.1 <- read_excel("data/seqone_qc_metrics_v1.1.xlsx") |>
   janitor::clean_names() |>
   dplyr::rename(
     shallow_sample_id = sample,
@@ -241,7 +233,7 @@ seqone_qc_data_v1.1 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.1.x
   ) |> 
   mutate(version = "1.1")
 
-seqone_qc_data_v1.2 <- read_excel(str_c(hrd_data_path, "seqone_qc_metrics_v1.2.xlsx")) |>
+seqone_qc_data_v1.2 <- read_excel("data/seqone_qc_metrics_v1.2.xlsx") |>
   janitor::clean_names() |>
   dplyr::rename(
     shallow_sample_id = sample,
@@ -578,10 +570,6 @@ export_timestamp(input = intra_run_table)
 
 intra_run_variation <- calculate_variation(intra_run_samples)
 
-range(intra_run_variation$range_lpc)
-range(intra_run_variation$range_lga)
-range(intra_run_variation$range_score)
-
 ## Inter run variation --------------------------------------------------------------
 
 inter_run_samples <- compare_results |>
@@ -630,11 +618,6 @@ hrd_score_reads_facet_plot <- ggplot(inter_run_samples, aes(x = million_reads,
   facet_wrap(~dlms_dna_number)
 
 save_hrd_plot(hrd_score_reads_facet_plot)
-
-min(inter_run_samples$coverage)
-max(inter_run_samples$coverage)
-min(inter_run_samples$million_reads)
-max(inter_run_samples$million_reads)
 
 ## Intra-run variation boxplots -----------------------------------------------------
 
@@ -823,7 +806,7 @@ check_version_statuses |>
 
 ## Manchester tBRCA DNA concentrations ----------------------------------------------
 
-tbrca_data <- read.csv(file = str_c(hrd_data_path, "tbrca_dlms_info.csv"))
+tbrca_data <- read.csv(file = "data/tbrca_dlms_info.csv")
 
 dna_qc_threshold <- round(50 / 15, 0)
 
@@ -867,15 +850,8 @@ tbrca_gi_scores |>
 
 myriad_sd <- 2.2
 
-tbrca_gi_scores |> 
-  ggplot(aes(x = gi_score, y = )) +
-  geom_density() +
-  geom_density(data = tbrca_gi_scores, aes(x = gi_score + myriad_sd, y = )) +
-  geom_density(data = tbrca_gi_scores, aes(x = gi_score - myriad_sd, y = )) +
-  theme_bw() +
-  scale_x_continuous(
-    breaks = c(0, 25, 42, 50, 75, 100)
-  )
+borderline_myriad_samples <- tbrca_gi_scores |> 
+  filter(gi_score <= 44 & gi_score >= 40)
 
 ## Manchester tBRCA inconclusive rate -----------------------------------------------
 
@@ -897,7 +873,6 @@ tbrca_inconclusive_summary <- tbrca_inconclusive_data |>
 # Export combined tables ------------------------------------------------------------
 
 export_timestamp(input = compare_results)
-
 
 # Inter-run variability investigation -----------------------------------------------
 
@@ -951,6 +926,16 @@ sd_table <- tribble(
 
 export_timestamp(input = sd_table)
 
+sd_results <- sd_score[[1]]
+
+ggplot(sd_results, aes(x = reorder(dlms_dna_number, sd), y = sd)) +
+  geom_point() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "") +
+  geom_hline(yintercept = sd_score[[2]], linetype = "dashed") +
+  geom_hline(yintercept = 2* sd_score[[2]], linetype = "dashed")
+
 # Remove outlier sample
 calculate_pooled_sd(repeated_samples |>  filter(dlms_dna_number != "21003549"),
                     seqone_hrd_score,
@@ -980,7 +965,7 @@ repeated_samples |>
 
 ## Sample 21003549 ------------------------------------------------------------------
 
-sample_21003549 <- read_excel(str_c(hrd_data_path, "21003549_lga_lpc_counts.xlsx"),
+sample_21003549 <- read_excel("data/21003549_lga_lpc_counts.xlsx",
                               col_types = c("text", "numeric", "numeric", "numeric"))
 
 ggplot(sample_21003549, aes(x = shallow_sample_id, y = lga, fill = shallow_sample_id)) +
@@ -1019,8 +1004,8 @@ compare_results |>
 
 ## Genome profile check -------------------------------------------------------------
 
-profile_check <- read_excel(path = str_c(hrd_data_path, 
-                                         "2023_11_20_08_22_11_genomic_profile_check.xlsx")) |> 
+profile_check <- read_excel(path = 
+                              "data/2023_11_20_08_22_11_genomic_profile_check.xlsx") |> 
   mutate(telomere_copy_profile = factor(telomere_copy_profile,
                                         levels = c("Normal", "Increased low",
                                                    "Increased high", "Decreased")))
@@ -1076,10 +1061,9 @@ ggplot(results_and_profile, aes(x = reorder(shallow_sample_id,
 # A: the same indexes have different telomere copy profiles, so it is unlikely
 # to be indexes.
 
-results_and_profile |> 
+index_check <- results_and_profile |> 
   select(shallow_sample_id, index, telomere_copy_profile) |> 
-  arrange(index) |> 
-  view()
+  arrange(index)
 
 # Q: are strange telomere copy profiles linked to:
 #     - robustness
@@ -1089,18 +1073,6 @@ results_and_profile |>
 #     - percentage bases with quality over 30
 
 # A: no, nothing obvious.
-
-make_telomere_plot <- function(x) {
-  
-  ggplot(results_and_profile, aes(x = reorder(shallow_sample_id, {{ x }}),
-                                y = {{ x }})) +
-  geom_point(aes(colour = telomere_copy_profile)) +
-  scale_colour_manual(values = telomere_colours) +
-  theme_bw() +
-  theme(axis.text.x = element_blank()) +
-  labs(x = "")
-  
-}
 
 make_telomere_plot(robustness)
 
@@ -1123,10 +1095,10 @@ ggplot(results_and_profile, aes(x = percent_dups, y = percent_q30)) +
 
 # A: yes - sample 20112141
 
-results_and_profile |> 
+diff_profile <- results_and_profile |> 
   filter(dlms_dna_number == 20112141) |> 
   select(worksheet, sample_id, telomere_copy_profile,
-         coverage, input_ng, lga, lpc) |>  view()
+         coverage, input_ng, lga, lpc)
 
 # Q: if we ignore LPC and just look at LGA, is sample 21003549 still an outlier?
 
@@ -1189,8 +1161,8 @@ plot_lpc_lga(inter_run_1.1) +
 
 # A: no change in LGA, LPC or score.
 
-version_comparison |> 
-  filter(dlms_dna_number == 21003549) |>  view()
+v1_1_check <- version_comparison |> 
+  filter(dlms_dna_number == 21003549)
 
 # Q: how many samples would adding a "telomere check" affect?
 
@@ -1232,39 +1204,38 @@ results_and_profile |>
 
 # A: these ones
 
-results_and_profile |> 
+telomere_change <- results_and_profile |> 
   filter(telomere_copy_profile %in% c("Increased high", "Decreased")) |> 
   select(telomere_copy_profile,
          shallow_sample_id, lga, lpc, seqone_hrd_status, myriad_hrd_status,
          myriad_gi_score, 
          myriad_brca_status, myriad_patient_name,
          input_ng, coverage, path_block_manual_check) |>  
-  arrange(telomere_copy_profile) |> view()
+  arrange(telomere_copy_profile)
 
 # Q: do we have any evidence of Myriad samples being repeat tested with different
 # results?
 
 # A: no. Only one sample with 2 Myriad results.
 
-tbrca_data_collection_clean |> 
+myriad_repeat <- tbrca_data_collection_clean |> 
   filter(duplicated(lab_number_id, fromLast = TRUE) |
            duplicated(lab_number_id, fromLast = FALSE)) |>  
-  filter(!is.na(lab_number_id)) |>  view()
+  filter(!is.na(lab_number_id))
 
 # Q: were the high telomere profile samples all in a similar plate location?
 
 # A: no.
 
-results_and_profile |> 
+position_check <- results_and_profile |> 
   mutate(plate_y =sub(x = plate_position, pattern = "\\d", replacement = ""),
          plate_x = parse_number(plate_position)) |> 
   select(plate_position, telomere_copy_profile, shallow_sample_id) |> 
-  arrange(plate_position) |> 
-  view()
+  arrange(plate_position)
 
 # Are any of the biobank or seracare controls impacted?
 
-results_and_profile |> 
+control_check <- results_and_profile |> 
   filter(sample_type %in% c("Seraseq control", "Biobank control")) |> 
   select(shallow_sample_id, dlms_dna_number, 
          surname, telomere_copy_profile, seqone_hrd_status,
