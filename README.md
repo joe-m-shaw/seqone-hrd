@@ -4,11 +4,21 @@ This repo contains the analysis script for the validation of Homologous Recombin
 
 ## Data
 
-Data were downloaded from the SeqOne website (https://seqone.com) as PDFs, and the pdftools package was used to convert them into dataframes. SeqOne do not currently offer the option of downloading information in a tabulated form.
+Reports were downloaded from the SeqOne website (https://seqone.com) as PDFs, and the pdftools package was used to convert them into dataframes. SeqOne do not currently offer the option of downloading information in a tabulated form.
 
-## Scripts
+The separate dlms_queries.R script was used to extract sample information from the DNA Laboratory Management System (DLMS) via an ODBC connection, which is set up for PC38698. The tables were then saved as csvs. The dlms_queries.R script will not run on a computer not set up with an ODBC DLMS connection, and is not required to rerun the hrd_analysis.R script. 
 
-The hrd_analysis.R script includes all analysis for the validation and should run with the associated data (the associated data is not included in this repo). The separate dlms_queries.R script was used to extract sample information from the DNA Laboratory Management System (DLMS) via an ODBC connection, which is set up for PC38698. The tables were then saved as csvs. The dlms_queries.R script will not run on a computer not set up with an ODBC DLMS connection, and is not required to rerun the hrd_analysis.R script.
+All the data used in this validation is saved in the "data" folder at this interal location: S:\central shared\Genetics\Mol_Shared\Development.Team\SeqOne Homologous Recombination Deficiency Validation\HRD R script files\data
+
+## Script
+
+The hrd_analysis.R script includes all analysis for the validation and uses local filepaths.
+
+## Running the Analysis
+
+To recreate the analysis performed for the validation, copy the data folder into the project folder. You will also need to create "outputs" and "plots" folders.
+
+The hrd_analysis.R analysis script should then produce the plots and tables included in the final validation document.
 
 ## SomaHRD Versions
 

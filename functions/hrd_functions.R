@@ -38,29 +38,12 @@ seqone_status_levels <- c(neg_text, pos_text, incon_text)
 
 consistency_levels <- c(consistent_text, inconsistent_text, inconclusive_text)
 
-# Filepaths -------------------------------------------------------------------------
-
-dev_team_path <- "S:/central shared/Genetics/Mol_Shared/Development.Team/"
-
-seqone_folder <- paste0(dev_team_path, 
-                        "SeqOne Homologous Recombination Deficiency Validation/")
-
-hrd_project_path <- paste0(seqone_folder, "HRD R script files/")
-
-hrd_data_path <- paste0(hrd_project_path, "data/")
-
-hrd_output_path <- paste0(hrd_project_path, "outputs/")
-
-hrd_plot_path <- paste0(hrd_project_path, "plots/")
-
-myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
-
 # CSV timestamp ---------------------------------------------------------------------
 
-export_timestamp <- function(filepath = hrd_output_path, input) {
+export_timestamp <- function(input) {
   write.csv(input,
     file = paste0(
-      filepath,
+      "outputs/",
       format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
       "_",
       deparse(substitute(input)), ".csv"
@@ -757,7 +740,7 @@ line_df <- data.frame(
 plot_lpc_lga <- function(df) {
   
   ggplot(df, aes(x = lga, y = lpc)) +
-    geom_point(aes(colour = seqone_hrd_status),
+    geom_jitter(aes(colour = seqone_hrd_status),
                size = 2, alpha = 0.6) +
     scale_colour_manual(name = "SeqOne HRD Status",
                         values = c(safe_blue, safe_red, safe_grey)) +
@@ -791,12 +774,45 @@ save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi =
     ),
     plot = input_plot,
     device = "png",
-    path = hrd_plot_path,
+    path = "plots/",
     units = "cm",
     width = input_width,
     height = input_height,
     dpi = 300
   )
+}
+
+investigate_plot <- function(variable1, variable2) {
+  
+  ggplot(inter_run_mod, aes(x = {{ variable1 }},
+                            y = {{ variable2 }})) +
+    geom_point(size = 2, alpha = 0.6) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id == "WS133557_21003549", ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_red, stroke = 3
+    ) +
+    geom_point(
+      data = inter_run_mod[inter_run_mod$shallow_sample_id %in% c("WS134687_21003549", 
+                                                                  "WS135001_21003549"), ],
+      aes({{ variable1 }}, {{ variable2 }}),
+      pch = 21, fill = NA, size = 5, colour = safe_blue, stroke = 3
+    ) +
+    theme_bw() +
+    theme(legend.position = "bottom")
+  
+}
+
+make_telomere_plot <- function(x) {
+  
+  ggplot(results_and_profile, aes(x = reorder(shallow_sample_id, {{ x }}),
+                                  y = {{ x }})) +
+    geom_point(aes(colour = telomere_copy_profile)) +
+    scale_colour_manual(values = telomere_colours) +
+    theme_bw() +
+    theme(axis.text.x = element_blank()) +
+    labs(x = "")
+  
 }
 
 # Table functions -------------------------------------------------------------------
@@ -940,5 +956,28 @@ add_version <- function(input_table, version_text) {
   input_table |> 
     mutate(Analysis = version_text) |> 
     relocate(Analysis)
+  
+}
+
+# The Pooled Standard Deviation is a weighted average of standard deviations for two or 
+# more groups, assumed to have equal variance. 
+
+calculate_pooled_sd <- function(df, x, round_places = 2) {
+  
+  output_table <- df |> 
+    group_by(dlms_dna_number) |> 
+    summarise(sd = sd( {{ x }} ),
+              max = max( {{ x }} ),
+              min = min( {{ x }} ),
+              range = max - min,
+              n = n(),
+              z = (n-1)*sd^2)
+  
+  pooled_sd <- round(sqrt(sum(output_table$z) / 
+                            (sum(output_table$n))), round_places)
+  
+  range <- str_c(min(output_table$range), "-", max(output_table$range))
+  
+  return(list(output_table, pooled_sd, range))
   
 }
