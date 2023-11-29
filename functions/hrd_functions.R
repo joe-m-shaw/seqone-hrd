@@ -38,29 +38,12 @@ seqone_status_levels <- c(neg_text, pos_text, incon_text)
 
 consistency_levels <- c(consistent_text, inconsistent_text, inconclusive_text)
 
-# Filepaths -------------------------------------------------------------------------
-
-dev_team_path <- "S:/central shared/Genetics/Mol_Shared/Development.Team/"
-
-seqone_folder <- paste0(dev_team_path, 
-                        "SeqOne Homologous Recombination Deficiency Validation/")
-
-hrd_project_path <- paste0(seqone_folder, "HRD R script files/")
-
-hrd_data_path <- paste0(hrd_project_path, "data/")
-
-hrd_output_path <- paste0(hrd_project_path, "outputs/")
-
-hrd_plot_path <- paste0(hrd_project_path, "plots/")
-
-myriad_reports_location <- paste0(hrd_data_path, "myriad_reports/")
-
 # CSV timestamp ---------------------------------------------------------------------
 
-export_timestamp <- function(filepath = hrd_output_path, input) {
+export_timestamp <- function(input) {
   write.csv(input,
     file = paste0(
-      filepath,
+      "outputs/",
       format(Sys.time(), "%Y_%m_%d_%H_%M_%S"),
       "_",
       deparse(substitute(input)), ".csv"
@@ -791,7 +774,7 @@ save_hrd_plot <- function(input_plot, input_width = 15, input_height = 12, dpi =
     ),
     plot = input_plot,
     device = "png",
-    path = hrd_plot_path,
+    path = "plots/",
     units = "cm",
     width = input_width,
     height = input_height,
@@ -817,6 +800,18 @@ investigate_plot <- function(variable1, variable2) {
     ) +
     theme_bw() +
     theme(legend.position = "bottom")
+  
+}
+
+make_telomere_plot <- function(x) {
+  
+  ggplot(results_and_profile, aes(x = reorder(shallow_sample_id, {{ x }}),
+                                  y = {{ x }})) +
+    geom_point(aes(colour = telomere_copy_profile)) +
+    scale_colour_manual(values = telomere_colours) +
+    theme_bw() +
+    theme(axis.text.x = element_blank()) +
+    labs(x = "")
   
 }
 
