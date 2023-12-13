@@ -704,10 +704,21 @@ seraseq_plot <- seraseq_control_data |>
   geom_vline(xintercept = 42, linetype = "dashed") +
   ylim(0, 1) +
   xlim(0, 80) +
-  labs(x = "SeqOne HRD score", y = "Myriad GI score") +
+  labs(x = "Myriad GI score", y = "SeqOne HRD score") +
   facet_wrap(~firstname_factor)
 
+seraseq_plot_2 <- seraseq_control_data |>
+  filter(version == "1.2") |> 
+  plot_lpc_lga() +
+  facet_wrap(~firstname_factor) +
+  labs(x = "Large Genomic Alterations",
+       y = "Loss of Parental Copy") +
+  xlim(0, 36) +
+  ylim(0, 36)
+
 save_hrd_plot(seraseq_plot, input_height = 10)
+
+save_hrd_plot(seraseq_plot_2, input_height = 10)
 
 ## Biobank controls -----------------------------------------------------------------
 
