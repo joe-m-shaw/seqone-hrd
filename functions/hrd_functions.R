@@ -531,7 +531,7 @@ get_robustness <- function(page, version) {
   
   robustness_regex <- regex(
     r"[
-    Robustness\sof\sgenomic\sinstability
+    (Robustness\sof\sgenomic\sinstability|Confidence\sin\sgenomic\sinstability)
     \s+
     (\d{1}\.\d{1,2} | \d{1})
     ]",
@@ -546,7 +546,7 @@ get_robustness <- function(page, version) {
   
   if (version == "1.2") {
     
-    robustness <- parse_number(str_extract(page, robustness_regex, group = 1),
+    robustness <- parse_number(str_extract(page, robustness_regex, group = 2),
                                locale = locale(decimal_mark = "."))
     
   }
@@ -612,7 +612,7 @@ get_ccne1_rad51b <- function(page, version) {
   
   ccne1_regex_1_2 <- regex(
     r"[
-    RAD51B
+    (RAD51B|RAD51B\s.COPY\sNUMBER.)  # Use . for bracket
     \n\n
     \s+
     (\d{1,2}\.\d{1,2} | \d{1,2})    # CCNE1 regex
@@ -634,10 +634,10 @@ get_ccne1_rad51b <- function(page, version) {
   
   if (version == "1.2") {
     
-    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_2, group = 1),
+    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_2, group = 2),
                           locale = locale(decimal_mark = "."))
     
-    rad51b <- parse_number(str_extract(page, ccne1_regex_1_2, group = 2),
+    rad51b <- parse_number(str_extract(page, ccne1_regex_1_2, group = 3),
                            locale = locale(decimal_mark = "."))
     
   }
