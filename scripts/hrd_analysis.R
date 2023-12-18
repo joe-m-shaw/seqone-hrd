@@ -1354,3 +1354,34 @@ control_check <- results_and_profile |>
     lga, lpc
   ) |>
   arrange(dlms_dna_number)
+
+# Additional 21003549 replicate -----------------------------------------------------
+
+new_rep <- read_seqone_report(file = "data/seq_one_reports_WS136827/WS136827_21003549.pdf",
+                              version = "1.2")
+
+reps_21003549 <- rbind(seqone_reports_v1_2 |>  
+        filter(dlms_dna_number == 21003549), new_rep) 
+
+
+ggplot(reps_21003549, aes(x = lga, y = lpc)) +
+  geom_jitter(aes(colour = seqone_hrd_status),
+              size = 2, alpha = 0.6) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_red)) +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend)
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  xlim(0, 45) +
+  ylim(0, 45)
+
+ggplot(reps_21003549, aes(x = worksheet, y = seqone_hrd_score)) +
+  geom_point(aes(colour = seqone_hrd_status),
+              size = 2, alpha = 0.6) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_red)) +
+  ylim(0, 1) +
+  theme_bw()
