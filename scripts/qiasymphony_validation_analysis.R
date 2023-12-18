@@ -88,6 +88,41 @@ dual_extracted_plot <- ws136827_joined |>
        x = "Large Genomic Alterations",
        y = "Loss of Parental Copy")
 
+coverage_plot <- plot_qc(df = ws136827_joined, x_var = worksheet,
+        yvar = coverage, outcome = extraction, alpha_number = 0.8) +
+  facet_wrap(~nhs_number) +
+  ylim(0, 1.5) +
+  labs(title = "Coverage")
+
+robustness_plot <- plot_qc(df = ws136827_joined, x_var = worksheet,
+                           yvar = robustness, outcome = extraction,
+                           alpha_number = 0.8) +
+  facet_wrap(~nhs_number) +
+  ylim(0.5, 1) +
+  labs(title = "Robustness")
+
+percent_mapping_plot <- plot_qc(df = ws136827_joined, x_var = worksheet,
+                           yvar = percent_mapping, outcome = extraction,
+                           alpha_number = 0.8) +
+  facet_wrap(~nhs_number) +
+  ylim(80, 100) +
+  labs(title = "Percent mapping")
+
+hrd_score_plot <- plot_qc(df = ws136827_joined, x_var = worksheet,
+                                yvar = seqone_hrd_score, outcome = extraction,
+                                alpha_number = 0.8) +
+  facet_wrap(~nhs_number) +
+  ylim(0, 1) +
+  labs(title = "HRD Probability")
+
+qc_metric_plot <- ggarrange(coverage_plot, robustness_plot, 
+                            percent_mapping_plot, hrd_score_plot, 
+          ncol = 2, nrow = 2, common.legend = TRUE, legend = "bottom")
+
+save_hrd_plot()
+
+save_hrd_plot(qc_metric_plot, input_width = 16, input_height = 16)
+
 save_hrd_plot(dual_extracted_plot)
 
 export_timestamp(input = ws136827_joined)
