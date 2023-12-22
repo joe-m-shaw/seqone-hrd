@@ -66,7 +66,7 @@ live_data <- live_reports |>
   )) |>
   list_rbind()
 
-all_hrd_data <- rbind(validation_reports, ws136827_reports, live_reports)
+all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
 
 ```
 
@@ -78,8 +78,8 @@ all_hrd_data <- rbind(validation_reports, ws136827_reports, live_reports)
 
 summary_table <- all_hrd_data |> 
   group_by(seqone_hrd_status) |> 
-  summarise(total = n(),
-            percentage = round((total / sum(total)) *100, 2))
+  summarise(total = n()) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1))
 
 knitr::kable(summary_table) 
 
@@ -98,11 +98,11 @@ safe_grey <- "#888888"
 seqone_histo_plot <- all_hrd_data |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
   ggplot(aes(x = seqone_hrd_score, y = )) +
-  geom_histogram(binwidth = 0.05, aes(fill = seqone_hrd_status)) +
+  geom_histogram(binwidth = 0.01, aes(fill = seqone_hrd_status)) +
   scale_fill_manual(values = c(safe_blue, safe_red)) +
   theme_bw() +
   scale_x_continuous(
-    breaks = c(0, 0.25, 0.5, 0.75, 100)
+    breaks = c(0, 0.25, 0.5, 0.75, 1)
   ) +
   geom_vline(xintercept = 0.5, linetype = "dashed") +
   theme(
@@ -114,12 +114,20 @@ seqone_histo_plot <- all_hrd_data |>
     x = "SeqOne HRD Probability",
     fill = "SeqOne HRD Status",
     title = "SeqOne HRD Probability Distribution",
-    subtitle = "Data for vaidation and live service shown. Non-conclusive results excluded",
-    caption: "Bin width is 0.05")
+    subtitle = "Data for vaidation and live service shown. Non-conclusive results excluded")
 
 seqone_histo_plot
 
 ```
+
+```{r}
+
+
+
+```
+
+
+
 
 ## Quality Metrics
 
@@ -130,22 +138,29 @@ seqone_histo_plot
 draw_qcplot <- function(yvar) {
   
   ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
-    geom_boxplot() +
+    geom_jitter(aes(colour = seqone_hrd_status)) +
+    scale_colour_manual(values = c(safe_blue, safe_red,
+                                   safe_grey)) +
     theme_bw() +
-    theme(axis.text.x = element_blank(),
-          panel.grid = element_blank()) +
+    theme(panel.grid = element_blank()) +
     labs(x = "")
 
 }
 
-cov_boxplot <- draw_qcplot(yvar = coverage)
+cov_boxplot <- draw_qcplot(yvar = coverage) +
+  ylim(0, 2.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed")
 
-rob_boxplot <- draw_qcplot(yvar = robustness)
+rob_boxplot <- draw_qcplot(yvar = robustness) +
+  ylim(0, 1) +
+  geom_hline(yintercept = 0.85, linetype = "dashed")
 
-map_boxplot <- draw_qcplot(yvar = percent_mapping)
+map_boxplot <- draw_qcplot(yvar = percent_mapping) +
+  ylim(0, 100)
 
 qc_plots <- ggarrange(cov_boxplot, rob_boxplot, map_boxplot,
-          nrow = 3, ncol = 1)
+          nrow = 3, ncol = 1, common.legend = TRUE,
+          legend = "bottom")
 
 qc_plots
 
