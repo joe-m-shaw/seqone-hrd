@@ -5,7 +5,7 @@ format: html
 editor: visual
 ---
 
-This is a Quarto document to automatically audit the SeqOne HRD service at the Manchester Genomic Laboratory Hub.
+Date of audit: **`r format(Sys.Date(), "%d/%m/%Y")`**
 
 ```{r}
 #| label: setup
@@ -70,7 +70,7 @@ all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
 
 ```
 
-## Sample Numbers
+Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
 
 ```{r}
 #| label: sample-numbers
@@ -85,7 +85,7 @@ knitr::kable(summary_table)
 
 ```
 
-## HRD Score Distribution
+## HRD Probability Distribution
 
 ```{r}
 #| label: hrd-score-distribution
@@ -113,21 +113,11 @@ seqone_histo_plot <- all_hrd_data |>
     y = "Number of samples",
     x = "SeqOne HRD Probability",
     fill = "SeqOne HRD Status",
-    title = "SeqOne HRD Probability Distribution",
-    subtitle = "Data for vaidation and live service shown. Non-conclusive results excluded")
+    caption = "Data for vaidation and live service shown. Non-conclusive results excluded")
 
 seqone_histo_plot
 
 ```
-
-```{r}
-
-
-
-```
-
-
-
 
 ## Quality Metrics
 
@@ -138,8 +128,9 @@ seqone_histo_plot
 draw_qcplot <- function(yvar) {
   
   ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
-    geom_jitter(aes(colour = seqone_hrd_status)) +
-    scale_colour_manual(values = c(safe_blue, safe_red,
+    geom_jitter(colour="black",pch=21,
+                aes(fill = seqone_hrd_status)) +
+    scale_fill_manual(values = c(safe_blue, safe_red,
                                    safe_grey)) +
     theme_bw() +
     theme(panel.grid = element_blank()) +
@@ -148,15 +139,12 @@ draw_qcplot <- function(yvar) {
 }
 
 cov_boxplot <- draw_qcplot(yvar = coverage) +
-  ylim(0, 2.5) +
   geom_hline(yintercept = 0.5, linetype = "dashed")
 
 rob_boxplot <- draw_qcplot(yvar = robustness) +
-  ylim(0, 1) +
   geom_hline(yintercept = 0.85, linetype = "dashed")
 
-map_boxplot <- draw_qcplot(yvar = percent_mapping) +
-  ylim(0, 100)
+map_boxplot <- draw_qcplot(yvar = percent_mapping)
 
 qc_plots <- ggarrange(cov_boxplot, rob_boxplot, map_boxplot,
           nrow = 3, ncol = 1, common.legend = TRUE,
