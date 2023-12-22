@@ -5,17 +5,15 @@ format: html
 editor: visual
 ---
 
-## Introduction
-
 This is a Quarto document to automatically audit the SeqOne HRD service at the Manchester Genomic Laboratory Hub.
 
 ```{r}
 #| label: setup
+#| include: false
 
 filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency/"
 
 ```
-
 
 ```{r}
 #| label: packages-and-functions
@@ -31,6 +29,7 @@ source(str_c(filepath, "functions/hrd_functions.R"))
 
 ```{r}
 #| label: load-data
+#| include: false
 
 validation_reports <- list.files(str_c(filepath, "data/seqone_reports_v1_2/"),
                                  full.names = TRUE,
@@ -42,7 +41,6 @@ validation_data <- validation_reports |>
     version = "1.2"
   )) |>
   list_rbind()
-
 
 ws136827_reports <- list.files(str_c(filepath, "data/seq_one_reports_WS136827/"),
                              full.names = TRUE,
@@ -68,9 +66,87 @@ live_data <- live_reports |>
   )) |>
   list_rbind()
 
-report_files <- list_rbind(validation_reports, ws136827_reports, live_reports)
-
+all_hrd_data <- rbind(validation_reports, ws136827_reports, live_reports)
 
 ```
 
+## Sample Numbers
 
+```{r}
+#| label: sample-numbers
+#| echo: false
+
+summary_table <- all_hrd_data |> 
+  group_by(seqone_hrd_status) |> 
+  summarise(total = n(),
+            percentage = round((total / sum(total)) *100, 2))
+
+knitr::kable(summary_table) 
+
+```
+
+## HRD Score Distribution
+
+```{r}
+#| label: hrd-score-distribution
+#| echo: FALSE
+
+safe_blue <- "#88CCEE"
+safe_red <- "#CC6677"
+safe_grey <- "#888888"
+
+seqone_histo_plot <- all_hrd_data |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  ggplot(aes(x = seqone_hrd_score, y = )) +
+  geom_histogram(binwidth = 0.05, aes(fill = seqone_hrd_status)) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  scale_x_continuous(
+    breaks = c(0, 0.25, 0.5, 0.75, 100)
+  ) +
+  geom_vline(xintercept = 0.5, linetype = "dashed") +
+  theme(
+    panel.grid = element_blank(),
+    legend.position = "bottom"
+  ) +
+  labs(
+    y = "Number of samples",
+    x = "SeqOne HRD Probability",
+    fill = "SeqOne HRD Status",
+    title = "SeqOne HRD Probability Distribution",
+    subtitle = "Data for vaidation and live service shown. Non-conclusive results excluded",
+    caption: "Bin width is 0.05")
+
+seqone_histo_plot
+
+```
+
+## Quality Metrics
+
+```{r}
+#| label: qc-metrics
+#| echo: FALSE
+
+draw_qcplot <- function(yvar) {
+  
+  ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(axis.text.x = element_blank(),
+          panel.grid = element_blank()) +
+    labs(x = "")
+
+}
+
+cov_boxplot <- draw_qcplot(yvar = coverage)
+
+rob_boxplot <- draw_qcplot(yvar = robustness)
+
+map_boxplot <- draw_qcplot(yvar = percent_mapping)
+
+qc_plots <- ggarrange(cov_boxplot, rob_boxplot, map_boxplot,
+          nrow = 3, ncol = 1)
+
+qc_plots
+
+```
