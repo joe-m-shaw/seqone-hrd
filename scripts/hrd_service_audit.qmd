@@ -1,0 +1,60 @@
+---
+title: "SeqOne HRD Service"
+author: "Joe Shaw"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This is a Quarto document to automatically audit the SeqOne HRD service at the Manchester Genomic Laboratory Hub.
+
+```{r}
+#| label: setup
+
+filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency/"
+
+```
+
+
+```{r}
+#| label: packages-and-functions
+#| include: false
+
+library("tidyverse")
+library("ggpubr")
+library("readxl")
+
+source(str_c(filepath, "functions/hrd_functions.R"))
+
+```
+
+```{r}
+#| label: load-data
+
+validation_reports <- list.files(str_c(filepath, "data/seqone_reports_v1_2/"),
+                                 full.names = TRUE,
+                                 pattern = "*.pdf")
+
+ws136827_reports <- list.files(str_c(filepath, "data/seq_one_reports_WS136827/"),
+                             full.names = TRUE,
+                             pattern = "*.pdf")
+
+live_service_path <- "S:/central shared/Genetics/Repository/WorksheetAnalysedData/"
+
+live_reports <- list.files(str_c(live_service_path, "WS137333/"),
+                           full.names = TRUE,
+                           pattern = "*.pdf")
+
+report_files <- str_c(validation_reports, ws136827_reports, live_reports)
+
+seqone_reports_v1_2 <- seqone_report_files_v1_2 |>
+  map(\(seqone_report_files_v1_2) read_seqone_report(
+    file = seqone_report_files_v1_2,
+    version = "1.2"
+  )) |>
+  list_rbind()
+
+```
+
+
