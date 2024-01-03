@@ -1,11 +1,11 @@
 ---
 title: "SeqOne HRD Service"
 author: "Joe Shaw"
-format: html
+date: today
+date-format: "DD/MM/YYYY"
+format: pdf
 editor: visual
 ---
-
-Date of audit: **`r format(Sys.Date(), "%d/%m/%Y")`**
 
 ```{r}
 #| label: setup
@@ -22,8 +22,9 @@ filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency
 library("tidyverse")
 library("ggpubr")
 library("readxl")
+library(here)
 
-source(str_c(filepath, "functions/hrd_functions.R"))
+source(here::here("functions/hrd_functions.R"))
 
 ```
 
@@ -70,8 +71,6 @@ all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
 
 ```
 
-Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
-
 ```{r}
 #| label: sample-numbers
 #| echo: false
@@ -84,6 +83,8 @@ summary_table <- all_hrd_data |>
 knitr::kable(summary_table) 
 
 ```
+
+Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
 
 ## HRD Probability Distribution
 
@@ -113,11 +114,13 @@ seqone_histo_plot <- all_hrd_data |>
     y = "Number of samples",
     x = "SeqOne HRD Probability",
     fill = "SeqOne HRD Status",
-    caption = "Data for vaidation and live service shown. Non-conclusive results excluded")
+    caption = "Data for validation and live service shown. Non-conclusive results excluded")
 
 seqone_histo_plot
 
 ```
+
+{{< pagebreak >}}
 
 ## Quality Metrics
 
@@ -125,31 +128,51 @@ seqone_histo_plot
 #| label: qc-metrics
 #| echo: FALSE
 
-draw_qcplot <- function(yvar) {
+draw_qc_dotplot <- function(yvar) {
   
   ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
     geom_jitter(colour="black",pch=21,
-                aes(fill = seqone_hrd_status)) +
+                aes(fill = seqone_hrd_status), size = 3,
+                alpha = 0.6) +
     scale_fill_manual(values = c(safe_blue, safe_red,
                                    safe_grey)) +
     theme_bw() +
-    theme(panel.grid = element_blank()) +
+    theme(panel.grid = element_blank(),
+          legend.position = "bottom",
+          axis.text.x = element_text(angle = 45, vjust = 0.2)) +
     labs(x = "")
 
 }
 
-cov_boxplot <- draw_qcplot(yvar = coverage) +
+draw_qc_boxplot <- function(yvar, ymin, ymax) {
+  
+  ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 45, vjust = 0.2)) +
+    labs(x = "") +
+    ylim(ymin, ymax)
+
+}
+
+cov_boxplot <- draw_qc_boxplot(yvar = coverage, ymin = 0, 
+                               ymax = max(all_hrd_data$coverage) + 0.5) +
   geom_hline(yintercept = 0.5, linetype = "dashed")
 
-rob_boxplot <- draw_qcplot(yvar = robustness) +
+rob_boxplot <- draw_qc_boxplot(yvar = robustness, 
+                               ymin = min(all_hrd_data$robustness) - 0.05,
+                               ymax = 1) +
   geom_hline(yintercept = 0.85, linetype = "dashed")
 
-map_boxplot <- draw_qcplot(yvar = percent_mapping)
+map_boxplot <- draw_qc_boxplot(yvar = percent_mapping,
+                               ymin = min(all_hrd_data$percent_mapping) - 5,
+                               ymax = 100)
 
-qc_plots <- ggarrange(cov_boxplot, rob_boxplot, map_boxplot,
-          nrow = 3, ncol = 1, common.legend = TRUE,
-          legend = "bottom")
+cov_boxplot
 
-qc_plots
+rob_boxplot
+
+map_boxplot
 
 ```
