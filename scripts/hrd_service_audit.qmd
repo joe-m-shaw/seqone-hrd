@@ -32,7 +32,7 @@ source(here::here("functions/hrd_functions.R"))
 #| label: load-data
 #| include: false
 
-validation_reports <- list.files(str_c(filepath, "data/seqone_reports_v1_2/"),
+validation_reports <- list.files(here::here("data/seqone_reports_v1_2/"),
                                  full.names = TRUE,
                                  pattern = "*.pdf")
 
@@ -85,6 +85,8 @@ all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
 
 ```
 
+## All Samples (validation and live service)
+
 ```{r}
 #| label: sample-numbers
 #| echo: false
@@ -99,6 +101,25 @@ knitr::kable(summary_table)
 ```
 
 Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
+
+## Live Service Samples
+
+```{r}
+#| label: live-service-numbers
+#| echo: false
+
+live_summary_table <- live_data |> 
+  group_by(seqone_hrd_status) |> 
+  summarise(total = n()) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1))
+
+knitr::kable(live_summary_table) 
+
+```
+
+Total samples tested: **`r length(unique(live_data$shallow_sample_id))`**
+
+{{< pagebreak >}}
 
 ## HRD Probability Distribution
 
