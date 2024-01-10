@@ -1385,3 +1385,23 @@ ggplot(reps_21003549, aes(x = worksheet, y = seqone_hrd_score)) +
                       values = c(safe_red)) +
   ylim(0, 1) +
   theme_bw()
+
+# Checking GIS and sequence variant concordance -------------------------------------
+
+pos_neg <- c("Positive", "Negative")
+
+tbrca_data_comparison <- tbrca_data_collection |> 
+  filter(gis_pos_neg %in% pos_neg & overall_hrd_pos_neg %in% pos_neg) |> 
+  mutate(gis_variant_check = ifelse(gis_pos_neg == overall_hrd_pos_neg,
+                "match",
+                "NO match")) |> 
+  relocate(gis_variant_check)
+
+tbrca_data_comparison |> 
+  select(gis_pos_neg, overall_hrd_pos_neg, gis_variant_check) |> 
+  arrange(gis_variant_check) |>  view()
+
+tbrca_data_comparison |> 
+  group_by(gis_variant_check) |> 
+  summarise(total = n()) |> 
+  mutate(prop = (total / sum(total)) * 100)
