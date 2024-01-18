@@ -68,7 +68,7 @@ ws136827_data <- ws136827_reports |>
   list_rbind()
 
 # Add new worksheets to this list to update the Quarto.
-live_ws <- list("WS137333", "WS137837")
+live_ws <- list("WS137333", "WS137837", "WS138061")
 
 live_ws_filepaths <- live_ws |> 
   map(\(live_ws) find_hrd_files(live_ws)) |> 
@@ -211,3 +211,19 @@ rob_boxplot
 map_boxplot
 
 ```
+
+```{r}
+#| label: qiasymphony-results
+#| include: FALSE
+
+qiasymphony_hrd_results <- all_hrd_data |> 
+  filter(worksheet == "WS136827" | dlms_dna_number %in% c(23047082,
+                                                          23053359)) |> 
+  filter(dlms_dna_number != 21003549)
+
+write.csv(qiasymphony_hrd_results, here::here("outputs/qiasymphony_hrd_results.csv"),
+          row.names = FALSE)
+
+```
+
+
