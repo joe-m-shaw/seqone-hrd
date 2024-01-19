@@ -1,0 +1,121 @@
+---
+title: "Insufficient samples"
+author: "Joe Shaw"
+date: "`r Sys.Date()`"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(readxl)
+library(here)
+
+```
+
+
+```{r}
+#| label: data
+#| include: FALSE
+
+tbrca_data_collection <- read_excel(here::here("data/tbrca_data_collection.xlsx"),
+                                    skip = 1) |>
+  janitor::clean_names()
+
+pansolid_2023 <- read_excel(here::here("data/DNA PanSolid QIAseq Submission Sheet 2023.xlsx")) |> 
+  janitor::clean_names()
+
+pansolid_conc <- pansolid_2023 |> 
+  filter(!is.na(stock_qubit) | !is.na(nanodrop)) |> 
+  mutate(stock_qubit = as.numeric(stock_qubit),
+         nanodrop = as.numeric(nanodrop))
+
+```
+
+## Nanodrop vs Qubit
+
+Data from PanSolid 2023 submissions sheet (Sharepoint).
+
+```{r}
+#| label: conc-plot
+#| echo: FALSE
+
+pansolid_conc |> 
+  filter(nanodrop >= 0) |>
+  filter(nanodrop < 500 & stock_qubit < 500) |> 
+          ggplot(aes(stock_qubit, nanodrop)) +
+          geom_point(alpha = 0.2) +
+          geom_abline(linetype = "dashed", colour = "red",
+                      slope = 3) +
+          ylim(0, 500) +
+          xlim(0, 500) +
+  theme_bw() +
+  labs(title = "Nanodrop readings are roughly 3 times higher than Qubit",
+       subtitle = "Red line slope is 3")
+
+```
+
+{{< pagebreak >}}
+
+## PanSolid samples in 2023
+
+Results for checking PanSolid samples in 2023 against the 3.3ng/ul threshold based on Qubit DNA concentration.
+
+```{r}
+#| label: threshold-check
+#| echo: FALSE
+
+conc_threshold <- 3.3
+
+threshold_summary <- pansolid_2023 |> 
+  filter(!is.na(stock_qubit)) |> 
+  mutate(threshold_qc = ifelse(stock_qubit >= conc_threshold, 
+                               "Pass", "Fail")) |> 
+  count(threshold_qc) |> 
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+
+knitr::kable(threshold_summary)
+
+```
+
+## Myriad Fails
+
+Check of the number of samples that Myriad didn't provide a result for. This data is from the service spreadsheet sent to me by Katie Sadler.
+
+```{r}
+#| label: myriad-fails
+#| echo: FALSE
+
+tbrca_check <- tbrca_data_collection |> 
+  filter(!is.na(t_brca_mutation_status)) |> 
+  mutate(myriad_check = ifelse(t_brca_mutation_status %in% c("Fail", "Not tested"),
+                               "Not tested",
+                               "Tested")) 
+
+tbrca_summary <- tbrca_check |>  
+  count(myriad_check) |> 
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+
+knitr::kable(tbrca_summary)
+
+```
+
+This is for  a variety of reasons including insufficient sample provided.
+
+```{r}
+#| label: fail-reasons
+#| echo: FALSE
+
+fails <- tbrca_check |> 
+  filter(myriad_check == "Not tested")
+
+unique(fails$comments_failure_reasons)
+
+```
+
+
+
+
