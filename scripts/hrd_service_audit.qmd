@@ -216,6 +216,24 @@ map_boxplot
 
 ```
 
+## External Quality Assurance Results
+
+```{r}
+#| label: eqa-results
+#| echo: FALSE
+
+eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
+                 "24008976", "24008978", "24008980", "24008981", "24008982")
+
+eqa_results <- live_data |> 
+  filter(sample_id %in% eqa_samples) |> 
+  select(sample_id, seqone_hrd_status, seqone_hrd_score) |> 
+  arrange(seqone_hrd_status)
+
+knitr::kable(eqa_results)
+
+```
+
 ```{r}
 #| label: qiasymphony-results
 #| include: FALSE
