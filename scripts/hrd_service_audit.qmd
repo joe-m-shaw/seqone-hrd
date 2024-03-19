@@ -104,6 +104,8 @@ knitr::kable(summary_table)
 
 Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
 
+Total replicates tested: **`r length(unique(all_hrd_data$sample_id))`**
+
 ## Live Service Samples
 
 ```{r}
@@ -119,7 +121,7 @@ knitr::kable(live_summary_table)
 
 ```
 
-Total samples tested: **`r length(unique(live_data$shallow_sample_id))`**
+Total samples tested: **`r length(unique(live_data$sample_id))`**
 
 Total worksheets: **`r length(live_ws[[1]])`**
 
@@ -135,25 +137,26 @@ safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
-seqone_histo_plot <- all_hrd_data |> 
+data_for_histogram_plot <- all_hrd_data |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
-  ggplot(aes(x = seqone_hrd_score, y = )) +
-  geom_histogram(binwidth = 0.01, aes(fill = seqone_hrd_status)) +
-  scale_fill_manual(values = c(safe_blue, safe_red)) +
-  theme_bw() +
-  scale_x_continuous(
-    breaks = c(0, 0.25, 0.5, 0.75, 1)
-  ) +
-  geom_vline(xintercept = 0.5, linetype = "dashed") +
-  theme(
-    panel.grid = element_blank(),
-    legend.position = "bottom"
-  ) +
-  labs(
-    y = "Number of samples",
-    x = "SeqOne HRD Probability",
-    fill = "SeqOne HRD Status",
-    caption = "Data for validation and live service shown. Non-conclusive results excluded")
+  filter(!duplicated(sample_id))
+
+seqone_histo_plot <- ggplot(data_for_histogram_plot, aes(x = seqone_hrd_score, y = )) +
+                            geom_histogram(binwidth = 0.01, 
+                                           aes(fill = seqone_hrd_status)) +
+                            scale_fill_manual(values = c(safe_blue, safe_red)) +
+                            theme_bw() +
+                            scale_x_continuous(
+                              breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+                            geom_vline(xintercept = 0.5, linetype = "dashed") +
+                            theme(
+                              panel.grid = element_blank(),
+                              legend.position = "bottom") +
+                            labs(
+                              y = "Number of samples",
+                              x = "SeqOne HRD Probability",
+                              fill = "SeqOne HRD Status",
+                              caption = "Data for validation and live service shown. Non-conclusive results excluded")
 
 seqone_histo_plot
 
