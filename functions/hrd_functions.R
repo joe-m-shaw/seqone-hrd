@@ -688,6 +688,47 @@ read_seqone_report <- function(file, version) {
 }
 
 
+# Read file functions ---------------------------------------------------------------
+
+find_hrd_files <- function(worksheet, filetype = ".pdf") {
+  
+  data_path <- "S:/central shared/Genetics/Repository/WorksheetAnalysedData/"
+  
+  folder_path <- str_c(data_path, worksheet, "/")
+  
+  output <- list.files(folder_path,
+                       full.names = TRUE,
+                       pattern = {{ filetype }})
+  
+}
+
+read_seqone_csv <- function(file) {
+  
+  output <- read_csv(file, 
+                     n_max = 1,
+                     col_types = list(
+                       sample = col_character(),
+                       analysis_date = col_datetime("%d/%m/%Y"),
+                       somahrd_version = col_character(),
+                       LGA = col_integer(),
+                       LPC = col_integer(),
+                       score = col_number(),
+                       status = col_character(),
+                       brca_status = col_logical(),
+                       brca_mutation = col_logical(),
+                       ccne1_cn = col_number(),
+                       rad51b_cn = col_number(),
+                       coverage = col_number(),
+                       pct_mapped_reads = col_number(),
+                       pct_tum_cell = col_number(),
+                       gi_confidence = col_number(),
+                       low_tumor_fraction = col_number()
+                     ))
+  
+  return(output)
+  
+}
+
 # Database functions ----------------------------------------------------------------
 
 get_sample_data <- function(sample_vector) {

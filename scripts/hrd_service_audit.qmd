@@ -22,14 +22,15 @@ filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency
 library("tidyverse")
 library("ggpubr")
 library("readxl")
-library(here)
+library("here")
+library("patchwork")
 
 source(here::here("functions/hrd_functions.R"))
 
 ```
 
 ```{r}
-#| label: load-data
+#| label: load-pdf-data
 #| include: false
 
 validation_reports <- list.files(here::here("data/seqone_reports_v1_2/"),
@@ -42,18 +43,6 @@ validation_data <- validation_reports |>
     version = "1.2"
   )) |>
   list_rbind()
-
-find_hrd_files <- function(worksheet) {
-  
-  data_path <- "S:/central shared/Genetics/Repository/WorksheetAnalysedData/"
-  
-  folder_path <- str_c(data_path, worksheet, "/")
-  
-  output <- list.files(folder_path,
-                       full.names = TRUE,
-                       pattern = "*.pdf")
-  
-}
 
 # Worksheet WS136827 was worksheet of Qiasymphony validation samples that was run after the validation ended and before the live service started.
 ws136827_reports <- list.files(str_c(filepath, "data/seq_one_reports_WS136827/"),
@@ -72,18 +61,33 @@ live_ws_excel <- read_excel(path = here::here("data/live_service_worksheets.xlsx
 
 live_ws <- list(live_ws_excel$worksheet)
 
-live_ws_filepaths <- live_ws |> 
-  map(\(live_ws) find_hrd_files(live_ws)) |> 
+live_ws_filepaths_pdf <- live_ws |> 
+  map(\(live_ws) find_hrd_files(live_ws, filetype = ".pdf")) |> 
   flatten()
 
-live_data <- live_ws_filepaths |>
-  map(\(live_ws_filepaths) read_seqone_report(
-    file = live_ws_filepaths,
+live_data_pdf <- live_ws_filepaths_pdf |>
+  map(\(live_ws_filepaths_pdf) read_seqone_report(
+    file = live_ws_filepaths_pdf,
     version = "1.2"
   )) |>
   list_rbind()
 
-all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
+all_hrd_data_pdf <- rbind(validation_data, ws136827_data, live_data_pdf)
+
+```
+
+```{r}
+#| label: load-csv-data
+#| include: FALSE
+#| warning: FALSE
+
+live_ws_filepaths_csv <- live_ws |> 
+  map(\(live_ws) find_hrd_files(live_ws, filetype = ".csv")) |> 
+  flatten()
+
+live_data_csv <- live_ws_filepaths_csv |> 
+  map(\(live_ws_filepaths_csv) read_seqone_csv(file = live_ws_filepaths_csv)) |> 
+  list_rbind()
 
 ```
 
@@ -93,7 +97,7 @@ all_hrd_data <- rbind(validation_data, ws136827_data, live_data)
 #| label: sample-numbers
 #| echo: false
 
-summary_table <- all_hrd_data |> 
+summary_table <- all_hrd_data_pdf |> 
   group_by(seqone_hrd_status) |> 
   summarise(total = n()) |> 
   mutate(percentage = round((total / sum(total)) * 100, 1))
@@ -102,9 +106,9 @@ knitr::kable(summary_table)
 
 ```
 
-Total samples tested: **`r length(unique(all_hrd_data$shallow_sample_id))`**
+Total samples tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
 
-Total replicates tested: **`r length(unique(all_hrd_data$sample_id))`**
+Total replicates tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
 
 ## Live Service Samples
 
@@ -112,7 +116,7 @@ Total replicates tested: **`r length(unique(all_hrd_data$sample_id))`**
 #| label: live-service-numbers
 #| echo: false
 
-live_summary_table <- live_data |> 
+live_summary_table <- live_data_pdf |> 
   group_by(seqone_hrd_status) |> 
   summarise(total = n()) |> 
   mutate(percentage = round((total / sum(total)) * 100, 1))
@@ -121,7 +125,7 @@ knitr::kable(live_summary_table)
 
 ```
 
-Total samples tested: **`r length(unique(live_data$sample_id))`**
+Total samples tested: **`r length(unique(live_data_pdf$sample_id))`**
 
 Total worksheets: **`r length(live_ws[[1]])`**
 
@@ -137,7 +141,7 @@ safe_blue <- "#88CCEE"
 safe_red <- "#CC6677"
 safe_grey <- "#888888"
 
-data_for_histogram_plot <- all_hrd_data |> 
+data_for_histogram_plot <- all_hrd_data_pdf |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
   filter(!duplicated(sample_id))
 
@@ -164,7 +168,7 @@ seqone_histo_plot
 
 ```{r}
 #| label: hrd-scores-across-worksheets
-#| echo: FALSE
+#| include: FALSE
 
 seqone_histo_plot +
   facet_wrap(~worksheet)
@@ -197,7 +201,7 @@ ws140359_pdf_data <- ws140359_pdfs |>
                                           version = "1.2")) |> 
         list_rbind()
 
-all_hrd_data |> 
+all_hrd_data_pdf |> 
   rbind(ws140359_pdf_data) |> 
   ggplot(aes(x = worksheet, y = robustness)) +
   geom_jitter(pch = 21) +
@@ -220,9 +224,9 @@ all_hrd_data |>
 #| label: qc-metrics
 #| echo: FALSE
 
-draw_qc_dotplot <- function(yvar) {
+draw_qc_dotplot <- function(df, yvar) {
   
-  ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
     geom_jitter(colour="black",pch=21,
                 aes(fill = seqone_hrd_status), size = 3,
                 alpha = 0.6) +
@@ -236,9 +240,9 @@ draw_qc_dotplot <- function(yvar) {
 
 }
 
-draw_qc_boxplot <- function(yvar, ymin, ymax) {
+draw_qc_boxplot <- function(df, yvar, ymin, ymax) {
   
-  ggplot(all_hrd_data, aes(x = worksheet, y = {{ yvar }})) +
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
     geom_boxplot() +
     theme_bw() +
     theme(panel.grid = element_blank(),
@@ -248,17 +252,20 @@ draw_qc_boxplot <- function(yvar, ymin, ymax) {
 
 }
 
-cov_boxplot <- draw_qc_boxplot(yvar = coverage, ymin = 0, 
-                               ymax = max(all_hrd_data$coverage) + 0.5) +
+cov_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+                               yvar = coverage, ymin = 0, 
+                               ymax = max(all_hrd_data_pdf$coverage) + 0.5) +
   geom_hline(yintercept = 0.5, linetype = "dashed")
 
-rob_boxplot <- draw_qc_boxplot(yvar = robustness, 
-                               ymin = min(all_hrd_data$robustness) - 0.05,
+rob_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+                               yvar = robustness, 
+                               ymin = min(all_hrd_data_pdf$robustness) - 0.05,
                                ymax = 1) +
   geom_hline(yintercept = 0.85, linetype = "dashed")
 
-map_boxplot <- draw_qc_boxplot(yvar = percent_mapping,
-                               ymin = min(all_hrd_data$percent_mapping) - 5,
+map_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+                               yvar = percent_mapping,
+                               ymin = min(all_hrd_data_pdf$percent_mapping) - 5,
                                ymax = 100)
 
 cov_boxplot
@@ -278,7 +285,7 @@ map_boxplot
 eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
                  "24008976", "24008978", "24008980", "24008981", "24008982")
 
-eqa_results <- live_data |> 
+eqa_results <- live_data_pdf |> 
   filter(sample_id %in% eqa_samples) |> 
   select(sample_id, seqone_hrd_status, seqone_hrd_score) |> 
   arrange(seqone_hrd_status)
@@ -289,6 +296,7 @@ knitr::kable(eqa_results)
 
 ```{r}
 #| label: qiasymphony-results
+#| eval: FALSE
 #| include: FALSE
 
 qiasymphony_hrd_results <- all_hrd_data |> 
@@ -298,5 +306,43 @@ qiasymphony_hrd_results <- all_hrd_data |>
 
 write.csv(qiasymphony_hrd_results, here::here("outputs/qiasymphony_hrd_results.csv"),
           row.names = FALSE)
+
+```
+
+## Low Tumour Fraction Score
+
+```{r}
+#| label: low-tumour-fraction
+#| echo: FALSE
+
+draw_low_tumor_plot <- function(y_var) {
+  
+  plot <- ggplot(live_data_csv, aes(x = low_tumor_fraction, y = {{ y_var }})) +
+              geom_point(pch = 21, size = 2, aes(fill = status)) +
+              scale_fill_manual(values = c(safe_blue, safe_grey, safe_red)) +
+              theme_bw() +
+              xlim(0, 5)
+  
+  return(plot)
+  
+}
+
+p1 <- draw_low_tumor_plot(coverage)
+
+p2 <- draw_low_tumor_plot(gi_confidence)
+
+p3 <- draw_low_tumor_plot(pct_mapped_reads)
+
+p4 <- ggplot(live_data_csv, aes(x = status, y = low_tumor_fraction)) +
+  geom_jitter(pch = 21, size = 2, aes(fill = status)) +
+  scale_fill_manual(values = c(safe_blue, safe_grey, safe_red)) +
+  theme_bw() +
+  ylim(0, 5)
+
+low_tumor_comb_plot <- p1 + p2 + p3 + p4 + guide_area() +
+  plot_layout(ncol = 2, guides = "collect",
+              heights = c(5, 5, 3))
+
+low_tumor_comb_plot
 
 ```
