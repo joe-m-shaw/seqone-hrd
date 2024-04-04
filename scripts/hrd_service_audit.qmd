@@ -162,7 +162,57 @@ seqone_histo_plot
 
 ```
 
+```{r}
+#| label: hrd-scores-across-worksheets
+#| echo: FALSE
+
+seqone_histo_plot +
+  facet_wrap(~worksheet)
+
+```
+
 {{< pagebreak >}}
+
+## WS140359 investigation
+
+```{r}
+#| label: WS140359
+#| echo: FALSE
+
+ws140359_csvs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".csv")
+
+ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".pdf")
+
+ws140359_csv_data <- ws140359_csvs |> 
+  map(\(ws140359_csvs) read_csv(ws140359_csvs,
+                                 show_col_types = FALSE)) |> 
+  list_rbind()
+
+ws140359_pdf_data <- ws140359_pdfs |> 
+  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
+                                          version = "1.2")) |> 
+        list_rbind()
+
+all_hrd_data |> 
+  rbind(ws140359_pdf_data) |> 
+  ggplot(aes(x = worksheet, y = robustness)) +
+  geom_jitter(pch = 21) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
+  scale_y_continuous(limits = c(0, 1.01), breaks = c(0, 0.25, 0.50, 0.75,
+                                                  0.85, 0.93, 1.00)) +
+  labs(x = "", y = "Genomic Instability", 
+       title = "WS140359 is an outlier for robustness") +
+  geom_hline(yintercept = 0.93, linetype = "dashed") +
+  geom_hline(yintercept = 0.85, colour = safe_red)
+  
+
+```
 
 ## Quality Metrics
 
