@@ -17,6 +17,7 @@ library("ggpubr")
 library("readxl")
 library("here")
 library("patchwork")
+library("rvest")
 
 source(here::here("functions/hrd_functions.R"))
 
@@ -58,5 +59,33 @@ comparison_tbl <- ws140359_csv_data |>
   arrange(sample, analysis_date)
 
 knitr::kable(comparison_tbl)
+
+```
+
+## Versions
+
+Looking at the HTML technical report files for a selection of samples shows that the versions of the components of the SomaHRD pipeline have changed since the validation.
+
+```{r}
+#| label: pipeline-versions
+#| echo: FALSE
+
+seqone_html_files <- list.files(path = here::here("data/html_reports/"), pattern = ".html", full.names = TRUE)
+
+seqone_html_collated <- seqone_html_files |> 
+  map(\(seqone_html_files) parse_seqone_html(seqone_html_files)) |> 
+  list_rbind()
+
+somahrd_pipeline_versions <- seqone_html_collated |> 
+  filter(name == "SomaHRD pipeline") |> 
+  arrange(worksheet)
+
+hrd_prediction_versions <- seqone_html_collated |> 
+  filter(name == "HRD prediction") |> 
+  arrange(worksheet)
+
+knitr::kable(somahrd_pipeline_versions)
+
+knitr::kable(hrd_prediction_versions)
 
 ```
