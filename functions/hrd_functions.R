@@ -1045,10 +1045,12 @@ get_tool_version_table <- function(html, table_id) {
   x <- tbl |> 
     filter(x1 %in% c("Name", "Version"))
   
-  names <- x[c(1, 3, 5, 7, 9), 2] |> 
+  row_odd <- seq_len(nrow(x)) %% 2
+  
+  names <- x[row_odd == 1, 2] |> 
     rename(name = x2)
   
-  versions <- x[c(2, 4, 6, 8, 10), 2] |> 
+  versions <-  x[row_odd == 0, 2] |> 
     rename(version = x2)
   
   output <- cbind(names, versions)
@@ -1073,11 +1075,15 @@ parse_seqone_html <- function(html_file) {
   
   sample_id <- str_extract(ws_sample_string, ws_sample_pattern, group = 2)
   
-  tool_version_table <- get_tool_version_table(html, "#tools_description") |> 
+  tool_version_table <- get_tool_version_table(html, "#tools_description") 
+  
+  data_version_table <- get_tool_version_table(html, "#database_description")
+  
+  output <- rbind(tool_version_table, data_version_table) |> 
     mutate(worksheet = worksheet,
            sample_id = sample_id) |> 
     relocate(worksheet, sample_id)
   
-  return(tool_version_table)
+  return(output)
   
 }
