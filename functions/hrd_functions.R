@@ -3,6 +3,7 @@
 library(pdftools)
 library(tidyverse)
 library(assertthat)
+library(rvest)
 
 # Standard text ---------------------------------------------------------------------
 
@@ -1020,5 +1021,63 @@ calculate_pooled_sd <- function(df, x, round_places = 2) {
   range <- str_c(min(output_table$range), "-", max(output_table$range))
   
   return(list(output_table, pooled_sd, range))
+  
+}
+
+
+# HTML functions --------------------------------------------------------------------
+
+get_html_table <- function(html, table_id) {
+  
+  output <- html |> 
+    html_element( {{ table_id }} ) |> 
+    html_table() |> 
+    janitor::clean_names()
+  
+  return(output)
+  
+}
+
+get_tool_version_table <- function(html, table_id) {
+  
+  tbl <- get_html_table({{ html }} , {{ table_id }})
+  
+  x <- tbl |> 
+    filter(x1 %in% c("Name", "Version"))
+  
+  names <- x[c(1, 3, 5, 7, 9), 2] |> 
+    rename(name = x2)
+  
+  versions <- x[c(2, 4, 6, 8, 10), 2] |> 
+    rename(version = x2)
+  
+  output <- cbind(names, versions)
+  
+  return(output)
+  
+}
+
+
+parse_seqone_html <- function(html_file) {
+  
+  html <- read_html( {{ html_file }})
+  
+  gen_info <- get_html_table(html, "#general_info")
+  
+  ws_sample_string <- grep(pattern = "SomaHRD - ", x = gen_info$x2,
+                           value = TRUE)
+  
+  ws_sample_pattern <- "SomaHRD\\s-\\s(WS\\d{6})_(\\d{8})"
+  
+  worksheet <- str_extract(ws_sample_string, ws_sample_pattern, group = 1)
+  
+  sample_id <- str_extract(ws_sample_string, ws_sample_pattern, group = 2)
+  
+  tool_version_table <- get_tool_version_table(html, "#tools_description") |> 
+    mutate(worksheet = worksheet,
+           sample_id = sample_id) |> 
+    relocate(worksheet, sample_id)
+  
+  return(tool_version_table)
   
 }
