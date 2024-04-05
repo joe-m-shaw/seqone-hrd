@@ -6,7 +6,7 @@ date: today
 date-format: "DD/MM/YYYY"
 ---
 
-This is an investigation into worksheet WS140359. When analysed on the SeqOne pipeline on 01/04/2024 and 02/04/2024, all 5 samples failed the genomic instability confidence ("robsutness") metric with very low values, and two new columns (“gi_confidence_min” and “gi_confidence_max”) appeared in the exported csv files.
+This is an investigation into worksheet WS140359. When analysed on the SeqOne pipeline on 01/04/2024 and 02/04/2024, all 5 samples failed the genomic instability confidence ("robustness") metric with very low values, and two new columns (“gi_confidence_min” and “gi_confidence_max”) appeared in the exported csv files.
  
 ```{r}
 #| label: packages-and-functions
@@ -78,11 +78,11 @@ seqone_html_collated <- seqone_html_files |>
 
 somahrd_pipeline_versions <- seqone_html_collated |> 
   filter(name == "SomaHRD pipeline") |> 
-  arrange(worksheet)
+  arrange(workset_version, version)
 
 hrd_prediction_versions <- seqone_html_collated |> 
   filter(name == "HRD prediction") |> 
-  arrange(worksheet)
+  arrange(workset_version, version)
 
 knitr::kable(somahrd_pipeline_versions)
 

@@ -1024,7 +1024,6 @@ calculate_pooled_sd <- function(df, x, round_places = 2) {
   
 }
 
-
 # HTML functions --------------------------------------------------------------------
 
 get_html_table <- function(html, table_id) {
@@ -1059,7 +1058,6 @@ get_tool_version_table <- function(html, table_id) {
   
 }
 
-
 parse_seqone_html <- function(html_file) {
   
   html <- read_html( {{ html_file }})
@@ -1068,6 +1066,9 @@ parse_seqone_html <- function(html_file) {
   
   ws_sample_string <- grep(pattern = "SomaHRD - ", x = gen_info$x2,
                            value = TRUE)
+  
+  workset_version <- grep(pattern = "^v1", x = gen_info$x2,
+                          value = TRUE)
   
   ws_sample_pattern <- "SomaHRD\\s-\\s(WS\\d{6})_(\\d{8})"
   
@@ -1081,8 +1082,9 @@ parse_seqone_html <- function(html_file) {
   
   output <- rbind(tool_version_table, data_version_table) |> 
     mutate(worksheet = worksheet,
-           sample_id = sample_id) |> 
-    relocate(worksheet, sample_id)
+           sample_id = sample_id,
+           workset_version = workset_version) |> 
+    relocate(worksheet, sample_id, workset_version)
   
   return(output)
   
