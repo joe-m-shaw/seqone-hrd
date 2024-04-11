@@ -124,7 +124,6 @@ All the other fields I'd expect to be the same are the same, except for robustne
 ```{r}
 #| label: check-results
 #| include: TRUE
-#| echo: FALSE
 
 all.equal(somahrd_v1_2_7_pdf_data, results_from_validation)
 
@@ -157,7 +156,7 @@ knitr::kable(robustness_comp_table)
 
 ## Could This Impact the Validation?
 
-If we assume that the robustness value can change from +0.07 to -0.12 when samples are analysed by different pipeline versions, then we can predict how many samples could be affected in the full validation cohort.
+If we assume that the robustness value can change from +0.07 to -0.12 when samples are analysed by different pipeline versions, then we can predict how many samples could be impacted in the full validation cohort.
 
 On the basis of this, a third of samples could have a change in overall status from a conclusive result to non-conclusive, or vice versa.
 
@@ -193,9 +192,6 @@ ggplot(validation_data_mod, aes(x = reorder(shallow_sample_id, robustness),
   geom_text(aes(x = 80, y = 0.87), label = "Conclusive") +
   geom_text(aes(x = 80, y = 0.83), label = "Not conclusive")
 
-validation_data_mod |> 
-  count(impact)
-
 ```
 
 ```{r}
@@ -214,11 +210,11 @@ comparison |>
   geom_text(aes(x = 7, y = 0.83), label = "Not conclusive") +
   labs(x = "")
 
-
 ```
 
-
 ## Could this impact the clinical service?
+
+Here is the data from the clinical service so far, with the same variation interval around the confidence in genomic instability threshold.
 
 ```{r}
 #| label: potential-impact-live-service
