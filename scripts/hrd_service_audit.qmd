@@ -195,7 +195,7 @@ draw_qc_dotplot <- function(df, yvar) {
     theme_bw() +
     theme(panel.grid = element_blank(),
           legend.position = "bottom",
-          axis.text.x = element_text(angle = 45, vjust = 0.2)) +
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
     labs(x = "")
 
 }
@@ -206,7 +206,7 @@ draw_qc_boxplot <- function(df, yvar, ymin, ymax) {
     geom_boxplot() +
     theme_bw() +
     theme(panel.grid = element_blank(),
-          axis.text.x = element_text(angle = 45, vjust = 0.2)) +
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
     labs(x = "") +
     ylim(ymin, ymax)
 
