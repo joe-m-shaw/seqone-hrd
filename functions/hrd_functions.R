@@ -857,6 +857,48 @@ make_telomere_plot <- function(x) {
   
 }
 
+draw_qc_dotplot <- function(df, yvar, ymin, ymax,
+                            fill_var = seqone_hrd_status) {
+  
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
+    geom_jitter(pch=21, width = 0.1,
+                aes(fill = {{ fill_var }}), size = 3,
+                alpha = 0.6) +
+    scale_fill_manual(values = c(safe_blue, safe_red,
+                                 safe_grey)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          legend.position = "bottom",
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
+    labs(x = "") +
+    ylim(ymin, ymax)
+  
+}
+
+draw_qc_boxplot <- function(df, yvar, ymin, ymax) {
+  
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
+    labs(x = "") +
+    ylim(ymin, ymax)
+  
+}
+
+draw_low_tumor_plot <- function(y_var) {
+  
+  plot <- ggplot(live_data_csv, aes(x = low_tumor_fraction, y = {{ y_var }})) +
+    geom_point(pch = 21, size = 2, aes(fill = status)) +
+    scale_fill_manual(values = c(safe_blue, safe_grey, safe_red)) +
+    theme_bw() +
+    xlim(0, 5)
+  
+  return(plot)
+  
+}
+
 # Table functions -------------------------------------------------------------------
 
 extract_kapa_data <- function(worksheet_number, worksheet_length) {
