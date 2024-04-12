@@ -70,9 +70,26 @@ live_data_pdf <- live_ws_filepaths_pdf |>
     file = live_ws_filepaths_pdf,
     version = "1.2"
   )) |>
-  list_rbind()
+  list_rbind() |> 
+  mutate(worksheet = ifelse(worksheet == "WS140359", "WS140359_2", worksheet))
 
-all_hrd_data_pdf <- rbind(validation_data, ws136827_data, live_data_pdf)
+# This is the data for the samples that had abnormally low confidence in genomic instability
+# scores due to a pipeline error (see incident INC9096).
+ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".pdf")
+
+ws140359_pdf_data <- ws140359_pdfs |> 
+  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
+                                          version = "1.2")) |> 
+        list_rbind() |> 
+  mutate(worksheet = "WS140359_1") |> 
+  filter(date == "2024-04-01")
+
+all_hrd_data_pdf <- rbind(validation_data, 
+                          ws136827_data, 
+                          live_data_pdf,
+                          ws140359_pdf_data)
 
 ```
 
@@ -87,8 +104,10 @@ live_ws_filepaths_csv <- live_ws |>
 
 live_data_csv <- live_ws_filepaths_csv |> 
   map(\(live_ws_filepaths_csv) read_seqone_csv(file = live_ws_filepaths_csv)) |> 
-  list_rbind()
-
+  list_rbind() |> 
+  mutate(worksheet = str_extract(string = sample,
+                                 pattern = "(WS[0-9]{6})_\\d{8}",
+                                 group = 1))
 ```
 
 ## All Samples (validation and live service)
@@ -183,12 +202,15 @@ seqone_histo_plot +
 ```{r}
 #| label: qc-metrics
 #| echo: FALSE
+#| warning: FALSE
+#| message: FALSE
 
-draw_qc_dotplot <- function(df, yvar) {
+draw_qc_dotplot <- function(df, yvar, ymin, ymax,
+                            fill_var = seqone_hrd_status) {
   
   ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
-    geom_jitter(colour="black",pch=21,
-                aes(fill = seqone_hrd_status), size = 3,
+    geom_jitter(pch=21, width = 0.1,
+                aes(fill = {{ fill_var }}), size = 3,
                 alpha = 0.6) +
     scale_fill_manual(values = c(safe_blue, safe_red,
                                    safe_grey)) +
@@ -196,7 +218,8 @@ draw_qc_dotplot <- function(df, yvar) {
     theme(panel.grid = element_blank(),
           legend.position = "bottom",
           axis.text.x = element_text(angle = 90, vjust = 0.2)) +
-    labs(x = "")
+    labs(x = "") +
+    ylim(ymin, ymax)
 
 }
 
@@ -212,29 +235,46 @@ draw_qc_boxplot <- function(df, yvar, ymin, ymax) {
 
 }
 
-cov_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+cov_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
                                yvar = coverage, ymin = 0, 
                                ymax = max(all_hrd_data_pdf$coverage) + 0.5) +
-  geom_hline(yintercept = 0.5, linetype = "dashed")
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  labs(y = "Coverage (X)")
 
-rob_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+rob_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
                                yvar = robustness, 
                                ymin = min(all_hrd_data_pdf$robustness) - 0.05,
-                               ymax = 1) +
-  geom_hline(yintercept = 0.85, linetype = "dashed")
+                               ymax = 1.1) +
+  geom_hline(yintercept = 0.85, linetype = "dashed") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.2)) +
+  labs(y = "Confidence in genomic instability")
 
-map_boxplot <- draw_qc_boxplot(df = all_hrd_data_pdf,
+map_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
                                yvar = percent_mapping,
-                               ymin = min(all_hrd_data_pdf$percent_mapping) - 5,
-                               ymax = 100)
+                               ymin = 0,
+                               ymax = 100) +
+  geom_hline(yintercept = 50, linetype = "dashed") +
+  scale_y_continuous(breaks = seq(0, 100, by = 10),
+                     limits = c(0,100)) +
+  labs(y = "Percentage correct mapping")
 
-cov_boxplot
+low_tumor_fraction_dot_plot <- draw_qc_dotplot(df = live_data_csv, 
+                                               yvar = low_tumor_fraction,
+                ymin = 0, ymax = 5,
+                fill_var = status) +
+  labs(y = "Low tumor fraction (%)")
 
-rob_boxplot
+cov_dotplot
 
-map_boxplot
+rob_dotplot
+
+map_dotplot
+
+low_tumor_fraction_dot_plot
 
 ```
+
+{{< pagebreak >}}
 
 ## External Quality Assurance Results
 
