@@ -146,7 +146,20 @@ validation_pipeline_comparison <- reanalysis_20240412_data |>
             robustness.y <= robustness_warning_threshold &
               robustness.y > robustness_fail_threshold ~ "WARNING",
             
-            robustness.y <= robustness_fail_threshold ~ "FAIL"))
+            robustness.y <= robustness_fail_threshold ~ "FAIL"),
+         
+         check_hrd_status = ifelse(seqone_hrd_status.x == seqone_hrd_status.y, 
+                                   "HRD status same", "HRD status different"))
+
+```
+
+```{r}
+#| label: check-hrd-status
+#| echo: FALSE
+#| include: FALSE
+
+validation_pipeline_comparison |> 
+  count(check_hrd_status)
 
 ```
 
