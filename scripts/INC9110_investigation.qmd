@@ -8,7 +8,7 @@ format: pdf
 
 ## Code
 
-Code to produce this Quarto was written using [Github copilot](https://github.com/features/copilot/) and is saved in my [Github repo](https://github.com/joeshaw824/homologous_recombination_deficiency/tree/qiasymphony_validation).
+Code to produce this Quarto was written using [Github copilot](https://github.com/features/copilot/) and is saved in my [Github repo](https://github.com/joeshaw824/homologous_recombination_deficiency).
 
 ## Introduction
 
