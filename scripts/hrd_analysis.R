@@ -704,10 +704,21 @@ seraseq_plot <- seraseq_control_data |>
   geom_vline(xintercept = 42, linetype = "dashed") +
   ylim(0, 1) +
   xlim(0, 80) +
-  labs(x = "SeqOne HRD score", y = "Myriad GI score") +
+  labs(x = "Myriad GI score", y = "SeqOne HRD score") +
   facet_wrap(~firstname_factor)
 
+seraseq_plot_2 <- seraseq_control_data |>
+  filter(version == "1.2") |> 
+  plot_lpc_lga() +
+  facet_wrap(~firstname_factor) +
+  labs(x = "Large Genomic Alterations",
+       y = "Loss of Parental Copy") +
+  xlim(0, 36) +
+  ylim(0, 36)
+
 save_hrd_plot(seraseq_plot, input_height = 10)
+
+save_hrd_plot(seraseq_plot_2, input_height = 10)
 
 ## Biobank controls -----------------------------------------------------------------
 
@@ -1343,3 +1354,54 @@ control_check <- results_and_profile |>
     lga, lpc
   ) |>
   arrange(dlms_dna_number)
+
+# Additional 21003549 replicate -----------------------------------------------------
+
+new_rep <- read_seqone_report(file = "data/seq_one_reports_WS136827/WS136827_21003549.pdf",
+                              version = "1.2")
+
+reps_21003549 <- rbind(seqone_reports_v1_2 |>  
+        filter(dlms_dna_number == 21003549), new_rep) 
+
+
+ggplot(reps_21003549, aes(x = lga, y = lpc)) +
+  geom_jitter(aes(colour = seqone_hrd_status),
+              size = 2, alpha = 0.6) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_red)) +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend)
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  xlim(0, 45) +
+  ylim(0, 45)
+
+ggplot(reps_21003549, aes(x = worksheet, y = seqone_hrd_score)) +
+  geom_point(aes(colour = seqone_hrd_status),
+              size = 2, alpha = 0.6) +
+  scale_colour_manual(name = "SeqOne HRD Status",
+                      values = c(safe_red)) +
+  ylim(0, 1) +
+  theme_bw()
+
+# Checking GIS and sequence variant concordance -------------------------------------
+
+pos_neg <- c("Positive", "Negative")
+
+tbrca_data_comparison <- tbrca_data_collection |> 
+  filter(gis_pos_neg %in% pos_neg & overall_hrd_pos_neg %in% pos_neg) |> 
+  mutate(gis_variant_check = ifelse(gis_pos_neg == overall_hrd_pos_neg,
+                "match",
+                "NO match")) |> 
+  relocate(gis_variant_check)
+
+tbrca_data_comparison |> 
+  select(gis_pos_neg, overall_hrd_pos_neg, gis_variant_check) |> 
+  arrange(gis_variant_check) |>  view()
+
+tbrca_data_comparison |> 
+  group_by(gis_variant_check) |> 
+  summarise(total = n()) |> 
+  mutate(prop = (total / sum(total)) * 100)

@@ -1,0 +1,306 @@
+---
+title: "SeqOne HRD Service"
+author: "Joe Shaw"
+date: today
+date-format: "DD/MM/YYYY"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency/"
+
+```
+
+```{r}
+#| label: packages-and-functions
+#| include: false
+
+library("tidyverse")
+library("ggpubr")
+library("readxl")
+library("here")
+library("patchwork")
+
+source(here::here("functions/hrd_functions.R"))
+
+```
+
+```{r}
+#| label: load-pdf-data
+#| include: false
+
+validation_reports <- list.files(here::here("data/seqone_reports_v1_2/"),
+                                 full.names = TRUE,
+                                 pattern = "*.pdf")
+
+validation_data <- validation_reports |>
+  map(\(validation_reports) read_seqone_report(
+    file = validation_reports,
+    version = "1.2"
+  )) |>
+  list_rbind()
+
+# Worksheet WS136827 was worksheet of Qiasymphony validation samples that was run after the validation ended and before the live service started.
+ws136827_reports <- list.files(str_c(filepath, "data/seq_one_reports_WS136827/"),
+                             full.names = TRUE,
+                             pattern = "*.pdf")
+
+ws136827_data <- ws136827_reports |>
+  map(\(ws136827_reports) read_seqone_report(
+    file = ws136827_reports,
+    version = "1.2"
+  )) |>
+  list_rbind()
+
+# New worksheets can be added to this Excel
+live_ws_excel <- read_excel(path = here::here("data/live_service_worksheets.xlsx"))
+
+live_ws <- list(live_ws_excel$worksheet)
+
+live_ws_filepaths_pdf <- live_ws |> 
+  map(\(live_ws) find_hrd_files(live_ws, filetype = ".pdf")) |> 
+  flatten()
+
+live_data_pdf <- live_ws_filepaths_pdf |>
+  map(\(live_ws_filepaths_pdf) read_seqone_report(
+    file = live_ws_filepaths_pdf,
+    version = "1.2"
+  )) |>
+  list_rbind() |> 
+  mutate(worksheet = ifelse(worksheet == "WS140359", "WS140359_2", worksheet))
+
+# This is the data for the samples that had abnormally low confidence in genomic instability
+# scores due to a pipeline error (see incident INC9096).
+ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".pdf")
+
+ws140359_pdf_data <- ws140359_pdfs |> 
+  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
+                                          version = "1.2")) |> 
+        list_rbind() |> 
+  mutate(worksheet = "WS140359_1") |> 
+  filter(date == "2024-04-01")
+
+all_hrd_data_pdf <- rbind(validation_data, 
+                          ws136827_data, 
+                          live_data_pdf,
+                          ws140359_pdf_data)
+
+```
+
+```{r}
+#| label: load-csv-data
+#| include: FALSE
+#| warning: FALSE
+
+live_ws_filepaths_csv <- live_ws |> 
+  map(\(live_ws) find_hrd_files(live_ws, filetype = ".csv")) |> 
+  flatten()
+
+live_data_csv <- live_ws_filepaths_csv |> 
+  map(\(live_ws_filepaths_csv) read_seqone_csv(file = live_ws_filepaths_csv)) |> 
+  list_rbind() |> 
+  mutate(worksheet = str_extract(string = sample,
+                                 pattern = "(WS[0-9]{6})_\\d{8}",
+                                 group = 1))
+```
+
+## All Samples (validation and live service)
+
+```{r}
+#| label: sample-numbers
+#| echo: false
+
+summary_table <- all_hrd_data_pdf |> 
+  group_by(seqone_hrd_status) |> 
+  summarise(total = n()) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1))
+
+knitr::kable(summary_table) 
+
+```
+
+Total samples tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
+
+Total replicates tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
+
+## Live Service Samples
+
+```{r}
+#| label: live-service-numbers
+#| echo: false
+
+live_summary_table <- live_data_pdf |> 
+  group_by(seqone_hrd_status) |> 
+  summarise(total = n()) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1))
+
+knitr::kable(live_summary_table) 
+
+```
+
+Total samples tested: **`r length(unique(live_data_pdf$sample_id))`**
+
+Total worksheets: **`r length(live_ws[[1]])`**
+
+{{< pagebreak >}}
+
+## HRD Probability Distribution
+
+```{r}
+#| label: hrd-score-distribution
+#| echo: FALSE
+
+safe_blue <- "#88CCEE"
+safe_red <- "#CC6677"
+safe_grey <- "#888888"
+
+data_for_histogram_plot <- all_hrd_data_pdf |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  filter(!duplicated(sample_id))
+
+seqone_histo_plot <- ggplot(data_for_histogram_plot, aes(x = seqone_hrd_score, y = )) +
+                            geom_histogram(binwidth = 0.01, 
+                                           aes(fill = seqone_hrd_status)) +
+                            scale_fill_manual(values = c(safe_blue, safe_red)) +
+                            theme_bw() +
+                            scale_x_continuous(
+                              breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+                            geom_vline(xintercept = 0.5, linetype = "dashed") +
+                            theme(
+                              panel.grid = element_blank(),
+                              legend.position = "bottom") +
+                            labs(
+                              y = "Number of samples",
+                              x = "SeqOne HRD Probability",
+                              fill = "SeqOne HRD Status",
+                              caption = "Data for validation and live service shown. Non-conclusive results excluded")
+
+seqone_histo_plot
+
+```
+
+```{r}
+#| label: hrd-scores-across-worksheets
+#| include: FALSE
+#| eval: FALSE
+
+seqone_histo_plot +
+  facet_wrap(~worksheet)
+
+```
+
+{{< pagebreak >}}
+
+## Quality Metrics
+
+```{r}
+#| label: qc-metrics
+#| echo: FALSE
+#| warning: FALSE
+#| message: FALSE
+
+cov_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
+                               yvar = coverage, ymin = 0, 
+                               ymax = max(all_hrd_data_pdf$coverage) + 0.5) +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  labs(y = "Coverage (X)")
+
+rob_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
+                               yvar = robustness, 
+                               ymin = min(all_hrd_data_pdf$robustness) - 0.05,
+                               ymax = 1.1) +
+  geom_hline(yintercept = 0.85, linetype = "dashed") +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.2)) +
+  labs(y = "Confidence in genomic instability")
+
+map_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
+                               yvar = percent_mapping,
+                               ymin = 0,
+                               ymax = 100) +
+  geom_hline(yintercept = 50, linetype = "dashed") +
+  scale_y_continuous(breaks = seq(0, 100, by = 10),
+                     limits = c(0,100)) +
+  labs(y = "Percentage correct mapping")
+
+low_tumor_fraction_dot_plot <- draw_qc_dotplot(df = live_data_csv, 
+                                               yvar = low_tumor_fraction,
+                ymin = 0, ymax = 5,
+                fill_var = status) +
+  labs(y = "Low tumor fraction (%)")
+
+cov_dotplot
+
+rob_dotplot
+
+map_dotplot
+
+low_tumor_fraction_dot_plot
+
+```
+
+{{< pagebreak >}}
+
+## External Quality Assurance Results
+
+```{r}
+#| label: eqa-results
+#| echo: FALSE
+
+eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
+                 "24008976", "24008978", "24008980", "24008981", "24008982")
+
+eqa_results <- live_data_pdf |> 
+  filter(sample_id %in% eqa_samples) |> 
+  select(sample_id, seqone_hrd_status, seqone_hrd_score) |> 
+  arrange(seqone_hrd_status)
+
+knitr::kable(eqa_results)
+
+```
+
+```{r}
+#| label: qiasymphony-results
+#| eval: FALSE
+#| include: FALSE
+
+qiasymphony_hrd_results <- all_hrd_data |> 
+  filter(worksheet == "WS136827" | dlms_dna_number %in% c(23047082,
+                                                          23053359)) |> 
+  filter(dlms_dna_number != 21003549)
+
+write.csv(qiasymphony_hrd_results, here::here("outputs/qiasymphony_hrd_results.csv"),
+          row.names = FALSE)
+
+```
+
+## Low Tumour Fraction Score
+
+```{r}
+#| label: low-tumour-fraction
+#| echo: FALSE
+
+p1 <- draw_low_tumor_plot(coverage)
+
+p2 <- draw_low_tumor_plot(gi_confidence)
+
+p3 <- draw_low_tumor_plot(pct_mapped_reads)
+
+p4 <- ggplot(live_data_csv, aes(x = status, y = low_tumor_fraction)) +
+  geom_jitter(pch = 21, size = 2, aes(fill = status)) +
+  scale_fill_manual(values = c(safe_blue, safe_grey, safe_red)) +
+  theme_bw() +
+  ylim(0, 5)
+
+low_tumor_comb_plot <- p1 + p2 + p3 + p4 + guide_area() +
+  plot_layout(ncol = 2, guides = "collect",
+              heights = c(5, 5, 3))
+
+low_tumor_comb_plot
+
+```

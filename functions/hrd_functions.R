@@ -3,6 +3,7 @@
 library(pdftools)
 library(tidyverse)
 library(assertthat)
+library(rvest)
 
 # Standard text ---------------------------------------------------------------------
 
@@ -531,7 +532,7 @@ get_robustness <- function(page, version) {
   
   robustness_regex <- regex(
     r"[
-    Robustness\sof\sgenomic\sinstability
+    (Robustness\sof\sgenomic\sinstability|Confidence\sin\sgenomic\sinstability)
     \s+
     (\d{1}\.\d{1,2} | \d{1})
     ]",
@@ -546,7 +547,7 @@ get_robustness <- function(page, version) {
   
   if (version == "1.2") {
     
-    robustness <- parse_number(str_extract(page, robustness_regex, group = 1),
+    robustness <- parse_number(str_extract(page, robustness_regex, group = 2),
                                locale = locale(decimal_mark = "."))
     
   }
@@ -612,7 +613,7 @@ get_ccne1_rad51b <- function(page, version) {
   
   ccne1_regex_1_2 <- regex(
     r"[
-    RAD51B
+    (RAD51B|RAD51B\s.COPY\sNUMBER.)  # Use . for bracket
     \n\n
     \s+
     (\d{1,2}\.\d{1,2} | \d{1,2})    # CCNE1 regex
@@ -634,10 +635,10 @@ get_ccne1_rad51b <- function(page, version) {
   
   if (version == "1.2") {
     
-    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_2, group = 1),
+    ccne1 <- parse_number(str_extract(page, ccne1_regex_1_2, group = 2),
                           locale = locale(decimal_mark = "."))
     
-    rad51b <- parse_number(str_extract(page, ccne1_regex_1_2, group = 2),
+    rad51b <- parse_number(str_extract(page, ccne1_regex_1_2, group = 3),
                            locale = locale(decimal_mark = "."))
     
   }
@@ -687,6 +688,47 @@ read_seqone_report <- function(file, version) {
   return(output)
 }
 
+
+# Read file functions ---------------------------------------------------------------
+
+find_hrd_files <- function(worksheet, filetype = ".pdf") {
+  
+  data_path <- "S:/central shared/Genetics/Repository/WorksheetAnalysedData/"
+  
+  folder_path <- str_c(data_path, worksheet, "/")
+  
+  output <- list.files(folder_path,
+                       full.names = TRUE,
+                       pattern = {{ filetype }})
+  
+}
+
+read_seqone_csv <- function(file) {
+  
+  output <- read_csv(file, 
+                     n_max = 1,
+                     col_types = list(
+                       sample = col_character(),
+                       analysis_date = col_datetime("%d/%m/%Y"),
+                       somahrd_version = col_character(),
+                       LGA = col_integer(),
+                       LPC = col_integer(),
+                       score = col_number(),
+                       status = col_character(),
+                       brca_status = col_logical(),
+                       brca_mutation = col_logical(),
+                       ccne1_cn = col_number(),
+                       rad51b_cn = col_number(),
+                       coverage = col_number(),
+                       pct_mapped_reads = col_number(),
+                       pct_tum_cell = col_number(),
+                       gi_confidence = col_number(),
+                       low_tumor_fraction = col_number()
+                     ))
+  
+  return(output)
+  
+}
 
 # Database functions ----------------------------------------------------------------
 
@@ -812,6 +854,48 @@ make_telomere_plot <- function(x) {
     theme_bw() +
     theme(axis.text.x = element_blank()) +
     labs(x = "")
+  
+}
+
+draw_qc_dotplot <- function(df, yvar, ymin, ymax,
+                            fill_var = seqone_hrd_status) {
+  
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
+    geom_jitter(pch=21, width = 0.1,
+                aes(fill = {{ fill_var }}), size = 3,
+                alpha = 0.6) +
+    scale_fill_manual(values = c(safe_blue, safe_red,
+                                 safe_grey)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          legend.position = "bottom",
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
+    labs(x = "") +
+    ylim(ymin, ymax)
+  
+}
+
+draw_qc_boxplot <- function(df, yvar, ymin, ymax) {
+  
+  ggplot(df, aes(x = worksheet, y = {{ yvar }})) +
+    geom_boxplot() +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 90, vjust = 0.2)) +
+    labs(x = "") +
+    ylim(ymin, ymax)
+  
+}
+
+draw_low_tumor_plot <- function(y_var) {
+  
+  plot <- ggplot(live_data_csv, aes(x = low_tumor_fraction, y = {{ y_var }})) +
+    geom_point(pch = 21, size = 2, aes(fill = status)) +
+    scale_fill_manual(values = c(safe_blue, safe_grey, safe_red)) +
+    theme_bw() +
+    xlim(0, 5)
+  
+  return(plot)
   
 }
 
@@ -979,5 +1063,71 @@ calculate_pooled_sd <- function(df, x, round_places = 2) {
   range <- str_c(min(output_table$range), "-", max(output_table$range))
   
   return(list(output_table, pooled_sd, range))
+  
+}
+
+# HTML functions --------------------------------------------------------------------
+
+get_html_table <- function(html, table_id) {
+  
+  output <- html |> 
+    html_element( {{ table_id }} ) |> 
+    html_table() |> 
+    janitor::clean_names()
+  
+  return(output)
+  
+}
+
+get_tool_version_table <- function(html, table_id) {
+  
+  tbl <- get_html_table({{ html }} , {{ table_id }})
+  
+  x <- tbl |> 
+    filter(x1 %in% c("Name", "Version"))
+  
+  row_odd <- seq_len(nrow(x)) %% 2
+  
+  names <- x[row_odd == 1, 2] |> 
+    rename(name = x2)
+  
+  versions <-  x[row_odd == 0, 2] |> 
+    rename(version = x2)
+  
+  output <- cbind(names, versions)
+  
+  return(output)
+  
+}
+
+parse_seqone_html <- function(html_file) {
+  
+  html <- read_html( {{ html_file }})
+  
+  gen_info <- get_html_table(html, "#general_info")
+  
+  ws_sample_string <- grep(pattern = "SomaHRD - ", x = gen_info$x2,
+                           value = TRUE)
+  
+  workset_version <- grep(pattern = "^v1", x = gen_info$x2,
+                          value = TRUE)
+  
+  ws_sample_pattern <- "SomaHRD\\s-\\s(WS\\d{6})_(\\d{8})"
+  
+  worksheet <- str_extract(ws_sample_string, ws_sample_pattern, group = 1)
+  
+  sample_id <- str_extract(ws_sample_string, ws_sample_pattern, group = 2)
+  
+  tool_version_table <- get_tool_version_table(html, "#tools_description") 
+  
+  data_version_table <- get_tool_version_table(html, "#database_description")
+  
+  output <- rbind(tool_version_table, data_version_table) |> 
+    mutate(worksheet = worksheet,
+           sample_id = sample_id,
+           workset_version = workset_version) |> 
+    relocate(worksheet, sample_id, workset_version)
+  
+  return(output)
   
 }

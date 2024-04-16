@@ -1,0 +1,91 @@
+---
+title: "INC9096 Investigation"
+author: "Joe Shaw"
+format: html
+date: today
+date-format: "DD/MM/YYYY"
+---
+
+This is an investigation into worksheet WS140359. When analysed on the SeqOne pipeline on 01/04/2024 and 02/04/2024, all 5 samples failed the genomic instability confidence ("robustness") metric with very low values, and two new columns (“gi_confidence_min” and “gi_confidence_max”) appeared in the exported csv files.
+ 
+```{r}
+#| label: packages-and-functions
+#| include: false
+
+library("tidyverse")
+library("ggpubr")
+library("readxl")
+library("here")
+library("patchwork")
+library("rvest")
+
+source(here::here("functions/hrd_functions.R"))
+
+```
+
+```{r}
+#| label: WS140359-data
+#| include: FALSE
+
+ws140359_csvs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".csv")
+
+ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".pdf")
+
+ws140359_csv_data <- ws140359_csvs |> 
+  map(\(ws140359_csvs) read_csv(ws140359_csvs,
+                                 show_col_types = FALSE)) |> 
+  list_rbind() |> 
+  mutate(analysis_date = factor(analysis_date))
+
+ws140359_pdf_data <- ws140359_pdfs |> 
+  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
+                                          version = "1.2")) |> 
+        list_rbind()
+
+```
+
+SeqOne addressed the issue and the samples were re-analysed on 04/04/2024: all samples now passed the genomic instability confidence threshold, and all other variables were the same.
+
+```{r}
+#| label: output-comparison
+#| echo: FALSE
+
+comparison_tbl <- ws140359_csv_data |> 
+  select(-c(brca_status, brca_mutation, somahrd_version)) |> 
+  arrange(sample, analysis_date)
+
+knitr::kable(comparison_tbl)
+
+```
+
+## Versions
+
+Looking at the HTML technical report files for a selection of samples shows that the versions of the components of the SomaHRD pipeline have changed since the validation.
+
+```{r}
+#| label: pipeline-versions
+#| echo: FALSE
+
+seqone_html_files <- list.files(path = here::here("data/html_reports/"), pattern = ".html", full.names = TRUE)
+
+seqone_html_collated <- seqone_html_files |> 
+  map(\(seqone_html_files) parse_seqone_html(seqone_html_files)) |> 
+  list_rbind()
+
+somahrd_pipeline_versions <- seqone_html_collated |> 
+  filter(name == "SomaHRD pipeline") |> 
+  arrange(workset_version, version)
+
+hrd_prediction_versions <- seqone_html_collated |> 
+  filter(name == "HRD prediction") |> 
+  arrange(workset_version, version)
+
+knitr::kable(somahrd_pipeline_versions)
+
+knitr::kable(hrd_prediction_versions)
+
+```

@@ -1,0 +1,163 @@
+---
+title: "Insufficient samples"
+author: "Joe Shaw"
+date: "`r Sys.Date()`"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(readxl)
+library(here)
+
+```
+
+```{r}
+#| label: data
+#| include: FALSE
+
+tbrca_data_collection <- read_excel(here::here("data/tbrca_data_collection.xlsx"),
+                                    skip = 1) |>
+  janitor::clean_names()
+
+# Downloaded from Sharepoint
+pansolid_2023 <- read_excel(here::here("data/DNA PanSolid QIAseq Submission Sheet 2023.xlsx")) |> 
+  janitor::clean_names()
+
+pansolid_conc <- pansolid_2023 |> 
+  mutate(stock_qubit = as.numeric(stock_qubit),
+         nanodrop = as.numeric(nanodrop))
+
+```
+
+## Nanodrop vs Qubit
+
+Data from PanSolid 2023 submissions sheet (Sharepoint).
+
+```{r}
+#| label: conc-plot
+#| echo: FALSE
+
+pansolid_conc |> 
+  filter(!is.na(stock_qubit) | !is.na(nanodrop)) |> 
+  filter(nanodrop >= 0) |>
+  filter(nanodrop < 500 & stock_qubit < 500) |> 
+  ggplot(aes(stock_qubit, nanodrop)) +
+    geom_point(alpha = 0.2) +
+    geom_abline(linetype = "dashed", colour = "red",
+                slope = 3) +
+    ylim(0, 500) +
+    xlim(0, 500) +
+    theme_bw() +
+    labs(title = "Nanodrop readings are roughly 3 times higher than Qubit",
+         subtitle = "Red line slope is 3")
+
+```
+
+{{< pagebreak >}}
+
+## PanSolid samples in 2023
+
+Results for checking PanSolid samples in 2023 against the 3.3ng/ul threshold based on Qubit DNA concentration. These results are for FFPE samples received for tumour BRCA testing.
+
+```{r}
+#| label: threshold-check
+#| echo: FALSE
+
+dbi_con <- DBI::dbConnect(
+  drv = odbc::odbc(),
+  dsn = "moldb")
+
+sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                    schema = "dbo",
+                    table = "Samples")) |> 
+  select(-c(StatusComment, COMMENTS, ConsultantAddress, ADDRESS1)) |> 
+  collect() |> 
+  mutate(LABNO = as.numeric(LABNO),
+         TISSUE = as.numeric(TISSUE))
+
+tissue_types <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                                                schema = "dbo",
+                                                table = "TissueTypes")) |> 
+  collect() |> 
+  janitor::clean_names()
+
+pansolid_sample_types <- pansolid_conc |> 
+  left_join(sample_tbl, join_by(sample_id == LABNO)) |> 
+  left_join(tissue_types, join_by(TISSUE == tissue_type_id))
+
+tbrca_ffpe_data <- pansolid_sample_types |> 
+  filter(panel == "M2M219_tBRCA_PS") |> 
+  filter(tissue_type %in% c("Shavings", "Slides", "Wax block")) |> 
+  filter(!is.na(stock_qubit))
+
+conc_threshold <- 3.3
+
+threshold_summary <- tbrca_ffpe_data |> 
+  mutate(threshold_qc = ifelse(stock_qubit >= conc_threshold, 
+                               "Pass", "Fail")) |> 
+  count(threshold_qc) |> 
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+
+knitr::kable(threshold_summary)
+
+```
+
+For Cobas extractions, the DNA is eluted in 100ul buffer. If the elution volume was changed to 50ul, then this would double the final concentration.
+
+Here are the results for FFPE samples received for tumour BRCA testing when a threshold of 3.3/2 is used.
+
+```{r}
+#| label: new-threshold-check
+#| echo: FALSE
+
+threshold_summary <- tbrca_ffpe_data |> 
+  mutate(threshold_qc = ifelse(stock_qubit >= conc_threshold/2, 
+                               "Pass", "Fail")) |> 
+  count(threshold_qc) |> 
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+
+knitr::kable(threshold_summary)
+
+```
+
+```{r}
+#| label: threshold-plot
+#| include: FALSE
+
+ggplot(tbrca_ffpe_data |> 
+         filter(stock_qubit < 50), aes(x = panel, y = stock_qubit)) +
+  geom_jitter(pch = 21, alpha = 0.8) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(),
+        panel.grid = element_blank()) +
+  geom_hline(yintercept = 3.3, linetype = "dashed") +
+  geom_hline(yintercept = 3.3/2, linetype = "dashed")
+
+```
+
+## Myriad Fails
+
+Check of the number of samples that Myriad didn't provide a result for. This data is from the service spreadsheet sent to me by Katie Sadler. This is for a variety of reasons including insufficient sample provided.
+
+```{r}
+#| label: myriad-fails
+#| echo: FALSE
+
+tbrca_check <- tbrca_data_collection |> 
+  filter(!is.na(t_brca_mutation_status)) |> 
+  mutate(myriad_check = ifelse(t_brca_mutation_status %in% c("Fail", "Not tested"),
+                               "Not tested",
+                               "Tested")) 
+
+tbrca_summary <- tbrca_check |>  
+  count(myriad_check) |> 
+  mutate(percentage = round((n / sum(n)) * 100, 1))
+
+knitr::kable(tbrca_summary)
+
+```
