@@ -55,8 +55,12 @@ validation_data_v1_2_0 <- validation_reports_v1_2_0 |>
     version = "1.2"
   )) |>
   list_rbind() |> 
-  mutate(somahrd_version = "v1.2.1") |> 
+  mutate(somahrd_version = "v1.2.0") |> 
   arrange(shallow_sample_id)
+
+stopifnot(anyNA(validation_data_v1_2_0) == FALSE)
+
+stopifnot(!duplicated(validation_data_v1_2_0$shallow_sample_id))
 
 ```
 
@@ -74,6 +78,10 @@ reanalysis_20240410_data <- reanalysis_20240410_pdfs |>
   mutate(somahrd_version = "v1.2.7") |>
   arrange(shallow_sample_id)
 
+stopifnot(anyNA(reanalysis_20240410_data) == FALSE)
+
+stopifnot(!duplicated(reanalysis_20240410_data$shallow_sample_id))
+
 ```
 
 ```{r}
@@ -89,6 +97,10 @@ reanalysis_20240412_data <- reanalysis_20240412_pdfs |>
   list_rbind() |> 
   mutate(somahrd_version = "v1.2.7") |>
   arrange(shallow_sample_id)
+
+stopifnot(anyNA(reanalysis_20240412_data) == FALSE)
+
+stopifnot(!duplicated(reanalysis_20240412_data$shallow_sample_id))
 
 ```
 
@@ -118,6 +130,26 @@ all.equal(reanalysis_20240412_data, validation_data_v1_2_0)
 
 ```
 
+```{r}
+#| label: join-results
+#| include: FALSE
+
+results_v120_vs_v127 <- reanalysis_20240412_data |> 
+  rbind(validation_data_v1_2_0) 
+
+results_v120_vs_v127_wide <- results_v120_vs_v127 |>
+  pivot_wider(id_cols = c(shallow_sample_id, worksheet, sample_id,
+                          dlms_dna_number),
+              names_from = somahrd_version,
+              values_from = -c(shallow_sample_id, worksheet, sample_id,
+                          dlms_dna_number, somahrd_version))
+
+write.csv(results_v120_vs_v127_wide, 
+          here::here("outputs/results_v120_vs_v127_wide.csv"), 
+          row.names = FALSE)
+
+```
+
 ## Confidence in Genomic Instability (Robustness)
 
 The confidence in genomic instability metric is calculated by computing copy number ratio profiles with three additional window sizes (150 kilobases, 200 kilobases and 250 kilobases) and comparing the large genomic alteration (LGA) and loss of parental copy (LPC) results to the initial analysis which uses a window size of 100 kilobases.
@@ -134,40 +166,26 @@ robustness_warning_threshold <- 0.93
 
 robustness_fail_threshold <- 0.85
 
-validation_pipeline_comparison <- reanalysis_20240412_data |> 
-  left_join(validation_data_v1_2_0, by = "shallow_sample_id") |> 
-  mutate(robustness_diff = robustness.x - robustness.y,
-         robustness_diff_abs = abs(robustness.x - robustness.y),
+validation_pipeline_comparison <- results_v120_vs_v127_wide |> 
+  mutate(robustness_diff = robustness_v1.2.7 - robustness_v1.2.0,
+         robustness_diff_abs = abs(robustness_v1.2.7 - robustness_v1.2.0),
          qc_v1_2_7 = case_when(
     
-            robustness.x > robustness_warning_threshold ~ "PASS",
+            robustness_v1.2.7 > robustness_warning_threshold ~ "PASS",
             
-            robustness.x <= robustness_warning_threshold &
-              robustness.x > robustness_fail_threshold ~ "WARNING",
+            robustness_v1.2.7 <= robustness_warning_threshold &
+              robustness_v1.2.7 > robustness_fail_threshold ~ "WARNING",
             
-            robustness.x <= robustness_fail_threshold ~ "FAIL"),
+            robustness_v1.2.7 <= robustness_fail_threshold ~ "FAIL"),
          
          qc_v1_2_0 = case_when(
     
-            robustness.y > robustness_warning_threshold ~ "PASS",
+            robustness_v1.2.0 > robustness_warning_threshold ~ "PASS",
             
-            robustness.y <= robustness_warning_threshold &
-              robustness.y > robustness_fail_threshold ~ "WARNING",
+            robustness_v1.2.0 <= robustness_warning_threshold &
+              robustness_v1.2.0 > robustness_fail_threshold ~ "WARNING",
             
-            robustness.y <= robustness_fail_threshold ~ "FAIL"),
-         
-         check_hrd_status = ifelse(seqone_hrd_status.x == seqone_hrd_status.y, 
-                                   "HRD status same", "HRD status different"))
-
-```
-
-```{r}
-#| label: check-hrd-status
-#| echo: FALSE
-#| include: FALSE
-
-validation_pipeline_comparison |> 
-  count(check_hrd_status)
+            robustness_v1.2.0 <= robustness_fail_threshold ~ "FAIL"))
 
 ```
 
@@ -183,8 +201,8 @@ robustness_axis_breaks <- c(seq(0, 0.8, by = 0.1), robustness_fail_threshold,
                                                  robustness_warning_threshold, 1.0)
 
 robustness_correlation_plot <- ggplot(validation_pipeline_comparison, 
-                                      aes(x = robustness.x,
-                                          y = robustness.y)) +
+                                      aes(x = robustness_v1.2.7,
+                                          y = robustness_v1.2.0)) +
   geom_point(pch = 21) +
   theme_bw() +
   labs(x = "Robustness (SomaHRD v1.2.7)", y = "Robustness (SomaHRD v1.2.0)",
@@ -214,34 +232,14 @@ This variation did not change the overall HRD status to or from "NON-CONCLUSIVE"
 robustness_category_changes <- validation_pipeline_comparison |> 
   filter(qc_v1_2_7 != qc_v1_2_0) |> 
   arrange(qc_v1_2_7) |> 
-  rename("Robustness (v1.2.7)" = robustness.x,
-         "Robustness (v1.2.0)" = robustness.y,
+  rename("Robustness (v1.2.7)" = robustness_v1.2.7,
+         "Robustness (v1.2.0)" = robustness_v1.2.0,
          "QC (v1.2.7)" = qc_v1_2_7,
          "QC (v1.2.0)" = qc_v1_2_0) |> 
   select(shallow_sample_id, "Robustness (v1.2.7)", "Robustness (v1.2.0)", 
          "QC (v1.2.7)", "QC (v1.2.0)")
 
 knitr::kable(robustness_category_changes)
-
-```
-
-{{< pagebreak >}}
-
-### Impact of Coverage
-
-The change in robustness seems to be impacted by sample coverage. The three largest differences between the two pipelines are for samples with coverage below the quality threshold of 0.5X.
-
-```{r}
-#| label: robustness-differences
-#| echo: FALSE
-
-robustness_coverage_plot <- ggplot(validation_pipeline_comparison, aes(x = robustness_diff_abs, y = coverage.x)) +
-  geom_point(pch = 21, size = 2) +
-  theme_bw() +
-  labs(x = "Absolute change in robustness score", y = "Coverage (X)") +
-  ylim(0, 2.5)
-
-robustness_coverage_plot
 
 ```
 
@@ -256,7 +254,7 @@ In samples with coverage above 0.5X, the difference in robustness varies from -0
 #| echo: FALSE
 
 validation_pipeline_comparison |> 
-  filter(coverage.x >= 0.5) |>
+  filter(coverage_v1.2.7 >= 0.5) |>
   ggplot(aes(x = robustness_diff, y = )) +
   geom_histogram(binwidth = 0.01) +
   theme_bw() +
