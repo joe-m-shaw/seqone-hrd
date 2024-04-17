@@ -1,6 +1,6 @@
 ---
 title: "INC9110 Investigation"
-author: "Joe Shaw"
+author: "Joe Shaw, Clinical Scientist (CS20980)"
 date: today
 date-format: "DD/MM/YYYY"
 format: pdf
@@ -267,3 +267,5 @@ validation_pipeline_comparison |>
 ## Explanation from SeqOne
 
 SeqOne communicated that in v1.2.0 the argument specifying the change in window sizes for the robustness calculation was missing. This was corrected on 29/11/2023, changing the version from v1.2.0 to v1.2.1. 
+
+The confidence in genomic instability metrics calculated by SomaHRD v1.2.1 onwards are therefore the correct values.
