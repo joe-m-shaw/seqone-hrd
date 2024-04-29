@@ -186,6 +186,108 @@ seqone_histo_plot
 ```
 
 ```{r}
+#| label: lga-lpc-distribution
+#| echo: FALSE
+
+lga_lpc_plot <- all_hrd_data_pdf |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  filter(!duplicated(sample_id)) |> 
+  group_by(lga, lpc, seqone_hrd_status) |> 
+  count() |>
+    ggplot(aes(x = lga, y = lpc)) +
+                            geom_point(pch = 21, alpha = 0.5,
+                                       aes(size = n,
+                                           fill = seqone_hrd_status)) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.box="vertical", legend.margin=margin()) +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  labs(x = "Large Genomic Alterations", y = "Loss of Parental Copy",
+       caption = "Data for validation and live service shown. Non-conclusive results excluded")
+  
+
+lga_lpc_plot
+
+```
+
+## Failing at Robustness of 0.9
+
+```{r}
+#| label: failing-at-0.9
+#| echo: FALSE
+
+seqone_robustness_threshold <- 0.85
+
+new_robustness_threshold <- 0.90
+
+live_data_pdf_with_checks <- live_data_pdf |> 
+  mutate(new_qc_check = case_when(
+    
+    robustness <= seqone_robustness_threshold ~"Inconclusive on SeqOne threshold",
+    
+    robustness >= new_robustness_threshold ~"Pass new threshold",
+    
+    robustness > seqone_robustness_threshold &
+      robustness < new_robustness_threshold ~"Between thresholds"),
+    
+    telomere_check = case_when(
+    
+    lga >= 10 & lga <= 17 ~"telomere check required",
+    
+    lga < 10 | lga > 17 ~"telomere check NOT required"),
+    
+    visual_check = case_when(
+      
+      new_qc_check == "Between thresholds" |
+        telomere_check == "telomere check required" ~"visual check required",
+      TRUE ~"visual check NOT required")) 
+
+new_qc_table <- live_data_pdf_with_checks |> 
+  group_by(new_qc_check) |> 
+  summarise(total = n()) |> 
+  mutate(percent = round((total / sum(total)) * 100, 1)) |> 
+  arrange(desc(total))
+
+knitr::kable(new_qc_table)
+
+```
+
+## Telomere Checks
+
+```{r}
+#| label: telomere-checks
+#| echo: FALSE
+
+telomere_check_table <- live_data_pdf_with_checks |> 
+  group_by(telomere_check) |> 
+  summarise(total = n()) |> 
+  mutate(percent = round((total / sum(total)) * 100, 1)) |> 
+  arrange(desc(total))
+
+knitr::kable(telomere_check_table)
+
+```
+
+## Both checks combined
+
+```{r}
+#| label: both-checks-combined
+#| echo: FALSE
+
+both_check_table <- live_data_pdf_with_checks |> 
+  group_by(visual_check) |> 
+  summarise(total = n()) |> 
+  mutate(percent = round((total / sum(total)) * 100, 1)) |> 
+  arrange(desc(total))
+
+knitr::kable(both_check_table)
+
+```
+
+```{r}
 #| label: hrd-scores-across-worksheets
 #| include: FALSE
 #| eval: FALSE
