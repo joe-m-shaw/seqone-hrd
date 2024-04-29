@@ -8,14 +8,6 @@ editor: visual
 ---
 
 ```{r}
-#| label: setup
-#| include: false
-
-filepath <- "C:/Users/joseph.shaw2/Documents/homologous_recombination_deficiency/"
-
-```
-
-```{r}
 #| label: packages-and-functions
 #| include: false
 
@@ -45,7 +37,7 @@ validation_data <- validation_reports |>
   list_rbind()
 
 # Worksheet WS136827 was worksheet of Qiasymphony validation samples that was run after the validation ended and before the live service started.
-ws136827_reports <- list.files(str_c(filepath, "data/seq_one_reports_WS136827/"),
+ws136827_reports <- list.files(here::here("data/seq_one_reports_WS136827/"),
                              full.names = TRUE,
                              pattern = "*.pdf")
 
