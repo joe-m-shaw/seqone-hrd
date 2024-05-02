@@ -22,7 +22,7 @@ source(here::here("functions/hrd_functions.R"))
 ```
 
 ```{r}
-#| label: load-pdf-data
+#| label: load-validation-pdf-data
 #| include: false
 
 validation_reports <- list.files(here::here("data/seqone_reports_v1_2/"),
@@ -48,6 +48,31 @@ ws136827_data <- ws136827_reports |>
   )) |>
   list_rbind()
 
+```
+
+```{r}
+#| label: load-INC9096-data
+#| include: false
+
+# This is the data for the samples that had abnormally low confidence in genomic instability
+# scores due to a pipeline error (see incident INC9096).
+ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
+                            full.names = TRUE,
+                            pattern = ".pdf")
+
+ws140359_pdf_data <- ws140359_pdfs |> 
+  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
+                                          version = "1.2")) |> 
+        list_rbind() |> 
+  mutate(worksheet = "WS140359_1") |> 
+  filter(date == "2024-04-01")
+
+```
+
+```{r}
+#| label: load-live-service-pdf-data
+#| include: false
+
 # New worksheets can be added to this Excel
 live_ws_excel <- read_excel(path = here::here("data/live_service_worksheets.xlsx"))
 
@@ -65,18 +90,12 @@ live_data_pdf <- live_ws_filepaths_pdf |>
   list_rbind() |> 
   mutate(worksheet = ifelse(worksheet == "WS140359", "WS140359_2", worksheet))
 
-# This is the data for the samples that had abnormally low confidence in genomic instability
-# scores due to a pipeline error (see incident INC9096).
-ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
-                            full.names = TRUE,
-                            pattern = ".pdf")
 
-ws140359_pdf_data <- ws140359_pdfs |> 
-  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
-                                          version = "1.2")) |> 
-        list_rbind() |> 
-  mutate(worksheet = "WS140359_1") |> 
-  filter(date == "2024-04-01")
+```
+
+```{r}
+#| label: collate-data
+#| include: false
 
 all_hrd_data_pdf <- rbind(validation_data, 
                           ws136827_data, 
@@ -200,7 +219,6 @@ lga_lpc_plot <- all_hrd_data_pdf |>
   labs(x = "Large Genomic Alterations", y = "Loss of Parental Copy",
        caption = "Data for validation and live service shown. Non-conclusive results excluded")
   
-
 lga_lpc_plot
 
 ```
@@ -375,9 +393,35 @@ write.csv(qiasymphony_hrd_results, here::here("outputs/qiasymphony_hrd_results.c
 
 ## Low Tumour Fraction Score
 
+The low tumour fraction score is provided within the csv file but not in the PDF report.
+
 ```{r}
 #| label: low-tumour-fraction
 #| echo: FALSE
+
+data_with_low_tumour_score <- live_data_pdf |> 
+  left_join(live_data_csv |> 
+              select(sample, low_tumor_fraction) |> 
+              rename(low_tumour_score = low_tumor_fraction),
+            join_by("shallow_sample_id" == "sample"))
+
+low_tumour_plot <- ggplot(data_with_low_tumour_score, aes(x = reorder(shallow_sample_id, 
+                                                   low_tumour_score),
+                                       y = low_tumour_score)) +
+  geom_point(pch = 21, size = 3, alpha = 0.8, aes(fill = low_tumour_fraction)) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  theme(axis.text.x = element_blank()) +
+  labs(x = "Sample", y = "Low tumour score from csv file")
+
+low_tumour_plot
+
+```
+
+```{r}
+#| label: low-tumour-fraction-qc
+#| eval: FALSE
+#| include: FALSE
 
 p1 <- draw_low_tumor_plot(coverage)
 
