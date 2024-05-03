@@ -442,3 +442,72 @@ low_tumor_comb_plot <- p1 + p2 + p3 + p4 + guide_area() +
 low_tumor_comb_plot
 
 ```
+
+{{< pagebreak >}}
+
+## Adding Confidence Intervals
+
+```{r}
+#| label: plot-confidence-intervals
+#| echo: FALSE
+
+error_bar_qc_check_threshold <- 0.5
+
+all_data_mod <- all_hrd_data_pdf |> 
+  # Remove data from INC9096
+  filter(worksheet != "WS140359_1") |> 
+  mutate(
+    std_dev = 1 - robustness,
+    hrd_score_minus_sd = seqone_hrd_score - std_dev,
+    hrd_score_plus_sd = seqone_hrd_score + std_dev,
+    hrd_score_min = case_when(
+      
+      hrd_score_minus_sd < 0 ~0,
+      
+      hrd_score_minus_sd > 1 ~1,
+      
+      TRUE ~hrd_score_minus_sd),
+    
+    hrd_score_max = case_when(
+      
+      hrd_score_plus_sd < 0 ~0,
+      
+      hrd_score_plus_sd > 1 ~1,
+      
+      TRUE ~hrd_score_plus_sd),
+    
+    error_bar_width = hrd_score_max - hrd_score_min,
+    
+    error_bar_qc_check = case_when(
+      
+      hrd_score_max > error_bar_qc_check_threshold &
+        
+        hrd_score_min > error_bar_qc_check_threshold ~"pass",
+      
+      hrd_score_max < error_bar_qc_check_threshold &
+        
+        hrd_score_min < error_bar_qc_check_threshold ~"pass",
+      
+      hrd_score_max > error_bar_qc_check_threshold &
+        
+        hrd_score_min < error_bar_qc_check_threshold ~"fail"))
+
+all_data_mod |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  count(error_bar_qc_check)
+
+all_data_mod |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  ggplot(aes(x = reorder(shallow_sample_id, seqone_hrd_score),
+                         y = seqone_hrd_score)) +
+  geom_point(pch = 21, aes(fill = error_bar_qc_check)) +
+  scale_fill_manual(values = c(safe_red, "white")) +
+  geom_errorbar(aes(ymin = hrd_score_min, ymax = hrd_score_max)) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_blank()) +
+  labs(title = "10 samples have error bars which cross 0.5 threshold",
+       y = "SeqOne HRD Score", x = "Sample") +
+  geom_hline(yintercept = 0.5, linetype = "dashed")
+
+```
