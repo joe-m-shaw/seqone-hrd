@@ -21,7 +21,8 @@ seqone_boundary_plot <- ggplot(data, aes(x = lga, y = lpc)) +
     data = new_line,
     mapping = aes(x = x, y = y, xend = xend, yend = yend)) +
   labs(x = "Large Genomic Alterations", y = "Loss of Parental Copy",
-       title = "SeqOne HRD Status Boundary") +
+       title = "SeqOne HRD Status Boundary",
+       subtitle = "Results lying on the boundary line are considered HRD positive") +
   scale_y_continuous(limits = c(0, axis_max), breaks = seq(0, axis_max, by = 1),
                      minor_breaks = FALSE) +
   scale_x_continuous(limits = c(0, axis_max), breaks = seq(0, axis_max, by = 1),
