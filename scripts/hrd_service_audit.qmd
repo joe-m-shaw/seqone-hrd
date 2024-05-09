@@ -447,9 +447,11 @@ low_tumor_comb_plot
 
 ## Adding Confidence Intervals
 
+SomaHRDv1.3 includes confidence intervals for the confidence in genomic instability metric. If the confidence intervals span 0.5 then the sample is classified as inconclusive.
+
 ```{r}
-#| label: plot-confidence-intervals
-#| echo: FALSE
+#| label: add-confidence-intervals
+#| include: FALSE
 
 error_bar_qc_check_threshold <- 0.5
 
@@ -492,22 +494,48 @@ all_data_mod <- all_hrd_data_pdf |>
         
         hrd_score_min < error_bar_qc_check_threshold ~"fail"))
 
+```
+
+
+```{r}
+#| label: plot-confidence-intervals
+#| echo: FALSE
+
 all_data_mod |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
   count(error_bar_qc_check)
 
 all_data_mod |> 
-  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
-  ggplot(aes(x = reorder(shallow_sample_id, seqone_hrd_score),
+  filter(seqone_hrd_status != "NON-CONCLUSIVE" &
+           error_bar_qc_check == "fail") |> 
+  ggplot(aes(x = reorder(sample_id, seqone_hrd_score),
                          y = seqone_hrd_score)) +
-  geom_point(pch = 21, aes(fill = error_bar_qc_check)) +
-  scale_fill_manual(values = c(safe_red, "white")) +
+  geom_point(pch = 21, size = 3, aes(fill = seqone_hrd_status)) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
   geom_errorbar(aes(ymin = hrd_score_min, ymax = hrd_score_max)) +
   theme_bw() +
   theme(legend.position = "bottom",
-        axis.text.x = element_blank()) +
-  labs(title = "10 samples have error bars which cross 0.5 threshold",
-       y = "SeqOne HRD Score", x = "Sample") +
-  geom_hline(yintercept = 0.5, linetype = "dashed")
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Samples with error bars which cross 0.5 threshold",
+       subtitle = "Only samples with conclusive results included",
+       y = "SeqOne HRD Score", x = "") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  ylim(0, 1)
 
 ```
+
+{{< pagebreak >}}
+
+The width of the confidence intervals does not seem to correlate with coverage.
+
+```{r}
+#| label: confidence-interval-width
+#| echo: FALSE
+
+ggplot(all_data_mod, aes(x = coverage,
+                         y = error_bar_width)) +
+  geom_point(pch = 21, alpha = 0.6, size = 2) +
+  theme_bw()
+
+```
+
