@@ -1,0 +1,114 @@
+---
+title: "Robustness Confidence Intervals"
+author: "Joe Shaw, Clinical Scientist (CS20980)"
+date: today
+date-format: "DD/MM/YYYY"
+format: pdf
+editor: visual
+---
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+
+source(here::here("functions/hrd_functions.R"))
+
+```
+```{r}
+#| label: load-collated-data
+#| include: FALSE
+
+# Data collated from PDFs in hrd_service_audit.qmd script.
+
+all_hrd_data_pdf <- read.csv(here::here("data/seqone_collated_data/seqone_collated_pdf_data.csv"))
+
+```
+SomaHRD v1.3 includes confidence intervals for the confidence in genomic instability metric. If the confidence intervals span 0.5 then the sample is classified as inconclusive. The script for this analysis is on my [Github](https://github.com/joeshaw824/homologous_recombination_deficiency).
+
+```{r}
+#| label: add-confidence-intervals
+#| include: FALSE
+
+error_bar_qc_check_threshold <- 0.5
+
+all_data_mod <- all_hrd_data_pdf |> 
+  # Remove data from INC9096
+  filter(worksheet != "WS140359_1") |> 
+  mutate(
+    std_dev = 1 - robustness,
+    hrd_score_minus_sd = seqone_hrd_score - std_dev,
+    hrd_score_plus_sd = seqone_hrd_score + std_dev,
+    hrd_score_min = case_when(
+      
+      hrd_score_minus_sd < 0 ~0,
+      
+      hrd_score_minus_sd > 1 ~1,
+      
+      TRUE ~hrd_score_minus_sd),
+    
+    hrd_score_max = case_when(
+      
+      hrd_score_plus_sd < 0 ~0,
+      
+      hrd_score_plus_sd > 1 ~1,
+      
+      TRUE ~hrd_score_plus_sd),
+    
+    error_bar_width = hrd_score_max - hrd_score_min,
+    
+    error_bar_qc_check = case_when(
+      
+      hrd_score_max > error_bar_qc_check_threshold &
+        
+        hrd_score_min > error_bar_qc_check_threshold ~"pass",
+      
+      hrd_score_max < error_bar_qc_check_threshold &
+        
+        hrd_score_min < error_bar_qc_check_threshold ~"pass",
+      
+      hrd_score_max >= error_bar_qc_check_threshold &
+        
+        hrd_score_min <= error_bar_qc_check_threshold ~"fail"))
+
+```
+
+This table shows whether samples in our dataset would be considered "inconclusive" based on the confidence intervals overlapping 0.5. This is only for samples where the overall HRD status was not "NON-CONCLUSIVE".
+
+```{r}
+#| label: summary-table
+#| echo: FALSE
+
+summary_table <- all_data_mod |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  count(error_bar_qc_check) |> 
+  mutate(percentage = round((n/sum(n)) * 100, 1))
+
+knitr::kable(summary_table)
+
+```
+
+```{r}
+#| label: plot-confidence-intervals
+#| echo: FALSE
+
+conf_int_plot <- all_data_mod |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE" &
+           error_bar_qc_check == "fail") |> 
+  ggplot(aes(x = reorder(sample_id, seqone_hrd_score),
+                         y = seqone_hrd_score)) +
+  geom_point(pch = 21, size = 3, aes(fill = seqone_hrd_status)) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  geom_errorbar(aes(ymin = hrd_score_min, ymax = hrd_score_max)) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "Samples with error bars which cross 0.5 threshold",
+       subtitle = "Only samples with conclusive results included",
+       y = "SeqOne HRD Score", x = "") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  ylim(0, 1)
+
+conf_int_plot
+
+```
