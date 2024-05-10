@@ -56,3 +56,7 @@ plots/*
 
 # output files
 outputs/*
+
+# Quarto outputs
+scripts/*.pdf
+scripts/*.html
