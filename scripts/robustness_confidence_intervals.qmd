@@ -33,8 +33,8 @@ SomaHRD v1.3 includes confidence intervals for the confidence in genomic instabi
 error_bar_qc_check_threshold <- 0.5
 
 all_data_mod <- all_hrd_data_pdf |> 
-  # Remove data from INC9096
-  filter(worksheet != "WS140359_1") |> 
+  # Remove data from INC9096 (WS140359_1) and QiaSymphony validation worksheet (WS136827)
+  filter(!worksheet %in% c("WS140359_1", "WS136827")) |> 
   mutate(
     std_dev = 1 - robustness,
     hrd_score_minus_sd = seqone_hrd_score - std_dev,
