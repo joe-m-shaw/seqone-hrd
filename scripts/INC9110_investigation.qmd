@@ -41,6 +41,12 @@ The full validation cohort was then re-analysed using SomaHRD v1.2.7 on 12/04/20
 
 I am using PDF reports as the data source because when the method was validated only PDFs were available for download from the SeqOne website, although csv files are now provided with new analyses.
 
+Data are stored on my local C drive but are copied here:
+
+S:/central shared/Genetics/Mol_Shared/Development.Team/
+SeqOne Homologous Recombination Deficiency Validation/
+INC9110 files
+
 ```{r}
 #| label: load-validation-data
 #| include: FALSE
