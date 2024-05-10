@@ -146,9 +146,9 @@ knitr::kable(summary_table)
 
 ```
 
-Total samples tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
+Total samples tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
 
-Total replicates tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
+Total replicates tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
 
 ## Live Service Samples
 
