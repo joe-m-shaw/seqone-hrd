@@ -452,3 +452,97 @@ low_tumor_comb_plot <- p1 + p2 + p3 + p4 + guide_area() +
 low_tumor_comb_plot
 
 ```
+
+# Referring Centres
+
+Here are the referring centres for samples tested in the live service since December 2023.
+
+```{r}
+#| label: dlms-connection
+#| include: FALSE
+
+dbi_con <- DBI::dbConnect(
+  drv = odbc::odbc(),
+  dsn = "moldb")
+
+sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                                              schema = "dbo",
+                                              table = "Samples")) |> 
+  janitor::clean_names()
+
+```
+
+```{r}
+#| label: get-referring-centres
+#| include: FALSE
+
+live_samples <- live_data_pdf$sample_id
+
+seqone_referring_centres <- sample_tbl |> 
+  filter(labno %in% live_samples) |> 
+  select(labno, consultant_address) |> 
+  collect()
+
+consultant_address_regex <- regex(
+  r"[
+  ^(.+)
+  _.+
+  ]",
+  comments = TRUE
+)
+  
+seqone_referring_centres_clean <- seqone_referring_centres |> 
+  mutate(consultant_address_mod = str_replace(string = consultant_address,
+                                            pattern = "\r\n",
+                                            replacement = "_"),
+    referring_centre = str_extract(string = consultant_address_mod,
+                                        pattern = consultant_address_regex,
+                                        group = 1),
+    
+    # Clean up
+    referring_centre = case_when(
+      
+      referring_centre == "Royal Oldham Hospital - Pathology Department" ~"Royal Oldham Hospital",
+      
+      referring_centre == "Manchester Royal Infirmary Laboratory" ~"Manchester Royal Infirmary",
+      
+      TRUE ~referring_centre))
+
+seqone_referring_centres_summary <- seqone_referring_centres_clean |> 
+  count(referring_centre)
+
+```
+
+```{r}
+#| label: referring-centres-plot
+#| echo: FALSE
+
+ggplot(seqone_referring_centres_summary, aes(x = reorder(referring_centre,
+                                                         desc(n)), y = n)) +
+  geom_col() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(y = "Number of samples tested",
+       x = "")
+
+```
+
+# BRCA Status
+
+```{r}
+#| label: brca-status
+#| echo: FALSE
+
+results_tbl <- tbl(dbi_con, 
+                   dbplyr::in_catalog(
+                     catalog = "MolecularDB",
+                     schema = "dbo",
+                     table = "ResultsAccess")) |> 
+  janitor::clean_names()
+
+all_results <- results_tbl |> 
+  filter(labno %in% live_samples) |> 
+  select(labno, test, genotype) |> 
+  collect()
+
+```
