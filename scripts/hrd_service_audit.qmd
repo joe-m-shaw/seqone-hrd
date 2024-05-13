@@ -1,9 +1,9 @@
 ---
-title: "SeqOne HRD Service"
+title: "SeqOne HRD Service Audit"
 author: "Joe Shaw"
 date: today
 date-format: "DD/MM/YYYY"
-format: pdf
+format: html
 editor: visual
 ---
 
@@ -16,80 +16,56 @@ library("ggpubr")
 library("readxl")
 library("here")
 library("patchwork")
+library("knitr")
 
 source(here::here("functions/hrd_functions.R"))
 
 ```
 
 ```{r}
-#| label: load-validation-pdf-data
+#| label: load-collated-data
 #| include: false
 
-validation_reports <- list.files(here::here("data/seqone_reports_v1_2/"),
-                                 full.names = TRUE,
-                                 pattern = "*.pdf")
+read_collated_pdf_data <- function(file) {
+  
+  output <- read_csv(file = here::here(str_c("data/seqone_collated_audit_data/",
+                                             {{ file }}, ".csv")),
+                     col_types = list(
+                       shallow_sample_id = col_character(),
+                       worksheet = col_character(),
+                       sample_id = col_character(),
+                       dlms_dna_number = col_character(),
+                       seqone_hrd_score = col_double(),
+                       seqone_hrd_status = col_factor(
+                         levels = c("NEGATIVE", "POSITIVE", "NON-CONCLUSIVE")),
+                       lga = col_double(),
+                       lpc = col_double(),
+                       ccne1 = col_double(),
+                       rad51b = col_double(),
+                       seqone_ncc = col_double(),
+                       coverage = col_double(),
+                       percent_mapping = col_double(),
+                       robustness = col_double(),
+                       low_tumour_fraction = col_character(),
+                       date = col_date(),
+                       user = col_character(),
+                       user = col_character(),
+                       filename = col_character(),
+                       version = col_character()))
+  
+  return(output)
+  
+}
 
-validation_data <- validation_reports |>
-  map(\(validation_reports) read_seqone_report(
-    file = validation_reports,
-    version = "1.2"
-  )) |>
-  list_rbind()
+collated_validation_pdf_data <- read_collated_pdf_data("collated_validation_pdf_data")
 
-# Worksheet WS136827 was worksheet of Qiasymphony validation samples that was run after the validation ended and before the live service started.
-ws136827_reports <- list.files(here::here("data/seq_one_reports_WS136827/"),
-                             full.names = TRUE,
-                             pattern = "*.pdf")
+collated_live_pdf_data <- read_collated_pdf_data("collated_live_pdf_data")
 
-ws136827_data <- ws136827_reports |>
-  map(\(ws136827_reports) read_seqone_report(
-    file = ws136827_reports,
-    version = "1.2"
-  )) |>
-  list_rbind()
+ws136827_pdf_data <- read_collated_pdf_data("ws136827_pdf_data")
 
-```
+ws140359_pdf_data <- read_collated_pdf_data("ws140359_pdf_data")
 
-```{r}
-#| label: load-INC9096-data
-#| include: false
-
-# This is the data for the samples that had abnormally low confidence in genomic instability
-# scores due to a pipeline error (see incident INC9096).
-ws140359_pdfs <- list.files(here::here("data/WS140359 data/"),
-                            full.names = TRUE,
-                            pattern = ".pdf")
-
-ws140359_pdf_data <- ws140359_pdfs |> 
-  map(\(ws140359_pdfs) read_seqone_report(file = ws140359_pdfs,
-                                          version = "1.2")) |> 
-        list_rbind() |> 
-  mutate(worksheet = "WS140359_1") |> 
-  filter(date == "2024-04-01")
-
-```
-
-```{r}
-#| label: load-live-service-pdf-data
-#| include: false
-
-# New worksheets can be added to this Excel
-live_ws_excel <- read_excel(path = here::here("data/live_service_worksheets.xlsx"))
-
-live_ws <- list(live_ws_excel$worksheet)
-
-live_ws_filepaths_pdf <- live_ws |> 
-  map(\(live_ws) find_hrd_files(live_ws, filetype = ".pdf")) |> 
-  flatten()
-
-live_data_pdf <- live_ws_filepaths_pdf |>
-  map(\(live_ws_filepaths_pdf) read_seqone_report(
-    file = live_ws_filepaths_pdf,
-    version = "1.2"
-  )) |>
-  list_rbind() |> 
-  mutate(worksheet = ifelse(worksheet == "WS140359", "WS140359_2", worksheet))
-
+collated_live_csv_data <- read_csv(file = here::here("data/seqone_collated_audit_data/collated_live_csv_data.csv"))
 
 ```
 
@@ -97,41 +73,113 @@ live_data_pdf <- live_ws_filepaths_pdf |>
 #| label: collate-data
 #| include: false
 
-all_hrd_data_pdf <- rbind(validation_data, 
-                          ws136827_data, 
-                          live_data_pdf,
+all_hrd_data_pdf <- rbind(collated_validation_pdf_data, 
+                          ws136827_pdf_data, 
+                          collated_live_pdf_data,
                           ws140359_pdf_data)
 
 ```
 
 ```{r}
-#| label: export-collated-data
-#| include: false
+#| label: dlms-connection
+#| include: FALSE
 
-write.csv(all_hrd_data_pdf,
-          file = here::here("data/seqone_collated_data/seqone_collated_pdf_data.csv"),
-          row.names = FALSE)
+dbi_con <- DBI::dbConnect(
+  drv = odbc::odbc(),
+  dsn = "moldb")
+
+sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                                              schema = "dbo",
+                                              table = "Samples")) |> 
+  janitor::clean_names()
 
 ```
 
 ```{r}
-#| label: load-csv-data
+#| label: get-referring-centres
 #| include: FALSE
-#| warning: FALSE
 
-live_ws_filepaths_csv <- live_ws |> 
-  map(\(live_ws) find_hrd_files(live_ws, filetype = ".csv")) |> 
-  flatten()
+live_samples <- collated_live_pdf_data$sample_id
 
-live_data_csv <- live_ws_filepaths_csv |> 
-  map(\(live_ws_filepaths_csv) read_seqone_csv(file = live_ws_filepaths_csv)) |> 
-  list_rbind() |> 
-  mutate(worksheet = str_extract(string = sample,
-                                 pattern = "(WS[0-9]{6})_\\d{8}",
-                                 group = 1))
+seqone_referring_centres <- sample_tbl |> 
+  filter(labno %in% live_samples) |> 
+  select(labno, consultant_address) |> 
+  collect()
+
+consultant_address_regex <- regex(
+  r"[
+  ^(.+)
+  _.+
+  ]",
+  comments = TRUE
+)
+  
+seqone_referring_centres_clean <- seqone_referring_centres |> 
+  mutate(consultant_address_mod = str_replace(string = consultant_address,
+                                            pattern = "\r\n",
+                                            replacement = "_"),
+    referring_centre = str_extract(string = consultant_address_mod,
+                                        pattern = consultant_address_regex,
+                                        group = 1),
+    
+    # Clean up
+    referring_centre = case_when(
+      
+      referring_centre == "Royal Oldham Hospital - Pathology Department" ~"Royal Oldham Hospital",
+      
+      referring_centre == "Manchester Royal Infirmary Laboratory" ~"Manchester Royal Infirmary",
+      
+      TRUE ~referring_centre))
+
+seqone_referring_centres_summary <- seqone_referring_centres_clean |> 
+  count(referring_centre) |> 
+  arrange(desc(n))
+
 ```
 
-## All Samples (validation and live service)
+```{r}
+#| label: get-brca-status
+#| echo: FALSE
+
+results_tbl <- tbl(dbi_con, 
+                   dbplyr::in_catalog(
+                     catalog = "MolecularDB",
+                     schema = "dbo",
+                     table = "ResultsAccess")) |> 
+  janitor::clean_names()
+
+all_results <- results_tbl |> 
+  filter(labno %in% live_samples) |> 
+  select(labno, test, genotype, genotype2,
+         genocomm) |> 
+  collect()
+
+pansolid_strings <- unique(grep(pattern = "PANSOLID", x = all_results$test,
+                         ignore.case = TRUE, value = TRUE))
+
+pansolid_results <- all_results |> 
+  filter(test %in% pansolid_strings)
+
+brca_strings <- unique(grep(pattern = "c.\\d{2,5}", x = pansolid_results$genotype, 
+            ignore.case = TRUE, value = TRUE))
+
+pansolid_results_mod <- pansolid_results |> 
+  mutate(brca_status = case_when(
+    
+    genotype %in% brca_strings ~"BRCA variant",
+    
+    genotype == "Analysis failed" ~"Fail",
+    
+    genotype == "No pathogenic variant identified" ~"No variant",
+    
+    TRUE ~"other"))
+
+seqone_pansolid_join <- collated_live_pdf_data |> 
+  left_join(pansolid_results_mod, join_by("sample_id" == "labno"))
+
+```
+
+# All Samples (validation and live service)
 
 ```{r}
 #| label: sample-numbers
@@ -150,13 +198,13 @@ Total samples tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
 
 Total replicates tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
 
-## Live Service Samples
+# Live Service Samples
 
 ```{r}
 #| label: live-service-numbers
 #| echo: false
 
-live_summary_table <- live_data_pdf |> 
+live_summary_table <- collated_live_pdf_data |> 
   group_by(seqone_hrd_status) |> 
   summarise(total = n()) |> 
   mutate(percentage = round((total / sum(total)) * 100, 1))
@@ -165,13 +213,11 @@ knitr::kable(live_summary_table)
 
 ```
 
-Total samples tested: **`r length(unique(live_data_pdf$sample_id))`**
+Total samples tested: **`r length(unique(collated_live_pdf_data$sample_id))`**
 
-Total worksheets: **`r length(live_ws[[1]])`**
+Total worksheets: **`r length(unique(collated_live_pdf_data$worksheet))`**
 
-{{< pagebreak >}}
-
-## HRD Probability Distribution
+# Plots
 
 ```{r}
 #| label: hrd-score-distribution
@@ -198,11 +244,38 @@ seqone_histo_plot <- ggplot(data_for_histogram_plot, aes(x = seqone_hrd_score, y
                               legend.position = "bottom") +
                             labs(
                               y = "Number of samples",
-                              x = "SeqOne HRD Probability",
+                              x = "SeqOne HRD Score",
+                              title = "SeqOne HRD Score Distribution",
                               fill = "SeqOne HRD Status",
                               caption = "Data for validation and live service shown. Non-conclusive results excluded")
 
 seqone_histo_plot
+
+```
+
+```{r}
+#| label: hrd-score-brca-status
+#| echo: FALSE
+
+hrd_score_brca_plot <- seqone_pansolid_join |> 
+  filter(brca_status %in% c("BRCA variant", "No variant") &
+           seqone_hrd_status != "NON-CONCLUSIVE") |>
+  ggplot(aes(x = seqone_hrd_score, y = )) +
+        geom_histogram(binwidth = 0.05, 
+                       aes(fill = seqone_hrd_status)) +
+        scale_fill_manual(values = c(safe_blue, safe_red)) +
+        theme_bw() +
+        scale_x_continuous(
+          breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+        geom_vline(xintercept = 0.5, linetype = "dashed") +
+  theme(legend.position = "bottom") +
+  facet_wrap(~brca_status) +
+  labs(title = "SeqOne HRD Score and BRCA Status",
+       caption = "Data for live service shown. Non-conclusive results excluded. DLMS samples only.", 
+       y = "Number of samples",
+       x = "SeqOne HRD Score")
+
+hrd_score_brca_plot
 
 ```
 
@@ -227,17 +300,17 @@ lga_lpc_plot <- all_hrd_data_pdf |>
     mapping = aes(x = x, y = y, xend = xend, yend = yend),
     linetype = "dashed") +
   labs(x = "Large Genomic Alterations", y = "Loss of Parental Copy",
+       title = "LGA and LPC Results",
        caption = "Data for validation and live service shown. Non-conclusive results excluded")
   
 lga_lpc_plot
 
 ```
 
-## Failing at Robustness of 0.9
-
 ```{r}
 #| label: failing-at-0.9
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 seqone_robustness_threshold <- 0.85
 
@@ -275,11 +348,10 @@ knitr::kable(new_qc_table)
 
 ```
 
-## Telomere Checks
-
 ```{r}
 #| label: telomere-checks
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 telomere_check_table <- live_data_pdf_with_checks |> 
   group_by(telomere_check) |> 
@@ -291,11 +363,10 @@ knitr::kable(telomere_check_table)
 
 ```
 
-## Both checks combined
-
 ```{r}
 #| label: both-checks-combined
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 both_check_table <- live_data_pdf_with_checks |> 
   group_by(visual_check) |> 
@@ -317,9 +388,17 @@ seqone_histo_plot +
 
 ```
 
-{{< pagebreak >}}
+# Referring Centres
 
-## Quality Metrics
+```{r}
+#| label: referring-centres-table
+#| echo: FALSE
+
+knitr::kable(seqone_referring_centres_summary)
+
+```
+
+# Quality Metrics
 
 ```{r}
 #| label: qc-metrics
@@ -350,7 +429,7 @@ map_dotplot <- draw_qc_dotplot(df = all_hrd_data_pdf,
                      limits = c(0,100)) +
   labs(y = "Percentage correct mapping")
 
-low_tumor_fraction_dot_plot <- draw_qc_dotplot(df = live_data_csv, 
+low_tumor_fraction_dot_plot <- draw_qc_dotplot(df = collated_live_csv_data, 
                                                yvar = low_tumor_fraction,
                 ymin = 0, ymax = 5,
                 fill_var = status) +
@@ -366,13 +445,10 @@ low_tumor_fraction_dot_plot
 
 ```
 
-{{< pagebreak >}}
-
-## External Quality Assurance Results
-
 ```{r}
 #| label: eqa-results
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
                  "24008976", "24008978", "24008980", "24008981", "24008982")
@@ -401,13 +477,10 @@ write.csv(qiasymphony_hrd_results, here::here("outputs/qiasymphony_hrd_results.c
 
 ```
 
-## Low Tumour Fraction Score
-
-The low tumour fraction score is provided within the csv file but not in the PDF report.
-
 ```{r}
 #| label: low-tumour-fraction
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 data_with_low_tumour_score <- live_data_pdf |> 
   left_join(live_data_csv |> 
@@ -453,96 +526,3 @@ low_tumor_comb_plot
 
 ```
 
-# Referring Centres
-
-Here are the referring centres for samples tested in the live service since December 2023.
-
-```{r}
-#| label: dlms-connection
-#| include: FALSE
-
-dbi_con <- DBI::dbConnect(
-  drv = odbc::odbc(),
-  dsn = "moldb")
-
-sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
-                                              schema = "dbo",
-                                              table = "Samples")) |> 
-  janitor::clean_names()
-
-```
-
-```{r}
-#| label: get-referring-centres
-#| include: FALSE
-
-live_samples <- live_data_pdf$sample_id
-
-seqone_referring_centres <- sample_tbl |> 
-  filter(labno %in% live_samples) |> 
-  select(labno, consultant_address) |> 
-  collect()
-
-consultant_address_regex <- regex(
-  r"[
-  ^(.+)
-  _.+
-  ]",
-  comments = TRUE
-)
-  
-seqone_referring_centres_clean <- seqone_referring_centres |> 
-  mutate(consultant_address_mod = str_replace(string = consultant_address,
-                                            pattern = "\r\n",
-                                            replacement = "_"),
-    referring_centre = str_extract(string = consultant_address_mod,
-                                        pattern = consultant_address_regex,
-                                        group = 1),
-    
-    # Clean up
-    referring_centre = case_when(
-      
-      referring_centre == "Royal Oldham Hospital - Pathology Department" ~"Royal Oldham Hospital",
-      
-      referring_centre == "Manchester Royal Infirmary Laboratory" ~"Manchester Royal Infirmary",
-      
-      TRUE ~referring_centre))
-
-seqone_referring_centres_summary <- seqone_referring_centres_clean |> 
-  count(referring_centre)
-
-```
-
-```{r}
-#| label: referring-centres-plot
-#| echo: FALSE
-
-ggplot(seqone_referring_centres_summary, aes(x = reorder(referring_centre,
-                                                         desc(n)), y = n)) +
-  geom_col() +
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
-  labs(y = "Number of samples tested",
-       x = "")
-
-```
-
-# BRCA Status
-
-```{r}
-#| label: brca-status
-#| echo: FALSE
-
-results_tbl <- tbl(dbi_con, 
-                   dbplyr::in_catalog(
-                     catalog = "MolecularDB",
-                     schema = "dbo",
-                     table = "ResultsAccess")) |> 
-  janitor::clean_names()
-
-all_results <- results_tbl |> 
-  filter(labno %in% live_samples) |> 
-  select(labno, test, genotype) |> 
-  collect()
-
-```
