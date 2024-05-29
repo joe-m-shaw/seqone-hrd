@@ -3,7 +3,7 @@ title: "SeqOne HRD Service Audit"
 author: "Joe Shaw"
 date: today
 date-format: "DD/MM/YYYY"
-format: html
+format: pdf
 editor: visual
 ---
 
@@ -21,6 +21,8 @@ library("knitr")
 source(here::here("functions/hrd_functions.R"))
 
 ```
+
+Data for this audit is collated using the collate_seqone_audit_data.R script.
 
 ```{r}
 #| label: load-collated-data
@@ -93,6 +95,7 @@ sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
                                               table = "Samples")) |> 
   janitor::clean_names()
 
+
 ```
 
 ```{r}
@@ -103,7 +106,7 @@ live_samples <- collated_live_pdf_data$sample_id
 
 seqone_referring_centres <- sample_tbl |> 
   filter(labno %in% live_samples) |> 
-  select(labno, consultant_address) |> 
+  select(labno, consultant_address, comments) |> 
   collect()
 
 consultant_address_regex <- regex(
@@ -128,6 +131,8 @@ seqone_referring_centres_clean <- seqone_referring_centres |>
       referring_centre == "Royal Oldham Hospital - Pathology Department" ~"Royal Oldham Hospital",
       
       referring_centre == "Manchester Royal Infirmary Laboratory" ~"Manchester Royal Infirmary",
+      
+      is.na(referring_centre) ~"Unknown",
       
       TRUE ~referring_centre))
 
@@ -166,13 +171,17 @@ brca_strings <- unique(grep(pattern = "c.\\d{2,5}", x = pansolid_results$genotyp
 pansolid_results_mod <- pansolid_results |> 
   mutate(brca_status = case_when(
     
-    genotype %in% brca_strings ~"BRCA variant",
+    genotype %in% brca_strings ~"BRCA variant detected",
     
     genotype == "Analysis failed" ~"Fail",
     
-    genotype == "No pathogenic variant identified" ~"No variant",
+    genotype == "No pathogenic variant identified" ~"No BRCA variants detected",
     
-    TRUE ~"other"))
+    TRUE ~"other"),
+    brca_status = factor(brca_status, levels = c("No BRCA variants detected",
+                                                 "BRCA variant detected",
+                                                 "Fail",
+                                                 "other")))
 
 seqone_pansolid_join <- collated_live_pdf_data |> 
   left_join(pansolid_results_mod, join_by("sample_id" == "labno"))
@@ -199,6 +208,8 @@ Total samples tested: **`r length(unique(all_hrd_data_pdf$sample_id))`**
 Total replicates tested: **`r length(unique(all_hrd_data_pdf$shallow_sample_id))`**
 
 # Live Service Samples
+
+The live service began in December 2023. These values are taken from the PDF reports exported from the SeqOne website.
 
 ```{r}
 #| label: live-service-numbers
@@ -258,10 +269,10 @@ seqone_histo_plot
 #| echo: FALSE
 
 hrd_score_brca_plot <- seqone_pansolid_join |> 
-  filter(brca_status %in% c("BRCA variant", "No variant") &
+  filter(brca_status %in% c("BRCA variant detected", "No BRCA variants detected") &
            seqone_hrd_status != "NON-CONCLUSIVE") |>
   ggplot(aes(x = seqone_hrd_score, y = )) +
-        geom_histogram(binwidth = 0.05, 
+        geom_histogram(binwidth = 0.01, 
                        aes(fill = seqone_hrd_status)) +
         scale_fill_manual(values = c(safe_blue, safe_red)) +
         theme_bw() +
@@ -269,7 +280,7 @@ hrd_score_brca_plot <- seqone_pansolid_join |>
           breaks = c(0, 0.25, 0.5, 0.75, 1)) +
         geom_vline(xintercept = 0.5, linetype = "dashed") +
   theme(legend.position = "bottom") +
-  facet_wrap(~brca_status) +
+  facet_wrap(~brca_status, nrow = 2) +
   labs(title = "SeqOne HRD Score and BRCA Status",
        caption = "Data for live service shown. Non-conclusive results excluded. DLMS samples only.", 
        y = "Number of samples",
