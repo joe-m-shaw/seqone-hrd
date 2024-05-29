@@ -60,3 +60,7 @@ outputs/*
 # Quarto outputs
 scripts/*.pdf
 scripts/*.html
+
+*.css
+*.woff
+*.js
