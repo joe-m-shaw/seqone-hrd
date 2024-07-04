@@ -513,6 +513,24 @@ low_tumour_plot
 ```
 
 ```{r}
+#| label: positive-negative-trends
+#| echo: FALSE
+
+all_hrd_data_pdf |> 
+  filter(date > "2023-12-13 00:00:00") |> 
+  group_by(worksheet) |> 
+  count(seqone_hrd_status) |> 
+  ggplot(aes(x = worksheet, y = n, fill = seqone_hrd_status)) +
+  geom_col(colour = "black") +
+  scale_fill_manual(values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "Number of results")
+
+
+```
+
+```{r}
 #| label: low-tumour-fraction-qc
 #| eval: FALSE
 #| include: FALSE
@@ -536,4 +554,3 @@ low_tumor_comb_plot <- p1 + p2 + p3 + p4 + guide_area() +
 low_tumor_comb_plot
 
 ```
-
