@@ -699,6 +699,7 @@ find_hrd_files <- function(worksheet, filetype = ".pdf") {
   
   output <- list.files(folder_path,
                        full.names = TRUE,
+                       recursive = TRUE,
                        pattern = {{ filetype }})
   
 }
