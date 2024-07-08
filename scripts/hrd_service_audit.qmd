@@ -399,6 +399,124 @@ seqone_histo_plot +
 
 ```
 
+{{< pagebreak >}}
+
+# EQA Results
+
+```{r}
+#| label: eqa-results
+#| echo: FALSE
+
+eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
+                 "24008976", "24008978", "24008980", "24008981", "24008982")
+
+eqa_results <- all_hrd_data_pdf |> 
+  filter(sample_id %in% eqa_samples) |> 
+  select(sample_id, lga, lpc, seqone_hrd_status, seqone_hrd_score) |> 
+  arrange(seqone_hrd_status)
+
+knitr::kable(eqa_results)
+
+eqa_result_lga_lpc <- ggplot(all_hrd_data_pdf |> 
+  filter(sample_id %in% eqa_samples), aes(x = lga, y = lpc)) +
+  geom_point(size = 2, aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  geom_point(data = all_hrd_data_pdf |> 
+               filter(sample_id == "24008982"), 
+             shape = 21, colour = safe_red, fill = NA, size = 5, stroke = 1) +
+  theme_bw() +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  ylim(0, 36) +
+  xlim(0, 36) +
+  labs(title = "EQA Ring Trial Results",
+       subtitle = "Red circled result (24008982) was discrepant with other labs")
+
+eqa_result_lga_lpc
+
+```
+
+{{< pagebreak >}}
+
+# SeraCare Controls
+
+```{r}
+#| label: check-seracare-controls
+#| echo: FALSE
+
+all_samples <- all_hrd_data_pdf$dlms_dna_number
+
+seracare_info <- sample_tbl |> 
+  filter(labno %in% all_samples) |> 
+  select(labno, firstname, surname, pathno) |> 
+  collect()
+
+all_hrd_data_pdf_with_sample_info <- all_hrd_data_pdf |> 
+  left_join(seracare_info, join_by(dlms_dna_number == labno)) |> 
+  mutate(month = floor_date(x = date, unit = "month"))
+
+seraseq_results <- all_hrd_data_pdf_with_sample_info |> 
+  filter(surname == "Seraseq") |> 
+  mutate(control_type = factor(x = firstname, levels = c("High-Positive FFPE HRD",
+                                                         "Low-Positive FFPE HRD",
+                                                         "FFPE HRD Negative")))
+
+deep_red <- "#660000"
+lighter_red <- "#FF6666"
+
+seracare_score_plot <- ggplot(seraseq_results, aes(x = date, y = seqone_hrd_score)) +
+  geom_jitter(aes(colour = control_type), size = 3,
+              alpha = 0.7) +
+  scale_colour_manual(values = c(deep_red, lighter_red, safe_blue)) +
+  labs(x = "", title = "SeraCare control SeqOne HRD Scores",
+       y = "SeqOne HRD Score") +
+  theme_bw() +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  scale_x_date(limits = c(as.Date("2023-11-01"), as.Date("2024-08-01")),
+               date_breaks = "month",
+               date_labels = "%b %Y") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  ylim(0, 1)
+
+seracare_score_plot
+
+seracare_lpc_lga_plot <- ggplot(seraseq_results, aes(x = lga, y = lpc)) +
+  geom_point(aes(colour = control_type), size = 3,
+              alpha = 0.5) +
+  scale_colour_manual(values = c(deep_red, lighter_red, safe_blue)) +
+  theme_bw() +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  ylim(0, 36) +
+  xlim(0, 36) +
+  labs(title = "SeraCare control LPC and LGA results")
+
+seracare_lpc_lga_plot
+
+seracare_lpc_lga_date_plot <- ggplot(seraseq_results, aes(x = lga, y = lpc)) +
+  geom_point(aes(shape = control_type,
+                 colour = month), size = 3,
+              alpha = 0.5) +
+  #scale_colour_manual(values = c(deep_red, lighter_red, safe_blue)) +
+  theme_bw() +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  ylim(0, 36) +
+  xlim(0, 36) +
+  labs(title = "SeraCare control LPC and LGA results")
+
+seracare_lpc_lga_date_plot
+
+```
+
+{{< pagebreak >}}
+
 # Referring Centres
 
 ```{r}
@@ -453,23 +571,6 @@ rob_dotplot
 map_dotplot
 
 low_tumor_fraction_dot_plot
-
-```
-
-```{r}
-#| label: eqa-results
-#| eval: FALSE
-#| include: FALSE
-
-eqa_samples <- c("24008971", "24008972", "24008973", "24008974", "24008975", 
-                 "24008976", "24008978", "24008980", "24008981", "24008982")
-
-eqa_results <- live_data_pdf |> 
-  filter(sample_id %in% eqa_samples) |> 
-  select(sample_id, seqone_hrd_status, seqone_hrd_score) |> 
-  arrange(seqone_hrd_status)
-
-knitr::kable(eqa_results)
 
 ```
 
