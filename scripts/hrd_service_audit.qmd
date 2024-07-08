@@ -318,6 +318,29 @@ lga_lpc_plot
 
 ```
 
+{{< pagebreak >}}
+
+# Adding LPC and LGA
+
+The Myriad "Genomic Instability Score" (GIS) is the sum of counts for LST, TAI and LOH events in the sample. What happens if we sum LPC and LGA events in the same way?
+
+```{r}
+#| label: summing-lga-lpc
+#| echo: FALSE
+
+all_hrd_data_pdf |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  mutate(sum_lpc_lga = lpc + lga) |> 
+  group_by(sum_lpc_lga, seqone_hrd_status) |> 
+  summarise(total = n())|> 
+  ggplot(aes(x = sum_lpc_lga, y = total)) +
+  geom_col(aes(fill = seqone_hrd_status), colour = "black") +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  labs(x = "Sum of LGA and LPC events", y = "Number of samples")
+
+```
+
 ```{r}
 #| label: failing-at-0.9
 #| eval: FALSE
