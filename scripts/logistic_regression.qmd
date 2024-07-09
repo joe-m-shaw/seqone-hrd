@@ -1,0 +1,124 @@
+---
+title: "Logisitic Regression Analysis"
+author: "Joe Shaw"
+format: pdf
+---
+
+```{r}
+#| label: packages-and-data
+#| include: FALSE
+
+library(tidyverse)
+library(here)
+
+source(here("functions/hrd_functions.R"))
+
+seqone_live_data <- read_csv(file = here("data/seqone_collated_audit_data/collated_live_csv_data.csv"))
+
+seqone_validation_data <- read_csv(file = here("data/seqone_collated_audit_data/collated_validation_pdf_data.csv"))
+
+```
+
+# Logistic regression of SeqOne results
+
+The SeqOne "HRD score" is a value between 0 and 1. It is calculated using a logistic regression model, which originally used data from 184 ovarian cancer samples. The Myriad HRD status was used as a binary outcome, and the values of large genomic alterations (LGA) and loss of parental copy (LPC) events were used as the starting variables. Full details are given in [Boidot et al (2024)](https://pubmed.ncbi.nlm.nih.gov/38471290/).
+
+My understanding of logistic regression is the cohort of 184 samples was used to develop a model to answer the question "given a certain combination of LGA and LPC values, what is the probability that the sample is HRD positive according to Myriad?"
+
+The aim of the model was to be able to predict the most number of Myriad statuses correctly from the LGA and LPC results. That model could then be applied to situations when the Myriad status wasn't known.
+
+# Logistic regression on Manchester data
+
+In the same way, we can use the SeqOne live service data from Manchester to act as a "training dataset" for a logistic regression model. The model will attempt to find the best way to predict the HRD status from the LGA and LPC results.
+
+Note: the idea is to recreate the logistic regression model workflow purely for the purpose of better understanding what's going on. 
+
+```{r}
+#| label: training-and-testing-data
+#| include: TRUE
+
+set.seed(1)
+
+training_data <- seqone_live_data |> 
+  filter(status != "Non-conclusive") |> 
+  janitor::clean_names() |> 
+  mutate(seqone_hrd_status = as.factor(status))
+
+testing_data <- seqone_validation_data |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE")
+
+# Use the "generalized linear models" function
+model <- glm(formula = as.factor(seqone_hrd_status) ~ lga + lpc, 
+             family = "binomial", 
+             data = training_data)
+
+```
+
+We can then use the model to predict the HRD status of samples in the validation dataset.
+
+(I decided to use the validation dataset as the "test" dataset purely because there were fewer samples)
+
+```{r}
+#| label: predict-hrd-status
+#| include: TRUE
+
+testing_data_with_predictions <- testing_data |> 
+  mutate(likelihood_hrd_pos = round(predict(model, 
+                                            pick(lga, lpc), 
+                                            type = "response"), 3),
+         predicted_status = case_when(
+           likelihood_hrd_pos >= 0.5 ~"Positive",
+           likelihood_hrd_pos < 0.5 ~"Negative"
+         ))
+
+```
+
+```{r}
+#| label: plot-results
+#| echo: FALSE
+
+results_plot <- ggplot(testing_data_with_predictions, aes(x = seqone_hrd_score, 
+                                          y = likelihood_hrd_pos)) +
+  geom_point(shape = 21, size = 2) +
+  theme_bw() +
+  geom_vline(xintercept = 0.5, linetype = "dashed") +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_point(data = testing_data_with_predictions |> 
+               filter(shallow_sample_id == "WS134687_21011999"), 
+             shape = 21, colour = "#CC6677", fill = NA, size = 5, stroke = 1) +
+  labs(title = "Logistic regression analysis of testing cohort",
+       x  = "SeqOne pipeline score",
+       y = "Logistic regression score",
+       subtitle = str_c("Model trained on ", nrow(training_data), 
+                        " samples in training cohort"),
+       caption = "One incorrect prediction circled in red")
+
+results_plot
+
+```
+
+```{r}
+#| label: plot-lga-lpc-results
+#| echo: FALSE
+
+lga_lpc_plot <- ggplot(testing_data_with_predictions, aes(x = lga, 
+                                          y = lpc)) +
+  geom_point(aes(colour = predicted_status, shape = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red))+
+  theme_bw() +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  geom_point(data = testing_data_with_predictions |> 
+               filter(shallow_sample_id == "WS134687_21011999"), 
+             shape = 21, colour = "#CC6677", fill = NA, size = 5, stroke = 1)
+
+lga_lpc_plot
+
+```
+
+# Reference
+
+This analysis is done using the information provided in this [worked example.](https://www.statology.org/logistic-regression-in-r/) 
+
