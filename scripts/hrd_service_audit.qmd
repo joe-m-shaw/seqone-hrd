@@ -228,6 +228,30 @@ Total samples tested: **`r length(unique(collated_live_pdf_data$sample_id))`**
 
 Total worksheets: **`r length(unique(collated_live_pdf_data$worksheet))`**
 
+# Previous Myriad Service
+
+```{r}
+#| label: myriad-service-numbers
+#| echo: false
+
+tbrca_data_collection <- read_excel(
+  here("data/tbrca_data_collection.xlsx"),
+  skip = 1
+) |>
+  janitor::clean_names() 
+
+myriad_service_summary <- tbrca_data_collection |> 
+  filter(!gis_pos_neg %in% c("Awaiting result", "Fail", "Not tested")) |> 
+  group_by(gis_pos_neg) |> 
+  summarise(total = n()) |> 
+  arrange(desc(total)) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1)) |> 
+  rename(myriad_hrd_status = gis_pos_neg)
+
+kable(myriad_service_summary)
+
+```
+
 # Plots
 
 ```{r}
