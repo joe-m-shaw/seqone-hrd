@@ -365,6 +365,27 @@ all_hrd_data_pdf |>
 
 ```
 
+# Looking at just LGA
+
+Some sWGS HRD solutions only look at LGA events.
+
+```{r}
+#| label: looking-at-lga
+#| echo: FALSE
+
+lga_only_plot <- collated_live_pdf_data |> 
+  filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
+  ggplot(aes(x = lga, y = , fill = seqone_hrd_status)) +
+  geom_histogram(binwidth = 1) +
+  scale_fill_manual(values = c(safe_blue, safe_red)) +
+  theme_bw()
+  
+lga_only_plot
+
+```
+
+
+
 ```{r}
 #| label: failing-at-0.9
 #| eval: FALSE
