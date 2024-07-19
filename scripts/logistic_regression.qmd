@@ -1,11 +1,13 @@
 ---
-title: "Logisitic Regression Analysis"
-author: "Joe Shaw"
+title: "Logistic Regression Analysis"
+author: "Joe Shaw, Clinical Scientist (CS20980)"
+date: today
+date-format: "DD/MM/YYYY"
 format: pdf
 ---
 
 ```{r}
-#| label: packages-and-data
+#| label: packages
 #| include: FALSE
 
 library(tidyverse)
@@ -13,108 +15,184 @@ library(here)
 
 source(here("functions/hrd_functions.R"))
 
-seqone_live_data <- read_csv(file = here("data/seqone_collated_audit_data/collated_live_csv_data.csv"))
-
-seqone_validation_data <- read_csv(file = here("data/seqone_collated_audit_data/collated_validation_pdf_data.csv"))
-
 ```
 
-# Logistic regression of SeqOne results
+# Logistic regression
 
-The SeqOne "HRD score" is a value between 0 and 1. It is calculated using a logistic regression model, which originally used data from 184 ovarian cancer samples. The Myriad HRD status was used as a binary outcome, and the values of large genomic alterations (LGA) and loss of parental copy (LPC) events were used as the starting variables. Full details are given in [Boidot et al (2024)](https://pubmed.ncbi.nlm.nih.gov/38471290/).
+The SeqOne HRD score is a value between 0 and 1. It is calculated using a logistic regression model, which originally used data from 184 ovarian cancer samples. The Myriad HRD status was used as a binary outcome, and the values of large genomic alterations (LGA) and loss of parental copy (LPC) events were used as the starting variables. Full details are given in [Boidot et al (2024)](https://pubmed.ncbi.nlm.nih.gov/38471290/).
 
-My understanding of logistic regression is the cohort of 184 samples was used to develop a model to answer the question "given a certain combination of LGA and LPC values, what is the probability that the sample is HRD positive according to Myriad?"
+My (basic) understanding of logistic regression is the cohort of 184 samples was used to develop a model to answer the question "given a certain combination of LGA and LPC values, what is the probability that the sample is HRD positive according to Myriad?"
 
 The aim of the model was to be able to predict the most number of Myriad statuses correctly from the LGA and LPC results. That model could then be applied to situations when the Myriad status wasn't known.
 
-# Logistic regression on Manchester data
+{{< pagebreak >}}
 
-In the same way, we can use the SeqOne live service data from Manchester to act as a "training dataset" for a logistic regression model. The model will attempt to find the best way to predict the HRD status from the LGA and LPC results.
+# Making my own logistic regression model
 
-Note: the idea is to recreate the logistic regression model workflow purely for the purpose of better understanding what's going on. 
+I can try to replicate this using the validation cohort from the SeqOne HRD validation performed at the Manchester lab.
+
+For this validation, there was a series of samples with known genomic instability scores and HRD statuses from the Myriad test, which were then tested via the SeqOne method.
+
+I will use this series of samples as the training dataset for my model, using the "generalized linear models" function on this dataset.
 
 ```{r}
-#| label: training-and-testing-data
-#| include: TRUE
+#| label: training-data
+#| echo: FALSE
+#| message: FALSE
 
 set.seed(1)
 
-training_data <- seqone_live_data |> 
-  filter(status != "Non-conclusive") |> 
-  janitor::clean_names() |> 
-  mutate(seqone_hrd_status = as.factor(status))
+output_filepath <- "S:/central shared/Genetics/Mol_Shared/Development.Team/SeqOne Homologous Recombination Deficiency Validation/HRD R script files/outputs/"
 
-testing_data <- seqone_validation_data |> 
-  filter(seqone_hrd_status != "NON-CONCLUSIVE")
+training_data <- read_csv(paste0(output_filepath, 
+                                   "2023_11_10_10_55_08_compare_results.csv")) |> 
+  filter(path_block_manual_check == "pathology blocks match" &
+           !duplicated(dlms_dna_number) &
+           robustness >= 0.85) |> 
+  select(dlms_dna_number, lga, lpc, myriad_hrd_status) |> 
+  mutate(myriad_hrd_status = as.factor(myriad_hrd_status))
 
-# Use the "generalized linear models" function
-model <- glm(formula = as.factor(seqone_hrd_status) ~ lga + lpc, 
+print(head(training_data |> 
+       select(-dlms_dna_number)))
+
+```
+
+```{r}
+#| label: model
+#| include: TRUE
+
+model <- glm(formula = as.factor(myriad_hrd_status) ~ lga + lpc, 
              family = "binomial", 
              data = training_data)
 
 ```
 
-We can then use the model to predict the HRD status of samples in the validation dataset.
+{{< pagebreak >}}
 
-(I decided to use the validation dataset as the "test" dataset purely because there were fewer samples)
+# Visualising the model
+
+According to my understanding, the model takes a combination of LGA and LPC results and then calculates the likelihood that the combination will also have a positive Myriad HRD status, based on the data provided in the training dataset.
+
+To visualise what this actually looks like, I will create a dataset which is every possible integer combination of LGA and LPC in a sensible range (0 to 40).
 
 ```{r}
-#| label: predict-hrd-status
-#| include: TRUE
+#| label: artificial-data
+#| include: FALSE
 
-testing_data_with_predictions <- testing_data |> 
-  mutate(likelihood_hrd_pos = round(predict(model, 
+artificial_data <- expand.grid("lga" = 0:40, "lpc" = 0:40) |> 
+  mutate(joe_likelihood_hrd_pos = round(predict(model, 
                                             pick(lga, lpc), 
                                             type = "response"), 3),
-         predicted_status = case_when(
-           likelihood_hrd_pos >= 0.5 ~"Positive",
-           likelihood_hrd_pos < 0.5 ~"Negative"
+         joe_hrd_status = case_when(
+           joe_likelihood_hrd_pos >= 0.5 ~"Positive",
+           joe_likelihood_hrd_pos < 0.5 ~"Negative"
          ))
 
 ```
 
+When I plot the results in terms of LGA and LPC, there is a diagonal region between 10 to 20 LGA events where the new HRD score shifts from being very negative (blue) to very positive (red).
+
 ```{r}
-#| label: plot-results
+#| label: plot-lga-lpc-score
 #| echo: FALSE
 
-results_plot <- ggplot(testing_data_with_predictions, aes(x = seqone_hrd_score, 
-                                          y = likelihood_hrd_pos)) +
-  geom_point(shape = 21, size = 2) +
+ggplot(artificial_data, aes(x = lga, y = lpc)) +
+  geom_point(size = 3, aes(colour = joe_likelihood_hrd_pos)) +
+  scale_colour_gradient(low = safe_blue, high = safe_red, n.breaks = 3) +
   theme_bw() +
-  geom_vline(xintercept = 0.5, linetype = "dashed") +
-  geom_hline(yintercept = 0.5, linetype = "dashed") +
-  geom_point(data = testing_data_with_predictions |> 
-               filter(shallow_sample_id == "WS134687_21011999"), 
-             shape = 21, colour = "#CC6677", fill = NA, size = 5, stroke = 1) +
-  labs(title = "Logistic regression analysis of testing cohort",
-       x  = "SeqOne pipeline score",
-       y = "Logistic regression score",
-       subtitle = str_c("Model trained on ", nrow(training_data), 
-                        " samples in training cohort"),
-       caption = "One incorrect prediction circled in red")
-
-results_plot
+  theme(legend.position = "bottom") +
+  labs(colour = "Joe's new HRD score")
 
 ```
 
+{{< pagebreak >}}
+
+If I use 0.5 as a threshold for classifying combinations as HRD positive, then colour the dots by this status, the boundary becomes even clearer.
+ 
 ```{r}
-#| label: plot-lga-lpc-results
+#| label: plot-lga-lpc-status
 #| echo: FALSE
 
-lga_lpc_plot <- ggplot(testing_data_with_predictions, aes(x = lga, 
-                                          y = lpc)) +
-  geom_point(aes(colour = predicted_status, shape = seqone_hrd_status)) +
-  scale_colour_manual(values = c(safe_blue, safe_red))+
+ggplot(artificial_data, aes(x = lga, y = lpc)) +
+  geom_point(size = 3, aes(colour = joe_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(colour = "Joe's new HRD status")
+
+```
+
+{{< pagebreak >}}
+
+I can then overlay the boundary line from the official SeqOne pipeline to show that it is slightly different to my boundary line, but not by much. My model is a bit more likely to call samples are HRD negative.
+
+My model is definitely less accurate than the official SeqOne model - SeqOne's model uses data from 184 samples, whereas mine only uses data from 31. But it interesting how similar they look.
+
+```{r}
+#| label: plot-lga-lpc-status-with-line
+#| echo: FALSE
+
+ggplot(artificial_data, aes(x = lga, y = lpc)) +
+  geom_point(size = 3, aes(colour = joe_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red)) +
   theme_bw() +
   geom_segment(
     data = line_df,
-    mapping = aes(x = x, y = y, xend = xend, yend = yend),
-    linetype = "dashed") +
-  geom_point(data = testing_data_with_predictions |> 
-               filter(shallow_sample_id == "WS134687_21011999"), 
-             shape = 21, colour = "#CC6677", fill = NA, size = 5, stroke = 1)
+    mapping = aes(x = x, y = y, xend = xend, yend = yend)) +
+  theme(legend.position = "bottom") +
+  labs(colour = "Joe's new HRD score")
 
-lga_lpc_plot
+```
+
+{{< pagebreak >}}
+
+# Predicting HRD status for real ovarian cancer samples
+
+Now the real test - how does my model do against the real SeqOne pipeline when it comes to all the ovarian cancer samples we've tested as part of the HRD service?
+
+```{r}
+#| label: testing-data
+#| include: FALSE
+
+testing_data <- read_csv(file = here("data/seqone_collated_audit_data/collated_live_csv_data.csv")) |> 
+  janitor::clean_names() |> 
+  filter(status != "Non-conclusive") |> 
+  rename(seqone_hrd_status = status,
+         seqone_hrd_score = score)
+
+testing_data_with_predictions <- testing_data |> 
+  mutate(joe_likelihood_hrd_pos = round(predict(model, 
+                                            pick(lga, lpc), 
+                                            type = "response"), 3),
+         joe_hrd_status = case_when(
+           joe_likelihood_hrd_pos >= 0.5 ~"Positive",
+           joe_likelihood_hrd_pos < 0.5 ~"Negative"
+         ))
+
+```
+
+For 200 samples, there are only 4 borderline samples with different HRD statuses.
+
+```{r}
+#| label: compare-to-seqone-score-lga-lpc
+#| echo: FALSE
+
+ggplot(testing_data_with_predictions, aes(x = lga, 
+                                          y = lpc)) +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_point(data = testing_data_with_predictions |>
+               filter(seqone_hrd_status != joe_hrd_status), 
+             shape = 21, colour = "#CC6677", fill = NA, size = 4, stroke = 1) +
+  geom_point(aes(colour = joe_hrd_status, shape = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red))+
+  theme_bw() +
+  labs(shape = "SeqOne HRD status",
+       colour = "Joe's HRD status",
+       title = str_c("Results for ", nrow(testing_data_with_predictions), 
+                     " ovarian cancer samples"),
+       subtitle = "Samples with discrepant HRD statuses circled in red") 
 
 ```
 
