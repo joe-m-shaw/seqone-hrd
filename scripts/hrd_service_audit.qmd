@@ -365,6 +365,8 @@ all_hrd_data_pdf |>
 
 ```
 
+{{< pagebreak >}}
+
 # Looking at just LGA
 
 Some sWGS HRD solutions only look at LGA events.
@@ -384,7 +386,41 @@ lga_only_plot
 
 ```
 
+{{< pagebreak >}}
 
+# Repeat Variation
+
+```{r}
+#| label: repeat-variation
+#| echo: FALSE
+#| fig-height: 20
+#| fig-width: 15
+
+repeat_data <- rbind(collated_validation_pdf_data, 
+                          ws136827_pdf_data, 
+                          collated_live_pdf_data) |> 
+  filter(duplicated(dlms_dna_number, fromLast = TRUE) |
+           duplicated(dlms_dna_number, fromLast = FALSE))
+
+repeat_sample_number <- length(unique(repeat_data$dlms_dna_number))
+
+repeat_replicate_number <- length(unique(repeat_data$shallow_sample_id))
+
+ggplot(repeat_data, aes(x = lga, y = lpc)) +
+  geom_point(size =2, alpha = 0.8, aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  geom_segment(
+    data = line_df,
+    mapping = aes(x = x, y = y, xend = xend, yend = yend),
+    linetype = "dashed") +
+  theme(legend.position = "bottom", legend.box="vertical", legend.margin=margin()) +
+  labs(x = "Large Genomic Alterations", y = "Loss of Parental Copy",
+       title = str_c("Repeat Results: ", repeat_sample_number, " samples and ",
+                     repeat_replicate_number, " replicates")) +
+  facet_wrap(~dlms_dna_number)
+  
+```
 
 ```{r}
 #| label: failing-at-0.9
