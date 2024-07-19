@@ -31,9 +31,15 @@ The aim of the model was to be able to predict the most number of Myriad statuse
 
 I can try to replicate this using the validation cohort from the SeqOne HRD validation performed at the Manchester lab.
 
-For this validation, there was a series of samples with known genomic instability scores and HRD statuses from the Myriad test, which were then tested via the SeqOne method.
+For this validation, there was a series of samples with known genomic instability scores and HRD statuses from the Myriad test, which were then tested via the SeqOne method to determine the number of LGA and LPC events.
 
-I will use this series of samples as the training dataset for my model, using the "generalized linear models" function on this dataset.
+This gives me the three pieces of information I need for the model:
+
+1. The LGA events
+
+2. The LPC events
+
+3. The Myriad HRD status
 
 ```{r}
 #| label: training-data
@@ -56,6 +62,8 @@ print(head(training_data |>
        select(-dlms_dna_number)))
 
 ```
+
+I will use this series of samples as the training dataset for my model, using the glm ("generalized linear models") function.
 
 ```{r}
 #| label: model
@@ -124,7 +132,7 @@ ggplot(artificial_data, aes(x = lga, y = lpc)) +
 
 {{< pagebreak >}}
 
-I can then overlay the boundary line from the official SeqOne pipeline to show that it is slightly different to my boundary line, but not by much. My model is a bit more likely to call samples are HRD negative.
+I can then overlay the boundary line from the official SeqOne pipeline to show that it is slightly different to my boundary line, but not by much. My model is a bit more likely to call samples as HRD negative.
 
 My model is definitely less accurate than the official SeqOne model - SeqOne's model uses data from 184 samples, whereas mine only uses data from 31. But it interesting how similar they look.
 
@@ -179,9 +187,6 @@ For 200 samples, there are only 4 borderline samples with different HRD statuses
 
 ggplot(testing_data_with_predictions, aes(x = lga, 
                                           y = lpc)) +
-  geom_segment(
-    data = line_df,
-    mapping = aes(x = x, y = y, xend = xend, yend = yend)) +
   geom_point(data = testing_data_with_predictions |>
                filter(seqone_hrd_status != joe_hrd_status), 
              shape = 21, colour = "#CC6677", fill = NA, size = 4, stroke = 1) +
