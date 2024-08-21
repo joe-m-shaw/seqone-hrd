@@ -18,7 +18,7 @@ library("here")
 library("patchwork")
 library("knitr")
 
-source(here::here("functions/hrd_functions.R"))
+source(here("scripts/collate_seqone_audit_data.R"))
 
 ```
 
@@ -393,8 +393,6 @@ lga_only_plot
 ```{r}
 #| label: repeat-variation
 #| echo: FALSE
-#| fig-height: 20
-#| fig-width: 15
 
 repeat_data <- rbind(collated_validation_pdf_data, 
                           ws136827_pdf_data, 
@@ -421,6 +419,23 @@ ggplot(repeat_data, aes(x = lga, y = lpc)) +
   facet_wrap(~dlms_dna_number)
   
 ```
+
+```{r}
+#| label: lga-variation-vs-coverage
+#| echo: FALSE
+
+ggplot(repeat_data, aes(x = lga, y = coverage)) +
+  geom_point(size =2, alpha = 0.8, aes(colour = seqone_hrd_status)) +
+  scale_colour_manual(values = c(safe_blue, safe_red, safe_grey)) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.box="vertical", legend.margin=margin()) +
+  labs(x = "Large Genomic Alterations", y = "Coverage") +
+  facet_wrap(~dlms_dna_number)
+  
+```
+
+
+
 
 ```{r}
 #| label: failing-at-0.9
