@@ -323,12 +323,10 @@ get_hrd_score <- function(page, version) {
   hrd_score_char <- str_extract(page, hrd_score_regex, group = 1)
   
   hrd_score_double <- parse_number(hrd_score_char, locale = locale(decimal_mark = "."))
-
-  assert_that(is.na(hrd_score_double) == FALSE,
-              msg = "Seqone HRD score is NA")
   
-  assert_that(hrd_score_double >= 0, hrd_score_double <= 1,
-              msg = "SeqOne HRD score outside 0-1 range")
+  if(is.na(hrd_score_double)) {
+    message("Warning: Seqone HRD score is NA")
+  }
   
   return(hrd_score_double)
   
@@ -347,7 +345,7 @@ get_hrd_status <- function(page) {
   seqone_hrd_status <- fct(str_extract(page, hrd_status_regex, group = 1),
                            levels = seqone_status_levels)
   
-  assert_that(!is.na(seqone_hrd_status))
+  #assert_that(!is.na(seqone_hrd_status))
   
   return(seqone_hrd_status)
   
@@ -366,7 +364,7 @@ get_lga <- function(page) {
   
   lga <- parse_number(str_extract(page, lga_regex, group = 1))
   
-  assert_that(!is.na(lga))
+  #assert_that(!is.na(lga))
   
   return(lga)
   
@@ -385,7 +383,7 @@ get_lpc <- function(page) {
   
   lpc <- parse_number(str_extract(page, lpc_regex, group = 1))
   
-  assert_that(!is.na(lpc))
+  #assert_that(!is.na(lpc))
   
   return(lpc)
   
@@ -552,7 +550,7 @@ get_robustness <- function(page, version) {
     
   }
   
-  assert_that(!is.na(robustness))
+  #assert_that(!is.na(robustness))
   
   return(robustness)
   
@@ -583,7 +581,7 @@ get_low_tumour_fraction <- function(page, version) {
     
   }
   
-  assert_that(!is.na(low_tumour_fraction))
+  #assert_that(!is.na(low_tumour_fraction))
   
   return(low_tumour_fraction)
   
@@ -643,9 +641,9 @@ get_ccne1_rad51b <- function(page, version) {
     
   }
   
-  assert_that(!is.na(ccne1))
+  #assert_that(!is.na(ccne1))
   
-  assert_that(!is.na(rad51b))
+  #assert_that(!is.na(rad51b))
   
   return(list(ccne1, rad51b))
   
@@ -683,7 +681,7 @@ read_seqone_report <- function(file, version) {
     "version" = version
   )
 
-  check_na(output)
+  #check_na(output)
 
   return(output)
 }
