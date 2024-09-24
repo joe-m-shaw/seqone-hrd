@@ -18,7 +18,7 @@ library("here")
 library("patchwork")
 library("knitr")
 
-source(here("scripts/collate_seqone_audit_data.R"))
+source(here::here("functions/hrd_functions.R"))
 
 ```
 
@@ -84,6 +84,7 @@ all_hrd_data_pdf <- rbind(collated_validation_pdf_data,
 
 ```{r}
 #| label: dlms-connection
+#| eval: FALSE
 #| include: FALSE
 
 dbi_con <- DBI::dbConnect(
@@ -100,6 +101,7 @@ sample_tbl <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
 
 ```{r}
 #| label: get-referring-centres
+#| eval: FALSE
 #| include: FALSE
 
 live_samples <- collated_live_pdf_data$sample_id
@@ -144,7 +146,8 @@ seqone_referring_centres_summary <- seqone_referring_centres_clean |>
 
 ```{r}
 #| label: get-brca-status
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 results_tbl <- tbl(dbi_con, 
                    dbplyr::in_catalog(
@@ -290,7 +293,8 @@ seqone_histo_plot
 
 ```{r}
 #| label: hrd-score-brca-status
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 hrd_score_brca_plot <- seqone_pansolid_join |> 
   filter(brca_status %in% c("BRCA variant detected", "No BRCA variants detected") &
@@ -344,13 +348,10 @@ lga_lpc_plot
 
 {{< pagebreak >}}
 
-# Adding LPC and LGA
-
-The Myriad "Genomic Instability Score" (GIS) is the sum of counts for LST, TAI and LOH events in the sample. What happens if we sum LPC and LGA events in the same way?
-
 ```{r}
 #| label: summing-lga-lpc
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 all_hrd_data_pdf |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
@@ -365,15 +366,10 @@ all_hrd_data_pdf |>
 
 ```
 
-{{< pagebreak >}}
-
-# Looking at just LGA
-
-Some sWGS HRD solutions only look at LGA events.
-
 ```{r}
 #| label: looking-at-lga
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 lga_only_plot <- collated_live_pdf_data |> 
   filter(seqone_hrd_status != "NON-CONCLUSIVE") |> 
@@ -386,12 +382,11 @@ lga_only_plot
 
 ```
 
-{{< pagebreak >}}
-
 # Repeat Variation
 
 ```{r}
 #| label: repeat-variation
+#| warning: FALSE
 #| echo: FALSE
 
 repeat_data <- rbind(collated_validation_pdf_data, 
@@ -422,7 +417,8 @@ ggplot(repeat_data, aes(x = lga, y = lpc)) +
 
 ```{r}
 #| label: lga-variation-vs-coverage
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 ggplot(repeat_data, aes(x = lga, y = coverage)) +
   geom_point(size =2, alpha = 0.8, aes(colour = seqone_hrd_status)) +
@@ -433,9 +429,6 @@ ggplot(repeat_data, aes(x = lga, y = coverage)) +
   facet_wrap(~dlms_dna_number)
   
 ```
-
-
-
 
 ```{r}
 #| label: failing-at-0.9
@@ -559,11 +552,10 @@ eqa_result_lga_lpc
 
 {{< pagebreak >}}
 
-# SeraCare Controls
-
 ```{r}
 #| label: check-seracare-controls
-#| echo: FALSE
+#| eval: FALSE
+#| include: FALSE
 
 all_samples <- all_hrd_data_pdf$dlms_dna_number
 
@@ -631,18 +623,6 @@ seracare_lpc_lga_date_plot <- ggplot(seraseq_results, aes(x = lga, y = lpc)) +
   labs(title = "SeraCare control LPC and LGA results")
 
 seracare_lpc_lga_date_plot
-
-```
-
-{{< pagebreak >}}
-
-# Referring Centres
-
-```{r}
-#| label: referring-centres-table
-#| echo: FALSE
-
-knitr::kable(seqone_referring_centres_summary)
 
 ```
 
@@ -744,7 +724,8 @@ all_hrd_data_pdf |>
   geom_col(colour = "black") +
   scale_fill_manual(values = c(safe_blue, safe_red, safe_grey)) +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90)) +
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "bottom") +
   labs(x = "", y = "Number of results")
 
 
