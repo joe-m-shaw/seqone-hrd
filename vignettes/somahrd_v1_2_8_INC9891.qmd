@@ -1,0 +1,128 @@
+---
+title: "SomaHRD v1.2.8 verification (INC9891)"
+author: "Joe Shaw (CS20980)"
+format: html
+date: today
+date-format: "YYYY-MM-DD"
+---
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(here)
+
+source(here("functions/hrd_functions.R"))
+
+data_filepath <- config::get(value = "data_filepath")
+
+options(digits = 16)
+
+```
+
+10 samples were run on SomaHRD v1.2.8 on the SeqOne portal and the csv file outputs were downloaded to this file location:
+
+`r paste0(data_filepath, "live_service/INC9891/")`
+
+The results from these files were compared to the csv file outputs for the same samples tested using SomaHRD v1.2.7 during INC9110, which are saved here:
+
+`r paste0(data_filepath, "live_service/INC9110/")`
+
+# Overall Results
+
+The results are shown in @tbl-version-comparison.
+
+```{r}
+#| label: tbl-version-comparison
+#| tbl-cap: "Overall results"
+#| echo: FALSE
+
+v1_2_8_files <- list.files(path = paste0(
+  data_filepath,
+  "live_service/INC9891/"),
+  full.names = TRUE,
+  pattern = "*.csv")
+
+v1_2_8_data <- v1_2_8_files |> 
+  map(\(v1_2_8_files) read_seqone_csv(file = v1_2_8_files)) |> 
+  list_rbind() |> 
+  mutate(semantic_version = "v1.2.8")
+
+v1_2_7_files <- list.files(path = paste0(
+  data_filepath,
+  "live_service/INC9110/20240412_reanalysis/"),
+  full.names = TRUE,
+  pattern = "*.csv")
+
+v1_2_7_data <- v1_2_7_files |> 
+  map(\(v1_2_7_files) read_seqone_csv(file = v1_2_7_files)) |> 
+  list_rbind() |> 
+  mutate(semantic_version = "v1.2.7") |> 
+  filter(sample %in% v1_2_8_data$sample)
+
+both_versions <- rbind(v1_2_7_data, v1_2_8_data) |> 
+  arrange(sample, analysis_date) |> 
+  select(-somahrd_version) |> 
+  pivot_wider(id_cols = c(sample),
+              names_from = semantic_version,
+              values_from = -c(sample, semantic_version))
+
+knitr::kable(both_versions) 
+
+```
+
+All outputs are equal except for the low_tumour_fraction output when compared to 16 decimal places.
+
+```{r}
+#| label: check-versions
+#| include: TRUE
+
+identical(both_versions$LGA_v1.2.7, both_versions$LGA_v1.2.8)
+
+identical(both_versions$LPC_v1.2.7, both_versions$LPC_v1.2.8)
+
+identical(both_versions$score_v1.2.7, both_versions$score_v1.2.8)
+
+identical(both_versions$status_v1.2.7, both_versions$status_v1.2.8)
+
+identical(both_versions$brca_status_v1.2.7, both_versions$brca_status_v1.2.8)
+
+identical(both_versions$brca_mutation_v1.2.7, both_versions$brca_mutation_v1.2.8)
+
+identical(both_versions$ccne1_cn_v1.2.7, both_versions$ccne1_cn_v1.2.8)
+
+identical(both_versions$rad51b_cn_v1.2.7, both_versions$rad51b_cn_v1.2.8)
+
+identical(both_versions$coverage_v1.2.7, both_versions$coverage_v1.2.8)
+
+identical(both_versions$pct_mapped_reads_v1.2.7, both_versions$pct_mapped_reads_v1.2.8)
+
+identical(both_versions$pct_tum_cell_v1.2.7, both_versions$pct_tum_cell_v1.2.8)
+
+identical(both_versions$gi_confidence_v1.2.7, both_versions$gi_confidence_v1.2.8)
+
+identical(both_versions$low_tumor_fraction_v1.2.7, both_versions$low_tumor_fraction_v1.2.8)
+
+```
+
+# Low Tumour Fraction
+
+```{r}
+#| label: tumor-fraction-difference
+#| include: FALSE
+
+low_tumor_diff <- both_versions |> 
+  select(sample, low_tumor_fraction_v1.2.7, low_tumor_fraction_v1.2.8) |> 
+  mutate(diff = abs(low_tumor_fraction_v1.2.7 - low_tumor_fraction_v1.2.8))
+
+```
+
+The difference in low tumour fraction calculation varied from `r min(low_tumor_diff$diff)` to `r max(low_tumor_diff$diff)`.
+
+```{r}
+#| label: tbl-tumor-fraction-difference
+#| tbl-cap: "Low tumour fraction difference"
+#| echo: FALSE
+
+knitr::kable(low_tumor_diff)
+
+```
