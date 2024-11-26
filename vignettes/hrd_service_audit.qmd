@@ -24,6 +24,7 @@ source(here("functions/hrd_functions.R"))
 
 Data for this audit is collated using the collate_seqone_audit_data.R script.
 
+
 ```{r}
 #| label: load-collated-data
 #| include: false
