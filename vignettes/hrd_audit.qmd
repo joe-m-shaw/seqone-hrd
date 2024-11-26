@@ -1,0 +1,146 @@
+---
+title: "SeqOne HRD Service Audit"
+format: 
+  docx:
+    reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
+    link-citations: true
+toc: true
+toc-title: "Table of Contents"
+bibliography: hrd_library.bib
+csl: harvard-manchester-metropolitan-university.csl
+fig-align: "left"
+date: today
+date-format: "DD/MM/YYYY"
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+
+```
+
+Authors: Joe Shaw (CS20980) and Antonio Pereira
+
+# Introduction
+
+This is an audit of the first year of the homologous recombination deficiency (HRD) testing service using the SeqOne SomaHRD pipeline at the Manchester Genomics Laboratory Hub (GLH).
+
+## Key points and references
+
+- **December 2023:** the SeqOne SomaHRD v1.2.0 pipeline was validated ([DOC6192]{custom-style="Strong"}).
+
+- **December 2023:** the SeqOne HRD clinical service began. DNA was extracted using the Cobas extraction method (Qiagen). Results were entered and reported by GLH scientists on the DNA Database.
+
+- **April 2024:** the QIAsymphony DNA extraction method was validated for use with SeqOne ([DOC6255]{custom-style="Strong"}).
+
+- **April 2024:** results were entered by GLH scientists on the iGene database.
+
+- **April 2024:** SomaHRD was upgraded to v1.2.7 ([INC9110]{custom-style="Strong"}).
+
+- **November 2024:** SomaHRD was upgraded to v1.2.8 ([INC9891]{custom-style="Strong"}).
+
+# Genomic instability and *BRCA1/2* variants
+
+```{r}
+#| label: load-igene-data
+#| include: FALSE
+
+audit_filepath <- paste0(config::get("data_filepath"), "live_service/service/")
+
+igene_export <- read_excel(path = paste0(audit_filepath,
+                                         "audit_files/",
+                                         "20241125 Draft Test Results HRD BRCA.xlsx")) |> 
+  clean_names()
+
+widen_by_test <- function(df = igene_export, test_string,
+                          prefix_string) {
+  
+  output <- igene_export |> 
+    filter(test == test_string) |> 
+    select(-box) |> 
+    pivot_wider(id_cols = c(referral:test_id),
+                names_from = field,
+                values_from = value,
+                names_prefix = prefix_string) |> 
+    clean_names()
+  
+  if(nrow(output) == 0){
+    stop("Output dataframe is empty")
+  }
+  
+  return(output)
+  
+}
+
+tbrca_igene_df <- widen_by_test(test_string = "PANEL: M2_tBRCA_PS", prefix_string = "t_BRCA")
+
+seqone_igene_df <- widen_by_test(test_string = "PANEL: M2.5 - SeqOne HRD Status", 
+                                 prefix_string = "seqone") |> 
+  mutate(seqone_seq_one_hrd_score = as.numeric(seqone_seq_one_hrd_score))
+
+icp_igene_df <- widen_by_test(test_string = "PANEL: R207.1 - Inherited ovarian cancer (without breast cancer) v4.0 (ICP)",
+                              prefix_string = "icp")
+
+pass_headlines <- c("No reportable variant(s) detected",
+                                       "Reportable variant(s) detected")
+
+tbrca_seqone_df <- tbrca_igene_df |> 
+  filter(t_brca_headline_result %in% pass_headlines) |> 
+  inner_join(seqone_igene_df |> 
+               filter(seqone_headline_result %in% pass_headlines),
+             by = c("patient_id", "referral"))
+
+icp_seqone_df <- icp_igene_df |> 
+  filter(icp_headline_result %in% pass_headlines) |> 
+  inner_join(seqone_igene_df |> 
+               filter(seqone_headline_result %in% pass_headlines),
+             by = c("patient_id"))
+
+```
+```{r}
+#| label: fig-tbrca-seqone
+#| fig-cap: "This figure shows the results for samples tested with both SeqOne SomaHRD and tBRCA NGS. Samples where either test failed are excluded."
+#| echo: FALSE
+
+tbrca_seqone_plot <- ggplot(tbrca_seqone_df, aes(x = seqone_seq_one_hrd_score, y = )) +
+  geom_histogram(aes(fill = t_brca_headline_result),
+                 binwidth = 0.01) +
+  scale_fill_manual(values = c("#888888", "#CC6677")) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Results for ", nrow(tbrca_seqone_df), " samples from iGene"),
+       x = "SeqOne HRD score (from iGene)",
+       y = "Number of samples",
+       fill = "tBRCA result")
+
+tbrca_seqone_plot
+
+```
+
+```{r}
+#| label: fig-icp-seqone
+#| echo: FALSE
+
+icp_seqone_plot <- ggplot(icp_seqone_df, aes(x = seqone_seq_one_hrd_score, y = )) +
+  geom_histogram(aes(fill = icp_headline_result),
+                 binwidth = 0.01) +
+  scale_fill_manual(values = c("#888888", "#CC6677")) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Results for ", nrow(icp_seqone_df), " samples from iGene"),
+       x = "SeqOne HRD score (from iGene)",
+       y = "Number of samples",
+       fill = "ICP result")
+
+icp_seqone_plot
+
+```
+
+
+
+
+
