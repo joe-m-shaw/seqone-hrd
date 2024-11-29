@@ -1,0 +1,157 @@
+---
+title: "SeqOne Manual Library Preparation"
+format: 
+  docx:
+    reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
+    link-citations: true
+toc: false
+bibliography: hrd_library.bib
+csl: harvard-manchester-metropolitan-university.csl
+fig-align: "left"
+date: today
+date-format: "DD/MM/YYYY"
+fig-width: 6
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(here)
+library(ggpubr)
+
+source(here("functions/hrd_functions.R"))
+
+data_path <- config::get("data_filepath")
+
+```
+
+```{r}
+#| label: data
+#| include: FALSE
+
+automated_files <- list.files(path = paste0(data_path,
+                                            "validation/DOC6255_qiasymphony/seqone_reports/"),
+                              pattern = "*.csv",
+                              full.names = TRUE)
+
+manual_files <- list.files(path = paste0(data_path,
+                                         "validation/manual_library_prep/",
+                                         "seqone_reports/"),
+                              pattern = "*.csv",
+                              full.names = TRUE)
+
+all_files <- c(automated_files, manual_files)
+
+collated_files <- all_files |> 
+  map(\(all_files) read_seqone_csv(all_files)) |> 
+  list_rbind() |> 
+  mutate(worksheet = str_extract(string = sample,
+                                 pattern = "WS\\d{6}"),
+         labno = str_extract(string = sample,
+                             pattern = "\\d{8}"),
+         library_prep = case_when(
+           worksheet %in% c("WS136827", "WS138061", "WS138201",
+                            "WS138439", "WS138627") ~"auto",
+           
+           worksheet == "WS147582" ~"manual"
+         ))
+
+collated_manual <- collated_files |> 
+  filter(library_prep == "manual")
+
+collated_auto <- collated_files |> 
+  filter(library_prep == "auto")
+
+auto_vs_manual_df <- collated_manual |> 
+  inner_join(collated_auto, by = "labno",
+             suffix = c("_manual", "_auto")) |> 
+  select(labno, 
+         worksheet_auto, worksheet_manual,
+         analysis_date_auto, analysis_date_manual,
+         LGA_auto, LGA_manual,
+         LPC_auto, LPC_manual,
+         score_auto, score_manual,
+         status_auto, status_manual,
+         ccne1_cn_auto, ccne1_cn_manual,
+         rad51b_cn_auto, rad51b_cn_manual,
+         coverage_auto, coverage_manual,
+         pct_mapped_reads_auto, pct_mapped_reads_manual,
+         pct_tum_cell_auto, pct_tum_cell_manual,
+         gi_confidence_auto, gi_confidence_manual,
+         low_tumor_fraction_auto, low_tumor_fraction_manual)
+
+if(nrow(auto_vs_manual_df) != 7) {
+  stop("Not 7 rows in comparison table")
+}
+
+write_csv(auto_vs_manual_df, file = paste0(data_path,
+                                           "validation/manual_library_prep/collated_data/",
+                                           "auto_vs_manual_results.csv"))
+
+```
+
+```{r}
+#| label: make-plots
+#| include: FALSE
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", 
+               "#009E73", "#F0E442", "#0072B2", "#D55E00")
+
+plot_auto_v_manual <- function(df, var1, var2, axismin, axismax) {
+  
+  plot <- df |> 
+    ggplot(aes(x = {{ var1 }}, y = {{ var2 }})) +
+      geom_point(shape = 21, size = 3, aes(fill = labno)) +
+      scale_fill_manual(values = cbPalette) +
+      geom_abline(linetype = "dashed") +
+      theme_bw() +
+      theme(legend.position = "none") +
+      ylim(axismin, axismax) +
+      xlim(axismin, axismax)
+  
+  return(plot)
+  
+}
+
+lga_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(var1 = LGA_auto, var2 = LGA_manual,
+                 0, max(auto_vs_manual_df$LGA_auto, auto_vs_manual_df$LGA_auto) + 2)
+
+lpc_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(var1 = LPC_auto, var2 = LPC_manual,
+                 0, max(auto_vs_manual_df$LPC_auto, auto_vs_manual_df$LPC_auto) + 2)
+
+score_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(score_auto, score_manual, 0, 1)
+
+coverage_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(coverage_auto, coverage_manual,
+                 min(auto_vs_manual_df$coverage_auto, auto_vs_manual_df$coverage_manual) - 0.5,
+                 max(auto_vs_manual_df$coverage_auto, auto_vs_manual_df$coverage_manual) + 0.5)
+
+confidence_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(gi_confidence_auto, gi_confidence_manual, 0.75, 1)
+
+pct_reads_plot <- auto_vs_manual_df |> 
+  plot_auto_v_manual(pct_mapped_reads_auto, pct_mapped_reads_manual, 0.95, 1)
+
+```
+
+```{r}
+#| label: fig-comparison-plots
+#| fig-cap: "Comparison of metrics from automated (auto) and manual library preparation methods."
+#| fig-height: 8
+#| echo: FALSE
+
+ggarrange(plotlist = list(lga_plot, lpc_plot, score_plot,
+                          coverage_plot, confidence_plot,
+                          pct_reads_plot),
+          nrow = 3, 
+          ncol = 2,
+          common.legend = TRUE,
+          legend = "bottom"
+          )
+  
+```
