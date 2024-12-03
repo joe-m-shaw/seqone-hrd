@@ -2,7 +2,7 @@
 
 library(tidyverse)
 
-audit_filepath <- paste0(config::get("data_filepath"), "live_service/service/audit_files/")
+DOC6590_filepath <- paste0(config::get("data_filepath"), "live_service/DOC6590/")
 
 dbi_con <- DBI::dbConnect(
   drv = odbc::odbc(),
@@ -31,7 +31,7 @@ ncc_regex <- regex(
 tbrca_sample_df <- sample_tbl |> 
   filter((disease == 204 | disease_2 == 204 |
            disease_3 == 204 | disease_4 == 204) &
-           date_in >= "2023-12-01 00:00:00" ) |> 
+           date_in >= "2023-12-01 00:00:00") |> 
   select(labno, disease, disease_2, disease_3, 
          disease_4, date_in, comments) |> 
   collect() |> 
@@ -39,7 +39,7 @@ tbrca_sample_df <- sample_tbl |>
                            pattern = ncc_regex, 
                            group = 1))
 
-write_csv(tbrca_sample_df, file = paste0(audit_filepath,
+write_csv(tbrca_sample_df, file = paste0(DOC6590_filepath,
                                         "dlims_sample_info.csv"))
 
 tbrca_sample_vector <- tbrca_sample_df$labno
@@ -56,7 +56,7 @@ tbrca_results <- results_tbl |>
 seqone_results <- tbrca_results |> 
   filter(test %in% c("sWGS HRD_SeqOne", "sWGS HRD_SeqOne SSXT HS2"))
 
-write_csv(seqone_results, file = paste0(audit_filepath, 
+write_csv(seqone_results, file = paste0(DOC6590_filepath, 
                                         "dlims_seqone_results.csv"))
 
 pansolid_results <- tbrca_results |> 
@@ -67,5 +67,5 @@ pansolid_results <- tbrca_results |>
                       "Proxy genotype WS for WS139270", 
                       "Qiseq re-analysis of WS139083 (CP20477)"))
 
-write_csv(pansolid_results, file = paste0(audit_filepath,
+write_csv(pansolid_results, file = paste0(DOC6590_filepath,
                                           "dlims_pansolid_results.csv"))
