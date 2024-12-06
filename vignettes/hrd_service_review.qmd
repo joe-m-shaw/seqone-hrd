@@ -342,14 +342,10 @@ knitr::kable(dlims_brca_samples)
 #| label: load-igene-data
 #| include: FALSE
 
-igene_export <- read_excel(path = paste0(DOC6590_filepath,
-                                         "20241125 Draft Test Results HRD BRCA.xlsx")) |> 
-  clean_names()
-
-widen_by_test <- function(df = igene_export, test_string,
+widen_by_test <- function(df = eval_hrd, test_string,
                           prefix_string) {
   
-  output <- igene_export |> 
+  output <- eval_hrd |> 
     filter(test == test_string) |> 
     select(-box) |> 
     pivot_wider(id_cols = c(referral:test_id),
@@ -390,7 +386,7 @@ if(any(duplicated(tbrca_igene_df$test_id)) |
   stop("Test IDs are duplicated in iGene data")
 }
 
-if(length(setdiff(unique(igene_export$test), igene_test_strings)) > 0){
+if(length(setdiff(unique(eval_hrd$test), igene_test_strings)) > 0){
   stop("Other test anames are present in iGene data")
 }
 
@@ -407,17 +403,17 @@ tbrca_seqone_df <- tbrca_igene_df |>
   filter(t_brca_headline_result %in% pass_headlines) |> 
   inner_join(seqone_igene_df |> 
                filter(seqone_headline_result %in% pass_headlines),
-             by = c("patient_id", "referral"))
+             by = c("nhs_no", "referral"))
 
 icp_seqone_df <- icp_igene_df |> 
   filter(icp_headline_result %in% pass_headlines) |> 
   inner_join(seqone_igene_df |> 
                filter(seqone_headline_result %in% pass_headlines),
-             by = c("patient_id"))
+             by = c("nhs_no"))
 
 ```
 
-The same analysis was performed on data from the iGene database. There were `r nrow(tbrca_seqone_df)` samples with reportable results from SeqOne testing and *BRCA1/2* sequencing. Samples with an inconclusive or fail result for either test were excluded. Results were joined using the "patient_id" and "referral" (R number) fields from iGene.
+The same analysis was performed on data from the iGene database. There were `r nrow(tbrca_seqone_df)` samples with reportable results from SeqOne testing and *BRCA1/2* sequencing. Samples with an inconclusive or fail result for either test were excluded. Results were joined using the "nhs_no" and "referral" (R number) fields from iGene.
 
 ```{r}
 #| label: fig-tbrca-seqone
@@ -454,7 +450,7 @@ knitr::kable(igene_brca_somatic_tbl)
 
 ```
 
-Samples were also checked to see if the patient had a germ-line *BRCA1/2* variant identified on the Inherited Cancer Panel (ICP) test. Results were joined by the "patient_id" field from iGene.
+Samples were also checked to see if the patient had a germ-line *BRCA1/2* variant identified on the Inherited Cancer Panel (ICP) test. Results were joined by the "nhs_no" field from iGene.
 
 ```{r}
 #| label: fig-icp-seqone
