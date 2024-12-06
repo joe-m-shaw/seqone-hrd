@@ -23,11 +23,14 @@ library(readxl)
 library(janitor)
 library(here)
 library(patchwork)
+library(odbc)
+library(DBI)
+library(dbplyr)
 
 ```
 
 ```{r}
-#| label: get-data
+#| label: get-dlims-data
 #| include: FALSE
 
 source(here("scripts/get_dlims_hrd_review_data.R"))
@@ -120,7 +123,25 @@ Data was collated from the following sources:
 
 - The DNA Database (DLIMS) MicroSoft SQL server, via an ODBC connection. Data was extracted for samples with disease code 204 (tumour BRCA) recieved after 01/12/2023.
 
-- The iGene database, via a custom data export.
+- The iGene database, via a custom data export. Data were saved on the MicrosoftSQL server as "Eval_HRD" and accessed using the odbc package.
+
+```{r}
+#| label: eval-hrd-connection
+#| echo: FALSE
+
+dbi_con <- DBI::dbConnect(
+  drv = odbc::odbc(),
+  dsn = "moldb")
+
+eval_hrd <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                                              schema = "dbo",
+                                              table = "Eval_HRD")) |> 
+  janitor::clean_names() |> 
+  collect()
+
+DBI::dbDisconnect(conn = dbi_con)
+
+```
 
 - Comma separated value (.csv) files downloaded from the SeqOne website: [https://seqone.com/]()
 
