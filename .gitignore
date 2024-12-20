@@ -65,3 +65,7 @@ scripts/*.html
 *.css
 *.woff
 *.js
+
+# Excels and csvs which could contain patient information
+*.csv
+*.xlsx
