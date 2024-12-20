@@ -143,12 +143,17 @@ data_folder_live_csv <- list.files(path = paste0(data_config, "live_service/serv
                                           pattern = "*.csv",
                                           full.names = TRUE)
 
+
+
 collated_live_csv_data <- data_folder_live_csv |> 
   map(\(data_folder_live_csv) read_seqone_csv(file = data_folder_live_csv)) |> 
   list_rbind() |> 
   mutate(worksheet = str_extract(string = sample,
-                                 pattern = "(WS[0-9]{6})_\\d{8}",
-                                 group = 1))
+                                 pattern = "(WS[0-9]{6})_(\\d{8})",
+                                 group = 1),
+         labno = str_extract(string = sample,
+                             pattern = "(WS[0-9]{6})_(\\d{8})",
+                             group = 2))
 
 if(nrow(collated_live_csv_data) == 0) {
   stop()
