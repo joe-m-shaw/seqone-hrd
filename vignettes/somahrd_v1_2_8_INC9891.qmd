@@ -10,6 +10,7 @@ date-format: "YYYY-MM-DD"
 #| include: FALSE
 
 library(here)
+library(readxl)
 
 source(here("functions/hrd_functions.R"))
 
@@ -19,21 +20,25 @@ options(digits = 16)
 
 ```
 
-10 samples were run on SomaHRD v1.2.8 on the SeqOne portal and the csv file outputs were downloaded to this file location:
+# Verification of SomaHRD v1.2.8
+
+10 samples were run on SomaHRD v1.2.8 on the SeqOne portal and the csv file 
+outputs were downloaded to this file location:
 
 `r paste0(data_filepath, "live_service/INC9891/")`
 
-The results from these files were compared to the csv file outputs for the same samples tested using SomaHRD v1.2.7 during INC9110, which are saved here:
+The results from these files were compared to the csv file outputs for the 
+same samples tested using SomaHRD v1.2.7 during INC9110, which are saved here:
 
 `r paste0(data_filepath, "live_service/INC9110/")`
 
-# Overall Results
+## Overall Results
 
 The results are shown in @tbl-version-comparison.
 
 ```{r}
 #| label: tbl-version-comparison
-#| tbl-cap: "Overall results"
+#| tbl-cap: "SomaHRD v1.2.7 vs 1.2.8 results"
 #| echo: FALSE
 
 v1_2_8_files <- list.files(path = paste0(
@@ -70,10 +75,11 @@ knitr::kable(both_versions)
 
 ```
 
-All outputs are equal except for the low_tumour_fraction output when compared to 16 decimal places.
+All outputs are equal except for the low_tumour_fraction output when compared 
+to 16 decimal places.
 
 ```{r}
-#| label: check-versions
+#| label: check-v-1-2-8
 #| include: TRUE
 
 identical(both_versions$LGA_v1.2.7, both_versions$LGA_v1.2.8)
@@ -104,7 +110,7 @@ identical(both_versions$low_tumor_fraction_v1.2.7, both_versions$low_tumor_fract
 
 ```
 
-# Low Tumour Fraction
+## Low Tumour Fraction
 
 ```{r}
 #| label: tumor-fraction-difference
@@ -116,7 +122,8 @@ low_tumor_diff <- both_versions |>
 
 ```
 
-The difference in low tumour fraction calculation varied from `r min(low_tumor_diff$diff)` to `r max(low_tumor_diff$diff)`.
+The difference in low tumour fraction calculation varied from 
+`r min(low_tumor_diff$diff)` to `r max(low_tumor_diff$diff)`.
 
 ```{r}
 #| label: tbl-tumor-fraction-difference
@@ -126,3 +133,166 @@ The difference in low tumour fraction calculation varied from `r min(low_tumor_d
 knitr::kable(low_tumor_diff)
 
 ```
+
+# Verification of SomaHRD v1.2.12
+
+On 2024-12-31 SeqOne alerted us that they were updating SomaHRD from v1.2.8 to
+v1.2.12.
+
+They had performed a comparison analysis of the same 10 samples, and sent us 
+the results: "2024-12-31_Manchester SomaHRD v1.2 patch updates - 
+Non-regression testing.xlsx"
+
+```{r}
+#| include: FALSE
+
+seqone_filename <- "2024-12-31_Manchester SomaHRD v1.2 patch updates - Non-regression testing.xlsx"
+
+seqone_excel_tab1 <- read_excel(path = paste0(data_filepath,
+                                         "live_service/INC9891/",
+                                        seqone_filename),
+                           sheet = "1.2.7 -> 1.2.8",
+                           col_types = 
+                             c("text", "date", "text", 
+                               "numeric", "numeric", "numeric", 
+                               "text", "text", "text",
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric")) |> 
+  janitor::clean_names()
+
+seqone_excel_tab2 <- read_excel(path = paste0(data_filepath,
+                                         "live_service/INC9891/",
+                                        seqone_filename),
+                           sheet = "1.2.8 -> 1.2.12",
+                           col_types = 
+                             c("text", "date", "text", 
+                               "numeric", "numeric", "numeric", 
+                               "text", "text", "text",
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric")) |> 
+  janitor::clean_names()
+
+seqone_tab1_wide <- seqone_excel_tab1 |> 
+  pivot_wider(id_cols = sample,
+              names_from = somahrd_version,
+              values_from = -c(sample, somahrd_version))
+
+seqone_tab2_wide <- seqone_excel_tab2 |> 
+  pivot_wider(id_cols = sample,
+              names_from = somahrd_version,
+              values_from = -c(sample, somahrd_version))
+
+```
+
+The results are show in @tbl-v1-2-12-comparison.
+
+```{r}
+#| label: tbl-v1-2-12-comparison
+#| tbl-cap: "SomaHRD v1.2.8 vs 1.2.12 results"
+#| echo: FALSE
+
+knitr::kable(seqone_tab2_wide)
+
+```
+
+All outputs are identical except for the low_tumour_fraction and rad51b_cn.
+
+```{r}
+#| label: check-v-1-2-12
+#| include: TRUE
+
+identical(seqone_tab2_wide$lga_v1.2.8, seqone_tab2_wide$lga_v1.2.12)
+
+identical(seqone_tab2_wide$lpc_v1.2.8, seqone_tab2_wide$lpc_v1.2.12)
+
+identical(seqone_tab2_wide$score_v1.2.8, seqone_tab2_wide$score_v1.2.12)
+
+identical(seqone_tab2_wide$status_v1.2.8, seqone_tab2_wide$status_v1.2.12)
+
+identical(seqone_tab2_wide$brca_status_v1.2.8, seqone_tab2_wide$brca_status_v1.2.12)
+
+identical(seqone_tab2_wide$brca_mutation_v1.2.8, seqone_tab2_wide$brca_mutation_v1.2.12)
+
+identical(seqone_tab2_wide$ccne1_cn_v1.2.8, seqone_tab2_wide$ccne1_cn_v1.2.12)
+
+identical(seqone_tab2_wide$rad51b_cn_v1.2.8, seqone_tab2_wide$rad51b_cn_v1.2.12)
+
+identical(seqone_tab2_wide$coverage_v1.2.8, 
+          seqone_tab2_wide$coverage_v1.2.12)
+
+identical(seqone_tab2_wide$pct_mapped_reads_v1.2.8,
+          seqone_tab2_wide$pct_mapped_reads_v1.2.12)
+
+identical(seqone_tab2_wide$pct_tum_cell_v1.2.8,
+          seqone_tab2_wide$pct_tum_cell_v1.2.12)
+
+identical(seqone_tab2_wide$gi_confidence_v1.2.8,
+          seqone_tab2_wide$gi_confidence_v1.2.12)
+
+identical(seqone_tab2_wide$low_tumor_fraction_v1.2.8,
+          seqone_tab2_wide$low_tumor_fraction_v1.2.12)
+
+```
+
+The difference for rad51b_cn was due to the value being formatted as a date, not
+a number, in the original Excel.
+
+```{r}
+#| label: rad51b_cn
+#| echo: FALSE
+
+rad51b_tbl <- seqone_tab2_wide |> 
+  filter(rad51b_cn_v1.2.8 != rad51b_cn_v1.2.12) |> 
+  select(sample, rad51b_cn_v1.2.8, rad51b_cn_v1.2.12)
+
+knitr::kable(rad51b_tbl)
+
+```
+
+```{r}
+#| label: v1-2-12-low-tumour-fraction
+#| echo: FALSE
+
+low_tumour_fraction_tbl <- seqone_tab2_wide |> 
+  filter(low_tumor_fraction_v1.2.8 != low_tumor_fraction_v1.2.12) |> 
+  select(sample, low_tumor_fraction_v1.2.8, low_tumor_fraction_v1.2.12) |> 
+  mutate(difference = abs(low_tumor_fraction_v1.2.8 - 
+                            low_tumor_fraction_v1.2.12))
+
+knitr::kable(low_tumour_fraction_tbl)
+
+```
+
+The differences for low_tumour_fraction were again very small, ranging from
+`r min(low_tumour_fraction_tbl$difference)` to 
+`r max(low_tumour_fraction_tbl$difference)`.
+
+```{r}
+#| label: low-tumour-fraction-full-comparison
+#| echo: FALSE
+
+low_tumour_v7_v12 <- seqone_tab1_wide |> 
+              select(sample, low_tumor_fraction_v1.2.7) |> 
+  left_join(seqone_tab2_wide |> 
+              select(sample, low_tumor_fraction_v1.2.12),
+            by = "sample") |> 
+  mutate(difference = abs(low_tumor_fraction_v1.2.7 -
+                          low_tumor_fraction_v1.2.12))
+
+knitr::kable(low_tumour_v7_v12)
+
+```
+
+Comparing v1.2.7 to v1.2.12, the low tumour fraction varies from 
+`r min(low_tumour_v7_v12$difference)` to 
+`r max(low_tumour_v7_v12$difference)`.
+
+The low tumour fraction metric is not used in the analysis of SeqOne data by
+Manchester GLH scientists, and hence these minor changes are not expected to
+impact the accuracy of the method.
+
+# Conclusion
+
+SeqOne SomaHRD v1.2.12 is accepted for clinical use.
