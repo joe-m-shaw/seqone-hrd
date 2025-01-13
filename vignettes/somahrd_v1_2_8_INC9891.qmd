@@ -293,6 +293,90 @@ The low tumour fraction metric is not used in the analysis of SeqOne data by
 Manchester GLH scientists, and hence these minor changes are not expected to
 impact the accuracy of the method.
 
+# Verification of SomaHRD v1.2.13
+
+On 2024-01-09 SeqOne informed us the SomaHRD version had updated again to 
+v1.1.13.
+
+I checked every column in the results table - all were identical except for 
+the low_tumour_fraction calculation.
+
+```{r}
+#| include: FALSE
+
+seqone_v13_data <- read_excel(path = paste0(data_filepath,
+                                         "live_service/INC9891/",
+                                        "somaHRD 1.2.12 vs 1.2.13.xlsx"),
+                           sheet = "Feuil1",
+                           col_types = 
+                             c("text", "date", "text", 
+                               "numeric", "numeric", "numeric", 
+                               "text", "text", "text",
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric")) |> 
+  janitor::clean_names()
+
+seqone_v13_wide <-  seqone_v13_data |> 
+  pivot_wider(id_cols = sample,
+              names_from = somahrd_version,
+              values_from = -c(sample, somahrd_version))
+
+identical(seqone_v13_wide$lga_v1.2.12, seqone_v13_wide$lga_v1.2.13)
+
+identical(seqone_v13_wide$lpc_v1.2.12, seqone_v13_wide$lpc_v1.2.13)
+
+identical(seqone_v13_wide$score_v1.2.12, seqone_v13_wide$score_v1.2.13)
+
+identical(seqone_v13_wide$status_v1.2.12, seqone_v13_wide$status_v1.2.13)
+
+identical(seqone_v13_wide$brca_status_v1.2.12, seqone_v13_wide$brca_status_v1.2.13)
+
+identical(seqone_v13_wide$brca_mutation_v1.2.12, 
+          seqone_v13_wide$brca_mutation_v1.2.13)
+
+identical(seqone_v13_wide$ccne1_cn_v1.2.12,
+          seqone_v13_wide$ccne1_cn_v1.2.13)
+
+identical(seqone_v13_wide$rad51b_cn_v1.2.12,
+          seqone_v13_wide$rad51b_cn_v1.2.13)
+
+identical(seqone_v13_wide$coverage_v1.2.12, 
+          seqone_v13_wide$coverage_v1.2.13)
+
+identical(seqone_v13_wide$pct_mapped_reads_v1.2.12,
+          seqone_v13_wide$pct_mapped_reads_v1.2.13)
+
+identical(seqone_v13_wide$pct_tum_cell_v1.2.12,
+          seqone_v13_wide$pct_tum_cell_v1.2.13)
+
+identical(seqone_v13_wide$gi_confidence_v1.2.12,
+          seqone_v13_wide$gi_confidence_v1.2.13)
+
+identical(seqone_v13_wide$low_tumor_fraction_v1.2.12,
+          seqone_v13_wide$low_tumor_fraction_v1.2.13)
+
+```
+
+```{r}
+#| echo: FALSE
+
+v13_low_tumour_table <- seqone_v13_wide |> 
+  select(sample, low_tumor_fraction_v1.2.12,
+         low_tumor_fraction_v1.2.13) |> 
+  mutate(diff = abs(low_tumor_fraction_v1.2.12 - 
+                      low_tumor_fraction_v1.2.13))
+
+knitr::kable(v13_low_tumour_table)
+
+```
+
+The maximum difference was 
+`r max(v13_low_tumour_table$diff)`.
+
+In the same way as the previous verification, the variation in low_tumour_fraction
+will not impact the accuracy of the SomaHRD method.
+
 # Conclusion
 
 SeqOne SomaHRD v1.2.12 is accepted for clinical use.
