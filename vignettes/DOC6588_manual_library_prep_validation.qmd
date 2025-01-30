@@ -1,0 +1,457 @@
+---
+title: "Validation of Manual setup of SeqOne Homologous Recombination Deficiency Testing"
+format: 
+  docx:
+    reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
+    link-citations: true
+toc: false
+bibliography: hrd_library.bib
+csl: harvard-manchester-metropolitan-university.csl
+fig-align: "left"
+date: today
+date-format: "DD/MM/YYYY"
+fig-width: 6
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(here)
+library(ggpubr)
+
+source(here("functions/hrd_functions.R"))
+
+data_path <- config::get("data_filepath")
+
+```
+
+# Introduction
+
+# Methods
+
+```{r}
+#| label: manual-prep-data
+#| include: FALSE
+
+manual_prep_files <- list.files(path = paste0(data_path,
+                                         "validation/",
+                                         "DOC6588_manual_library_prep/",
+                                         "seqone_reports/"),
+                              pattern = "*.csv",
+                              full.names = TRUE)
+
+manual_prep_data <- manual_prep_files |> 
+  map(\(manual_prep_files) read_seqone_csv(manual_prep_files)) |> 
+  list_rbind() |> 
+  mutate(library_prep = "manual",
+         labno = str_extract(string = sample,
+                             pattern = "\\d{8}"),
+         worksheet = str_extract(string = sample,
+                                 pattern = "WS\\d{6}")) |> 
+  relocate(labno, worksheet) |> 
+  mutate(somahrd_semantic_version = case_when(
+    somahrd_version == "v1.2" ~"v1.2.8",
+    TRUE ~somahrd_version
+  ),
+  repeat_sample = ifelse(duplicated(labno), "repeat", ""))
+
+labno_vector <- manual_prep_data$labno
+
+```
+
+`r length(unique(manual_prep_data$labno))` samples were tested using the manual
+library preparation method. FASTQs were analysed using the SomaHRD pipeline
+versions 1.2.8 and 1.2.13.
+
+There were 3 sample cohorts.
+
+1. Samples from the original SeqOne method validation.
+
+2. Samples from the QIAsymphony-extraction validation.
+
+3. Samples from the live clinical service with borderline results.
+
+A range of DNA inputs were tested.
+
+```{r}
+#| label: cohorts
+#| echo: FALSE
+
+cohort_table <- tibble::tribble(
+  ~Cohort, ~`DNA extraction method`, ~`SomaHRD version`, ~`Myriad HRD result`, ~`Repeat testing`,
+  "1",       "Cobas",                 "v1.2.7",          "Yes",               "Yes",
+  "2",       "QIAsymphony",           "v1.2.1",          "Yes",                "No",
+  "3",       "QIAsymphony",           "Various",         "No",                 "No"
+)
+
+knitr::kable(cohort_table)
+
+```
+
+
+```{r}
+#| label: auto-prep-data
+#| include: FALSE
+
+qiasymphony_val_files <- list.files(path = paste0(data_path,
+                                            "validation/DOC6255_qiasymphony/seqone_reports/"),
+                              pattern = "*.csv",
+                              full.names = TRUE)
+
+qiasymphony_val_data <- qiasymphony_val_files |> 
+  map(\(qiasymphony_val_files) read_seqone_csv(qiasymphony_val_files)) |> 
+  list_rbind() |> 
+  mutate(library_prep = "automated",
+         labno = str_extract(string = sample,
+                             pattern = "\\d{8}"),
+         worksheet = str_extract(string = sample,
+                                 pattern = "WS\\d{6}")) |> 
+  relocate(labno, worksheet) |> 
+  mutate(somahrd_semantic_version = "v1.2.1",
+         repeat_sample = ifelse(duplicated(labno), "repeat", ""))
+
+live_service_files <- list.files(path = paste0(data_path,
+                                              "live_service/service/csv_reports/"),
+                                 pattern = "*.csv",
+                                 full.names = TRUE)
+
+live_service_data <- live_service_files |> 
+  map(\(live_service_files) read_seqone_csv(live_service_files)) |> 
+  list_rbind() |> 
+  mutate(library_prep = "automated",
+         labno = str_extract(string = sample,
+                             pattern = "\\d{8}"),
+         worksheet = str_extract(string = sample,
+                                 pattern = "WS\\d{6}")) |> 
+  relocate(labno, worksheet) |> 
+  mutate(somahrd_semantic_version = somahrd_version,
+         repeat_sample = ifelse(duplicated(labno), "repeat", "")) |> 
+    filter(labno %in% manual_prep_data$labno)
+  
+seqone_val_files_1 <- list.files(path = paste0(data_path,
+                                            "live_service/INC9110/20240410_reanalysis/"),
+                               pattern = "*.csv",
+                               full.names = TRUE)
+
+seqone_val_files_2 <- list.files(path = paste0(data_path,
+                                            "live_service/INC9110/20240412_reanalysis/"),
+                               pattern = "*.csv",
+                               full.names = TRUE)
+
+seqone_val_files <- c(seqone_val_files_1, seqone_val_files_2)
+
+seqone_val_data <- seqone_val_files |> 
+  map(\(seqone_val_files) read_seqone_csv(seqone_val_files)) |> 
+  list_rbind() |> 
+  mutate(library_prep = "automated",
+         labno = str_extract(string = sample,
+                             pattern = "\\d{8}"),
+         worksheet = str_extract(string = sample,
+                                 pattern = "WS\\d{6}")) |> 
+  relocate(labno, worksheet) |> 
+  mutate(somahrd_semantic_version = "v1.2.7",
+         repeat_sample = ifelse(duplicated(labno), "repeat", "")) |> 
+    filter(labno %in% manual_prep_data$labno)
+
+auto_prep_data <- rbind(qiasymphony_val_data, live_service_data,
+                        seqone_val_data) 
+
+```
+
+```{r}
+#| label: auto-vs-manual
+#| include: FALSE
+
+auto_vs_manual_df_wide <- manual_prep_data |> 
+  # Exclude data run with incorrect indexes
+  filter(analysis_date != "2025-01-16") |> 
+  inner_join(auto_prep_data, by = "labno",
+             suffix = c("_manual", "_auto")) |> 
+  select(labno, 
+         worksheet_auto, worksheet_manual,
+         analysis_date_auto, analysis_date_manual,
+         somahrd_semantic_version_auto, somahrd_semantic_version_manual,
+         LGA_auto, LGA_manual,
+         LPC_auto, LPC_manual,
+         score_auto, score_manual,
+         status_auto, status_manual,
+         ccne1_cn_auto, ccne1_cn_manual,
+         rad51b_cn_auto, rad51b_cn_manual,
+         coverage_auto, coverage_manual,
+         pct_mapped_reads_auto, pct_mapped_reads_manual,
+         pct_tum_cell_auto, pct_tum_cell_manual,
+         gi_confidence_auto, gi_confidence_manual,
+         low_tumor_fraction_auto, low_tumor_fraction_manual,
+         repeat_sample_auto, repeat_sample_manual) |> 
+  mutate(outcome = case_when(
+    status_auto == status_manual ~"Same",
+    TRUE ~"Different"))
+
+auto_vs_manual_df_long <- rbind(manual_prep_data,
+                                auto_prep_data) |> 
+  filter(labno %in% manual_prep_data$labno)
+
+write_csv(auto_vs_manual_df_wide, file = paste0(data_path,
+                                           "validation/DOC6588_manual_library_prep/",
+                                           "collated_data/",
+                                           "DOC6588_automated_vs_manual_results.csv"))
+
+```
+
+{{< pagebreak >}}
+
+# Results
+
+## Overall results
+
+The threshold for classifying samples as "non-conclusive" is a genomic 
+instablility score of 0.85 or below.
+
+```{r}
+#| label: tbl-overall-results
+#| tbl-cap: "Repeat results not shown. Scores are rounded to 2 decimal places"
+#| echo: FALSE
+
+overall_results <- auto_vs_manual_df_wide |> 
+  filter(repeat_sample_auto != "repeat" &
+           repeat_sample_manual != "repeat") |> 
+  select(labno, score_auto, score_manual,
+         status_auto, status_manual, outcome) |>  
+  mutate(
+    score_auto = round(score_auto, 2),
+    score_manual = round(score_manual, 2)) |> 
+  arrange(outcome, status_auto)
+
+knitr::kable(overall_results)
+
+```
+
+Here are the 2 discrepant results:
+
+```{r}
+#| label: tbl-discrepant-results
+#| echo: FALSE
+
+discrepant_results <- auto_vs_manual_df_wide |> 
+  filter(outcome == "Different") |> 
+  mutate(gi_confidence_auto = round(gi_confidence_auto, 2),
+         gi_confidence_manual = round(gi_confidence_manual, 2)) |> 
+  select(labno, LGA_auto, LGA_manual, LPC_auto, LPC_manual,
+         gi_confidence_auto, gi_confidence_manual,
+         status_auto, status_manual) |> 
+  arrange(status_auto)
+
+knitr::kable(discrepant_results)
+
+```
+
+
+```{r}
+#| label: make-plots
+#| include: FALSE
+
+plot_auto_v_manual <- function(df, xvar, yvar, axismin, axismax,
+                               breaks, xlabel, ylabel, title) {
+  
+  plot <- df |> 
+    ggplot(aes(x = {{ xvar }}, y = {{ yvar }})) +
+      geom_point(shape = 21, size = 3) +
+      geom_abline(linetype = "dashed") +
+      theme_bw() +
+      theme(legend.position = "none") +
+      scale_x_continuous(breaks = breaks,
+                         limits = c(axismin, axismax)) +
+      scale_y_continuous(breaks = breaks,
+                         limits = c(axismin, axismax)) +
+    labs(x = xlabel, y = ylabel, 
+         title = title)
+  
+  return(plot)
+  
+}
+
+data_without_repeats <- auto_vs_manual_df_wide |> 
+  filter(repeat_sample_auto != "repeat" &
+           repeat_sample_manual != "repeat") 
+
+lga_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = LGA_auto, yvar = LGA_manual,
+                               0, 40,
+                               seq(0, 40, by = 10),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "LGA")
+
+lpc_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = LPC_auto, yvar = LPC_manual,
+                               0, 40,
+                               seq(0, 40, by = 10),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "LPC")
+
+score_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = score_auto, yvar = score_manual,
+                               0, 1,
+                               seq(0, 1, by = 0.1),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "HRD score")
+
+coverage_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = coverage_auto, yvar = coverage_manual,
+                               0, 3,
+                               seq(0, 3, by = 0.5),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "Coverage")
+  
+gi_conf_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = gi_confidence_auto, 
+                               yvar = gi_confidence_manual,
+                               0.65, 1,
+                               seq(0.65, 1, by = 0.05),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "GI confidence")
+
+pct_mapped_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = pct_mapped_reads_auto, 
+                               yvar = pct_mapped_reads_manual,
+                               0.9, 1,
+                               seq(0.9, 1, by = 0.02),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "Percent mapped reads")
+
+ccne1_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = ccne1_cn_auto, 
+                               yvar = ccne1_cn_manual,
+                               0, 12,
+                               seq(0, 12, by = 2),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "CCNE1 copy number")
+
+rad51b_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = rad51b_cn_auto, 
+                               yvar = rad51b_cn_manual,
+                               0, 4,
+                               seq(0, 4, by = 1),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "RAD51B copy number")
+
+low_tumour_plot <- plot_auto_v_manual(df = data_without_repeats,
+                               xvar = low_tumor_fraction_auto, 
+                               yvar = low_tumor_fraction_manual,
+                               0, 6,
+                               seq(0, 6, by = 1),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "Low tumour fraction")
+
+```
+
+
+```{r}
+#| label: fig-comparison-plots1
+#| fig-cap: "Comparison of metrics from automated and manual library preparation methods."
+#| fig-height: 8
+#| echo: FALSE
+
+ggarrange(plotlist = list(lga_plot, lpc_plot, 
+                          score_plot, gi_conf_plot),
+          nrow = 2, 
+          ncol = 2,
+          common.legend = TRUE,
+          legend = "bottom"
+          )
+
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-comparison-plots2
+#| fig-cap: "Comparison of metrics from automated and manual library preparation methods."
+#| fig-height: 8
+#| echo: FALSE
+
+ggarrange(plotlist = list(coverage_plot, pct_mapped_plot, 
+                          ccne1_plot, rad51b_plot, 
+                          low_tumour_plot),
+          nrow = 3, 
+          ncol = 2,
+          common.legend = TRUE,
+          legend = "bottom"
+          )
+
+
+```
+
+{{< pagebreak >}}
+
+## Repeatability
+
+```{r}
+#| label: fig-lga-lpc-results
+#| fig-cap: "LGA and LPC results"
+#| fig-height: 8
+#| echo: FALSE
+
+make_lga_lpc_facet <- function(df) {
+  
+  plot <- ggplot(df, aes(x = LGA, y = LPC)) +
+    geom_point(size = 2, shape = 1) +
+    theme_bw() +
+    theme(legend.position = "bottom") +
+    geom_segment(
+      data = line_df,
+      mapping = aes(x = x, y = y, xend = xend, yend = yend)
+    ) +
+    geom_point(data = df |> 
+                 filter(library_prep == "manual"),
+               shape = 21, fill = "red") +
+    ylim(0, 42) +
+    xlim(0, 42) +
+    labs(x = "Loss of parental copy", 
+         y = "Large genomic alterations",
+         shape = "Library preparation") 
+  
+  return(plot)
+  
+}
+
+facet_plot1 <- make_lga_lpc_facet(auto_vs_manual_df_long |> 
+                     filter(labno %in% labno_vector[1:12])) +
+  facet_wrap(~labno, ncol = 3)
+
+facet_plot1
+
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-lga-lpc-results2
+#| fig-cap: "LGA and LPC results"
+#| fig-height: 8
+#| echo: FALSE
+
+facet_plot2 <- make_lga_lpc_facet(auto_vs_manual_df_long |> 
+                     filter(labno %in% labno_vector[13:length(labno_vector)])) +
+  facet_wrap(~labno, ncol = 3)
+
+facet_plot2
+
+```
+
+# Discussion
+
+# Conclusion
+
+
+# Appendix
