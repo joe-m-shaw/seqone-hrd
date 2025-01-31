@@ -4,14 +4,30 @@ format:
   docx:
     reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
     link-citations: true
-toc: false
+toc: true
+toc-title: "Table of Contents"
 bibliography: hrd_library.bib
 csl: harvard-manchester-metropolitan-university.csl
 fig-align: "left"
-date: today
-date-format: "DD/MM/YYYY"
 fig-width: 6
 ---
+
+{{< pagebreak >}}
+
+# Authors
+
+Authors: Joe Shaw (CS20980) and Jack Ritson
+
+Author contact: joseph.shaw2\@mft.nhs.uk; john.ritson\@mft.nhs.uk
+
+Date: `r Sys.Date()`
+
+# Purpose
+
+The purpose of this document is to describe the validation of a manual library
+preparation method for the Agilent Sureselect HS2 library enrichment, which can
+be used for the testing of ovarian cancer samples by the SomaHRD pipeline 
+(SeqOne).
 
 ```{r}
 #| label: packages
@@ -197,6 +213,20 @@ write_csv(auto_vs_manual_df_wide, file = paste0(data_path,
                                            "validation/DOC6588_manual_library_prep/",
                                            "collated_data/",
                                            "DOC6588_automated_vs_manual_results.csv"))
+
+auto_vs_manual_summary <- auto_vs_manual_df_wide |> 
+  filter(repeat_sample_auto != "repeat") |> 
+  select(labno, 
+         worksheet_auto, worksheet_manual,
+         LGA_auto, LGA_manual,
+         LPC_auto, LPC_manual,
+         score_auto, score_manual,
+         status_auto, status_manual)
+
+write_csv(auto_vs_manual_summary, file = paste0(data_path,
+                                           "validation/DOC6588_manual_library_prep/",
+                                           "collated_data/",
+                                           "auto_vs_manual_summary.csv"))
 
 ```
 
@@ -396,6 +426,20 @@ ggarrange(plotlist = list(coverage_plot, pct_mapped_plot,
 
 ## Repeatability
 
+The variation observed is influenced by the size of the copy number segments
+within the sample.
+
+Samples with larger copy number segments have less variation when repeated, and
+less variation between the manual and automated methods (example: 20127786).
+
+Conversely, samples with smaller copy number segments are more impacted by 
+repeat variation (example: 21003549).
+
+It's similar to uncertainty of measurement for repeat expansions: the 
+variation is much less for small alleles, but when the expansion gets big there
+is more variation (but it's not as important - either way, the expansion is big,
+so the clinical outcome is the same).
+
 ```{r}
 #| label: fig-lga-lpc-results
 #| fig-cap: "LGA and LPC results"
@@ -417,8 +461,8 @@ make_lga_lpc_facet <- function(df) {
                shape = 21, fill = "red") +
     ylim(0, 42) +
     xlim(0, 42) +
-    labs(x = "Loss of parental copy", 
-         y = "Large genomic alterations",
+    labs(x = "Large genomic alterations", 
+         y = "Loss of parental copy",
          shape = "Library preparation") 
   
   return(plot)
@@ -448,6 +492,11 @@ facet_plot2 <- make_lga_lpc_facet(auto_vs_manual_df_long |>
 facet_plot2
 
 ```
+
+## Specific samples
+
+23016526: low DNA input. False negative on original SeqOne validation. Still a 
+false negative when tested by the manual method.
 
 # Discussion
 
