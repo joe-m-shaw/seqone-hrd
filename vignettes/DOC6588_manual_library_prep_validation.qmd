@@ -36,6 +36,7 @@ be used for the testing of ovarian cancer samples by the SomaHRD pipeline
 library(tidyverse)
 library(here)
 library(ggpubr)
+library(readxl)
 
 source(here("functions/hrd_functions.R"))
 
@@ -44,6 +45,13 @@ data_path <- config::get("data_filepath")
 ```
 
 # Introduction
+
+HRD testing was validated using an automated library preparation on the
+Agilent Bravo platform ([DOC6192]{custom-style="Strong"}).
+
+A manual method is required because one of the Agilent Bravo liquid handling
+stations is being removed. A manual method is required as a backup in case the
+remaining Agilent Bravo breaks.
 
 # Methods
 
@@ -75,34 +83,53 @@ manual_prep_data <- manual_prep_files |>
 
 labno_vector <- manual_prep_data$labno
 
+sample_info <- read_csv(file = paste0(data_path,
+                                      "validation/",
+                                      "DOC6588_manual_library_prep/",
+                                      "sample_info/",
+                                      "labno_sample_info.csv"),
+                        col_types = "cc")
+
 ```
 
-`r length(unique(manual_prep_data$labno))` samples were tested using the manual
-library preparation method. FASTQs were analysed using the SomaHRD pipeline
-versions 1.2.8 and 1.2.13.
-
-There were 3 sample cohorts.
-
-1. Samples from the original SeqOne method validation.
-
-2. Samples from the QIAsymphony-extraction validation.
-
-3. Samples from the live clinical service with borderline results.
-
-A range of DNA inputs were tested.
-
 ```{r}
-#| label: cohorts
-#| echo: FALSE
+#| label: dna-concentrations
+#| include: FALSE
 
-cohort_table <- tibble::tribble(
-  ~Cohort, ~`DNA extraction method`, ~`SomaHRD version`, ~`Myriad HRD result`, ~`Repeat testing`,
-  "1",       "Cobas",                 "v1.2.7",          "Yes",               "Yes",
-  "2",       "QIAsymphony",           "v1.2.1",          "Yes",                "No",
-  "3",       "QIAsymphony",           "Various",         "No",                 "No"
-)
+hs2_prep_2023 <- read_excel(path = paste0(data_path,
+                                          "validation/DOC6588_manual_library_prep/",
+                                          "excel_spreadsheets/",
+                                          "HS2 Sample Prep 2023 - NEW_copy.xlsx"),
+                            skip = 1,
+                            sheet = "HRD_SeqOne") |> 
+  janitor::clean_names()
 
-knitr::kable(cohort_table)
+hs2_prep_2023_clean <- hs2_prep_2023 |> 
+  filter(sample_id %in% labno_vector &
+           !duplicated(sample_id)) |> 
+  mutate(stock_qubit_ng_ul = as.numeric(stock_qubit_ng_ul),
+         excel = "2023") |> 
+    select(sample_id, stock_qubit_ng_ul, excel) 
+
+hs2_prep_2024 <- read_excel(path = paste0(data_path,
+                                          "validation/DOC6588_manual_library_prep/",
+                                          "excel_spreadsheets/",
+                                          "HS2 Sample Prep 2024 - USE 2025 SPREADSHEET_copy.xlsx"),
+                            skip = 1,
+                            sheet = "HRD_SeqOne") |> 
+  janitor::clean_names()
+
+hs2_prep_2024_clean <- hs2_prep_2024 |> 
+  filter(sample_id %in% labno_vector &
+           !duplicated(sample_id)) |> 
+  mutate(stock_qubit_ng_ul = as.numeric(stock_qubit_ng_ul_fail_if_below_3_34),
+         excel = "2024") |>
+  select(sample_id, stock_qubit_ng_ul, excel) 
+
+sample_dna_concentrations <- rbind(hs2_prep_2023_clean, hs2_prep_2024_clean) |>  
+  arrange(sample_id) |> 
+  filter(!duplicated(sample_id)) |> 
+  rename(labno = sample_id)
 
 ```
 
@@ -125,8 +152,7 @@ qiasymphony_val_data <- qiasymphony_val_files |>
          worksheet = str_extract(string = sample,
                                  pattern = "WS\\d{6}")) |> 
   relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = "v1.2.1",
-         repeat_sample = ifelse(duplicated(labno), "repeat", ""))
+  mutate(somahrd_semantic_version = "v1.2.1")
 
 live_service_files <- list.files(path = paste0(data_path,
                                               "live_service/service/csv_reports/"),
@@ -142,8 +168,7 @@ live_service_data <- live_service_files |>
          worksheet = str_extract(string = sample,
                                  pattern = "WS\\d{6}")) |> 
   relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = somahrd_version,
-         repeat_sample = ifelse(duplicated(labno), "repeat", "")) |> 
+  mutate(somahrd_semantic_version = somahrd_version) |> 
     filter(labno %in% manual_prep_data$labno)
   
 seqone_val_files_1 <- list.files(path = paste0(data_path,
@@ -167,12 +192,63 @@ seqone_val_data <- seqone_val_files |>
          worksheet = str_extract(string = sample,
                                  pattern = "WS\\d{6}")) |> 
   relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = "v1.2.7",
-         repeat_sample = ifelse(duplicated(labno), "repeat", "")) |> 
+  mutate(somahrd_semantic_version = "v1.2.7") |> 
     filter(labno %in% manual_prep_data$labno)
 
 auto_prep_data <- rbind(qiasymphony_val_data, live_service_data,
-                        seqone_val_data) 
+                        seqone_val_data) |> 
+  mutate(repeat_sample = ifelse(duplicated(labno), "repeat", ""))
+
+```
+
+```{r}
+#| label: organise-cohorts
+#| include: FALSE
+
+cohort_table <- tibble::tribble(
+  ~cohort, ~`Description`, ~`DNA extraction method`, 
+  ~`SomaHRD version`, ~`Myriad HRD result`, ~`Repeat testing`,
+  "1",       "Samples from SeqOne SomaHRD validation (DOC6192)", 
+  "Cobas",  "v1.2.7",  "Yes",  "Yes",
+  "2",      "Samples from QIAsymphony extraction validation (DOC6255)", 
+  "QIAsymphony",  "v1.2.1",  "Yes",  "No",
+  "3",      "Samples from clinical SeqOne service",  
+  "QIAsymphony", "Various (v1.2.1 to v1.2.13)",  "No",  "No"
+)
+
+manual_data_with_cohorts <- manual_prep_data |> 
+  mutate(cohort = case_when(
+    labno %in% seqone_val_data$labno ~"1",
+    labno %in% qiasymphony_val_data$labno ~"2",
+    labno %in% live_service_data$labno ~"3"
+  )) |> 
+  left_join(sample_info, by = "labno") 
+
+cohort_counts <- manual_data_with_cohorts |> 
+  group_by(cohort) |> 
+  count()
+
+tbl_cohorts <- cohort_counts |> 
+  inner_join(cohort_table, by = "cohort") |> 
+  rename(`Cohort` = cohort,
+         `Samples` = n)
+
+```
+
+`r length(unique(manual_prep_data$labno))` samples were tested using the manual
+library preparation method. FASTQs were analysed using the SomaHRD pipeline
+versions 1.2.8 and 1.2.13. Samples were selected from 3 cohorts, shown in
+@tbl-cohorts, with DNA concentrations ranging from 
+`r round(min(sample_dna_concentrations$stock_qubit_ng_ul), 1)`
+-
+`r max(sample_dna_concentrations$stock_qubit_ng_ul)` ng/ul.
+
+```{r}
+#| label: tbl-cohorts
+#| tbl-cap: "Validation sample cohorts"
+#| echo: FALSE
+
+knitr::kable(tbl_cohorts)
 
 ```
 
@@ -236,13 +312,12 @@ write_csv(auto_vs_manual_summary, file = paste0(data_path,
 
 ## Overall results
 
-The threshold for classifying samples as "non-conclusive" is a genomic 
-instablility score of 0.85 or below.
+Quality control: all samples had over 0.5X coverage. All samples except
+23016526 had DNA concentrations greater than 3.3 ng/ul.
 
 ```{r}
-#| label: tbl-overall-results
-#| tbl-cap: "Repeat results not shown. Scores are rounded to 2 decimal places"
-#| echo: FALSE
+#| label: overall-results
+#| include: FALSE
 
 overall_results <- auto_vs_manual_df_wide |> 
   filter(repeat_sample_auto != "repeat" &
@@ -254,29 +329,43 @@ overall_results <- auto_vs_manual_df_wide |>
     score_manual = round(score_manual, 2)) |> 
   arrange(outcome, status_auto)
 
-knitr::kable(overall_results)
+stopifnot(length(setdiff(labno_vector, overall_results$labno)) == 0)
 
 ```
 
-Here are the 2 discrepant results:
+In total, 
+`r nrow(overall_results[overall_results$outcome == "Same", ])` samples had the
+same HRD status on the manual library preparation as on the automated 
+preparation, with
+`r nrow(overall_results[overall_results$outcome == "Different", ])` 
+samples having different HRD statuses.
+
+The samples with discrepant results are shown in @tbl-discrepant-results. 
+2 samples had improved confidence in genomic instability scores using the 
+manual method, which changed the overall HRD status from "Non-conclusive" to
+"Positive" and "Negative". The threshold for classifying samples as 
+"non-conclusive" is a genomic instability score of 0.85 or below.
 
 ```{r}
 #| label: tbl-discrepant-results
+#| tbl-cap: "Discrepant results"
 #| echo: FALSE
 
 discrepant_results <- auto_vs_manual_df_wide |> 
   filter(outcome == "Different") |> 
   mutate(gi_confidence_auto = round(gi_confidence_auto, 2),
          gi_confidence_manual = round(gi_confidence_manual, 2)) |> 
-  select(labno, LGA_auto, LGA_manual, LPC_auto, LPC_manual,
+  select(labno, score_auto, score_manual,
          gi_confidence_auto, gi_confidence_manual,
          status_auto, status_manual) |> 
+  mutate(status_auto = factor(status_auto, levels = c(
+    "Non-conclusive", "Negative", "Positive"
+  ))) |> 
   arrange(status_auto)
 
 knitr::kable(discrepant_results)
 
 ```
-
 
 ```{r}
 #| label: make-plots
@@ -385,7 +474,6 @@ low_tumour_plot <- plot_auto_v_manual(df = data_without_repeats,
 
 ```
 
-
 ```{r}
 #| label: fig-comparison-plots1
 #| fig-cap: "Comparison of metrics from automated and manual library preparation methods."
@@ -419,26 +507,11 @@ ggarrange(plotlist = list(coverage_plot, pct_mapped_plot,
           legend = "bottom"
           )
 
-
 ```
 
 {{< pagebreak >}}
 
-## Repeatability
-
-The variation observed is influenced by the size of the copy number segments
-within the sample.
-
-Samples with larger copy number segments have less variation when repeated, and
-less variation between the manual and automated methods (example: 20127786).
-
-Conversely, samples with smaller copy number segments are more impacted by 
-repeat variation (example: 21003549).
-
-It's similar to uncertainty of measurement for repeat expansions: the 
-variation is much less for small alleles, but when the expansion gets big there
-is more variation (but it's not as important - either way, the expansion is big,
-so the clinical outcome is the same).
+## Variation
 
 ```{r}
 #| label: fig-lga-lpc-results
@@ -493,7 +566,21 @@ facet_plot2
 
 ```
 
-## Specific samples
+## Variation due to sample genotype
+
+The variation observed is influenced by the size of the copy number segments
+within the sample.
+
+Samples with larger copy number segments have less variation when repeated, and
+less variation between the manual and automated methods (example: 20127786).
+
+Conversely, samples with smaller copy number segments are more impacted by 
+repeat variation (example: 21003549).
+
+It's similar to uncertainty of measurement for repeat expansions: the 
+variation is much less for small alleles, but when the expansion gets big there
+is more variation (but it's not as important - either way, the expansion is big,
+so the clinical outcome is the same).
 
 23016526: low DNA input. False negative on original SeqOne validation. Still a 
 false negative when tested by the manual method.
@@ -502,5 +589,3 @@ false negative when tested by the manual method.
 
 # Conclusion
 
-
-# Appendix
