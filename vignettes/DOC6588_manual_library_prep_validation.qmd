@@ -2,7 +2,7 @@
 title: "Validation of Manual setup of SeqOne Homologous Recombination Deficiency Testing"
 format: 
   docx:
-    reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
+    reference-doc: "north_west_glh_document_template.docx"
     link-citations: true
 toc: true
 toc-title: "Table of Contents"
@@ -10,6 +10,7 @@ bibliography: hrd_library.bib
 csl: harvard-manchester-metropolitan-university.csl
 fig-align: "left"
 fig-width: 6
+fig-height: 6
 ---
 
 {{< pagebreak >}}
@@ -18,16 +19,32 @@ fig-width: 6
 
 Authors: Joe Shaw (CS20980) and Jack Ritson
 
-Author contact: joseph.shaw2\@mft.nhs.uk; john.ritson\@mft.nhs.uk
+Author contacts: joseph.shaw2\@mft.nhs.uk; john.ritson\@mft.nhs.uk
 
 Date: `r Sys.Date()`
 
+# Acronyms
+
+**GI:** Genomic Instability
+
+**GLH:** Genomic Laboratory Hub
+
+**HRD:** Homologous Recombination Deficiency
+
+**LGA:** Large Genomic Alteration
+
+**LPC:** Loss of Parental Copy
+
+**PARP:** Poly ADP Ribose Polymerase
+
+**sWGS:** shallow Whole Genome Sequencing
+
+**UDI:** Unique Dual Index
+
 # Purpose
 
-The purpose of this document is to describe the validation of a manual library
-preparation method for the Agilent Sureselect HS2 library enrichment, which can
-be used for the testing of ovarian cancer samples by the SomaHRD pipeline 
-(SeqOne).
+The purpose of this document is to describe the validation of the manual setup
+for homologous recombination deficiency (HRD) testing at the North West Genomic Laboratory Hub (GLH). 
 
 ```{r}
 #| label: packages
@@ -46,18 +63,61 @@ data_path <- config::get("data_filepath")
 
 # Introduction
 
-HRD testing was validated using an automated library preparation on the
-Agilent Bravo platform ([DOC6192]{custom-style="Strong"}).
+Testing for tumour genomic instability (GI) to detect HRD is required 
+to guide PARP inhibitor
+treatment in patients with ovarian cancer. At the North West GLH, GI testing
+is performed using shallow whole genome sequencing (sWGS) with the SomaHRD 
+analysis pipeline marketed by SeqOne [@boidot2024].
 
-A manual method is required because one of the Agilent Bravo liquid handling
-stations is being removed. A manual method is required as a backup in case the
-remaining Agilent Bravo breaks.
+GI testing was validated using 2 Agilent Bravo automated liquid handling 
+stations and the Agilent SureSelect XT HS2 library preparation kit 
+(validation document: [DOC6192]{custom-style="Strong"};
+SOP: [DOC6163]{custom-style="Strong"}). 
+A full description of the testing process, including definition of large genomic alterations (LGA) and loss of parental copy (LPC) events is given in 
+([DOC6192]{custom-style="Strong"}). As one Agilent Bravo is being decommissioned,
+a validated manual protocol for performing the library preparation is 
+required as a backup method.
+
+# Requirements
+
+The requirements for this new manual method are as follows:
+
+**Capacity:** the manual method should equivalent sample capacity compared 
+to the automated method.
+
+**Accuracy:** the manual method should provide equivalent GI status results to 
+the automated method.
+
+{{< pagebreak >}}
 
 # Methods
 
 ```{r}
 #| label: manual-prep-data
 #| include: FALSE
+
+collate_seqone_files <- function(file_list, prep_text) {
+  
+  if(length(file_list) == 0){
+    stop("File list is empty")
+  }
+  
+  df <- file_list |> 
+    map(\(file_list) read_seqone_csv(file_list)) |> 
+    list_rbind() |> 
+    mutate(library_prep = prep_text,
+           labno = str_extract(string = sample,
+                               pattern = "\\d{8}"),
+           worksheet = str_extract(string = sample,
+                                   pattern = "WS\\d{6}")) |> 
+    relocate(labno, worksheet) |> 
+    select(-c(brca_status, brca_mutation))
+  
+  stopifnot(anyNA.data.frame(df) == FALSE)
+  
+  return(df)
+  
+}
 
 manual_prep_files <- list.files(path = paste0(data_path,
                                          "validation/",
@@ -66,35 +126,41 @@ manual_prep_files <- list.files(path = paste0(data_path,
                               pattern = "*.csv",
                               full.names = TRUE)
 
-manual_prep_data <- manual_prep_files |> 
-  map(\(manual_prep_files) read_seqone_csv(manual_prep_files)) |> 
-  list_rbind() |> 
-  mutate(library_prep = "manual",
-         labno = str_extract(string = sample,
-                             pattern = "\\d{8}"),
-         worksheet = str_extract(string = sample,
-                                 pattern = "WS\\d{6}")) |> 
-  relocate(labno, worksheet) |> 
+stopifnot(length(manual_prep_files) == 21)
+
+manual_prep_data <- collate_seqone_files(file_list = manual_prep_files,
+                                         prep_text = "manual") |> 
   mutate(somahrd_semantic_version = case_when(
     somahrd_version == "v1.2" ~"v1.2.8",
     TRUE ~somahrd_version
   ),
   repeat_sample = ifelse(duplicated(labno), "repeat", ""))
 
+stopifnot(anyNA.data.frame(manual_prep_data) == FALSE)
+
 labno_vector <- manual_prep_data$labno
 
-sample_info <- read_csv(file = paste0(data_path,
+# Extraction methods found by manual checking on DNA database
+sample_extraction_methods <- read_csv(file = paste0(data_path,
                                       "validation/",
                                       "DOC6588_manual_library_prep/",
                                       "sample_info/",
-                                      "labno_sample_info.csv"),
+                                      "sample_extraction_methods.csv"),
                         col_types = "cc")
+
+stopifnot(dim(sample_extraction_methods) == c(length(labno_vector), 2))
+
+stopifnot(setequal(manual_prep_data$labno, sample_extraction_methods$labno))
 
 ```
 
 ```{r}
 #| label: dna-concentrations
 #| include: FALSE
+
+# DNA concentrations taken from the technical team Sharepoint Excels,
+# not DNA database. Concentrations on DNA database may be from different
+# methods, whereas the Sharepoint Excels contain only Qubit data.
 
 hs2_prep_2023 <- read_excel(path = paste0(data_path,
                                           "validation/DOC6588_manual_library_prep/",
@@ -131,46 +197,17 @@ sample_dna_concentrations <- rbind(hs2_prep_2023_clean, hs2_prep_2024_clean) |>
   filter(!duplicated(sample_id)) |> 
   rename(labno = sample_id)
 
-```
+stopifnot(setequal(sample_dna_concentrations$labno, 
+          manual_prep_data$labno))
 
+```
 
 ```{r}
 #| label: auto-prep-data
 #| include: FALSE
 
-qiasymphony_val_files <- list.files(path = paste0(data_path,
-                                            "validation/DOC6255_qiasymphony/seqone_reports/"),
-                              pattern = "*.csv",
-                              full.names = TRUE)
+# Cohort 1 - samples from original SeqOne validation DOC6192
 
-qiasymphony_val_data <- qiasymphony_val_files |> 
-  map(\(qiasymphony_val_files) read_seqone_csv(qiasymphony_val_files)) |> 
-  list_rbind() |> 
-  mutate(library_prep = "automated",
-         labno = str_extract(string = sample,
-                             pattern = "\\d{8}"),
-         worksheet = str_extract(string = sample,
-                                 pattern = "WS\\d{6}")) |> 
-  relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = "v1.2.1")
-
-live_service_files <- list.files(path = paste0(data_path,
-                                              "live_service/service/csv_reports/"),
-                                 pattern = "*.csv",
-                                 full.names = TRUE)
-
-live_service_data <- live_service_files |> 
-  map(\(live_service_files) read_seqone_csv(live_service_files)) |> 
-  list_rbind() |> 
-  mutate(library_prep = "automated",
-         labno = str_extract(string = sample,
-                             pattern = "\\d{8}"),
-         worksheet = str_extract(string = sample,
-                                 pattern = "WS\\d{6}")) |> 
-  relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = somahrd_version) |> 
-    filter(labno %in% manual_prep_data$labno)
-  
 seqone_val_files_1 <- list.files(path = paste0(data_path,
                                             "live_service/INC9110/20240410_reanalysis/"),
                                pattern = "*.csv",
@@ -183,21 +220,45 @@ seqone_val_files_2 <- list.files(path = paste0(data_path,
 
 seqone_val_files <- c(seqone_val_files_1, seqone_val_files_2)
 
-seqone_val_data <- seqone_val_files |> 
-  map(\(seqone_val_files) read_seqone_csv(seqone_val_files)) |> 
-  list_rbind() |> 
-  mutate(library_prep = "automated",
-         labno = str_extract(string = sample,
-                             pattern = "\\d{8}"),
-         worksheet = str_extract(string = sample,
-                                 pattern = "WS\\d{6}")) |> 
-  relocate(labno, worksheet) |> 
-  mutate(somahrd_semantic_version = "v1.2.7") |> 
-    filter(labno %in% manual_prep_data$labno)
+seqone_val_data <- collate_seqone_files(file_list = seqone_val_files,
+                                        prep_text = "auto") |> 
+  mutate(somahrd_semantic_version = "v1.2.7")
+
+stopifnot(anyNA.data.frame(seqone_val_data) == FALSE)
+
+# Cohort 2 - samples from QIAsymphony validation DOC6255
+
+qiasymphony_val_files <- list.files(path = paste0(data_path,
+                                            "validation/DOC6255_qiasymphony/",
+                                            "seqone_reports/"),
+                              pattern = "*.csv",
+                              full.names = TRUE)
+
+qiasymphony_val_data <- collate_seqone_files(file_list = qiasymphony_val_files,
+                                             prep_text = "auto") |>
+  mutate(somahrd_semantic_version = "v1.2.1") 
+
+stopifnot(anyNA.data.frame(qiasymphony_val_data) == FALSE)
+
+# Cohort 3 - samples from live clinical service
+
+live_service_files <- list.files(path = paste0(data_path,
+                                              "live_service/service/",
+                                              "csv_reports/"),
+                                 pattern = "*.csv",
+                                 full.names = TRUE)
+
+live_service_data <- collate_seqone_files(file_list = live_service_files,
+                              prep_text = "automated") |> 
+  mutate(somahrd_semantic_version = somahrd_version)
 
 auto_prep_data <- rbind(qiasymphony_val_data, live_service_data,
                         seqone_val_data) |> 
+  filter(labno %in% labno_vector) |> 
   mutate(repeat_sample = ifelse(duplicated(labno), "repeat", ""))
+
+# Check all samples are present
+stopifnot(setequal(unique(auto_prep_data$labno), labno_vector))
 
 ```
 
@@ -222,7 +283,7 @@ manual_data_with_cohorts <- manual_prep_data |>
     labno %in% qiasymphony_val_data$labno ~"2",
     labno %in% live_service_data$labno ~"3"
   )) |> 
-  left_join(sample_info, by = "labno") 
+  left_join(sample_extraction_methods, by = "labno") 
 
 cohort_counts <- manual_data_with_cohorts |> 
   group_by(cohort) |> 
@@ -235,13 +296,18 @@ tbl_cohorts <- cohort_counts |>
 
 ```
 
+## Samples
+
 `r length(unique(manual_prep_data$labno))` samples were tested using the manual
-library preparation method. FASTQs were analysed using the SomaHRD pipeline
-versions 1.2.8 and 1.2.13. Samples were selected from 3 cohorts, shown in
+library preparation method. Samples were selected from 3 cohorts, shown in
 @tbl-cohorts, with DNA concentrations ranging from 
 `r round(min(sample_dna_concentrations$stock_qubit_ng_ul), 1)`
 -
-`r max(sample_dna_concentrations$stock_qubit_ng_ul)` ng/ul.
+`r max(sample_dna_concentrations$stock_qubit_ng_ul)` ng/ul. Samples with a range
+of HRD scores were selected, including samples which had been repeated 
+multiple times during the initial validation. When a sample had been repeated 
+multiple times on the automated method, a single replicate was arbitrarily 
+chosen for comparison with the results from the manual method.
 
 ```{r}
 #| label: tbl-cohorts
@@ -252,13 +318,114 @@ knitr::kable(tbl_cohorts)
 
 ```
 
+## Laboratory workflow
+
+### Protocol
+
+All samples were prepared with the Agilent SureSelect XT HS2 library preparation
+kit. The full protocol is described in 
+[DOC6589 GDL SOP: Manual setup for sWGS HRD_SeqOne (using Agilent SureSelectXT HS2)]{custom-style="Strong"}. 
+The laboratory workflow can be briefly 
+summarised as follows:
+
+**DNA dilution:** the protocol for SureSelect XT HS2 provided by Agilent 
+specifies different DNA volumes for the automated and manual approaches. To 
+maintain the DNA input quantity at 50ng, samples tested on the manual method
+were diluted to 7.2ng/µl, rather than 3.3ng/ul. DNA samples with 
+concentrations below 7.2ng/µl were used neat. 
+
+**Enzymatic fragmentation:** 50ng DNA was added to an enzymatic fragmentation 
+reaction mix. The reactions were incubated at 15 minutes at 37°C. The input 
+volume of DNA added differs between the manual and automated processing however 
+the final DNA input quantity is the same. 
+
+**End repair, A-tailing and adaptor ligation:** Each stage was performed 
+manually with successive rounds on the thermal cycler including bead clean ups 
+with ethanol. The reagents used were the same as the automated method, 
+but volumes differ slightly. 
+
+**Index addition:** Illumina unique dual indexes (UDIs) added. There was 
+no change to the indexes or input method compared to the automated method
+([DOC6163]{custom-style="Strong"}) as this was already a manual part 
+of the process.
+
+**Whole genome amplification:** 12 cycles of PCR were performed, according 
+to Agilent guidance for 50ng DNA input.
+
+**Library clean-up:** manual AMPure clean-ups were performed following the 
+Agilent protocol using 70% ethanol. These clean-ups are automated in
+the automated method ([DOC6163]{custom-style="Strong"}).
+
+**Quality checks:** library sizes checked on the Agilent Tapestation 
+using D1000 tapes, and libraries quantified using the
+KAPA Library Quantification Kit (Roche). Quality checks, pooling and 
+sequencing are the same as the automated method.
+
+**Library pooling:** libraries were pooled to a final concentration of 2.3pM. 
+The pool concentration was different to the 3pM concentration used in the initial 
+validation ([DOC6192]{custom-style="Strong"}). This reflects the pooling
+concentration being altered over time in response to sequencing quality, and 
+reflects the pooling concentration for the live HRD service.
+
+**Sequencing:** pooled libraries were loaded onto an Illumina NextSeq with a
+high or mid-output flow cell (@tbl-sequencing-runs) for paired-end sequencing. 
+
+### Sequencing runs
+
+```{r}
+#| label: tbl-sequencing-runs
+#| tbl-cap: "Sequencing runs"
+#| echo: FALSE
+
+sequencing_runs <- tribble(
+  ~"Worksheet", ~"DNA inputs", ~"Sequencer", ~"Flow cell", ~"Notes",
+  "WS147582",    7,  "NextSeq 550", "1x150bp Mid-output", "Initial run",
+  "WS149085 and WS149086", 14, "NextSeq 550", "1x150bp High-output", 
+  "Each worksheet completed by separate operators then loaded onto a single NextSeq run"
+)
+
+knitr::kable(sequencing_runs)
+
+```
+
+Initially for WS149085 and WS149086 indexes were incorrectly assigned due to 
+an index check not being performed (see [INC10127]{custom-style="Strong"}
+for details).
+
+## SomaHRD version
+
+FASTQ files were uploaded to the SeqOne website and analysed 
+using the SomaHRD pipeline versions 1.2.8 and 1.2.13. Whilst the SomaHRD
+pipeline has remained at v1.2 since the initial validation, the patch number
+has changed on multiple occasions with no substantial impact on accuracy
+(for details see [INC9110]{custom-style="Strong"}, 
+[INC9096]{custom-style="Strong"}, 
+[INC9891]{custom-style="Strong"}). 
+Consequently the data from the manual setup and the automated setup was 
+analysed with versions of SomaHRD ranging from v1.2.1 to v1.2.13 
+(@tbl-cohorts).
+
+## Data
+
+All data relating to this validation are saved in this file location:
+
+S:/central shared/Genetics/Mol_Shared/Development.Team/
+
+SeqOne HRD/data/validation/DOC6588_manual_library_prep/
+
+## Analysis
+
+This validation document was created using Quarto [@Allaire_Quarto_2024] and 
+all analysis was performed in R (v4.4.1) [@rcore2024] using packages from the 
+tidyverse [@wickham2019]. This code is publicly available on Github:
+
+[https://github.com/joe-m-shaw/seqone-hrd](https://github.com/joe-m-shaw/seqone-hrd)
+
 ```{r}
 #| label: auto-vs-manual
 #| include: FALSE
 
 auto_vs_manual_df_wide <- manual_prep_data |> 
-  # Exclude data run with incorrect indexes
-  filter(analysis_date != "2025-01-16") |> 
   inner_join(auto_prep_data, by = "labno",
              suffix = c("_manual", "_auto")) |> 
   select(labno, 
@@ -279,30 +446,23 @@ auto_vs_manual_df_wide <- manual_prep_data |>
          repeat_sample_auto, repeat_sample_manual) |> 
   mutate(outcome = case_when(
     status_auto == status_manual ~"Same",
-    TRUE ~"Different"))
+    TRUE ~"Different"),
+    lga_diff = abs(LGA_auto - LGA_manual),
+    lpc_diff = abs(LPC_auto - LPC_manual))
+
+stopifnot(setequal(auto_vs_manual_df_wide$labno, labno_vector))
 
 auto_vs_manual_df_long <- rbind(manual_prep_data,
-                                auto_prep_data) |> 
-  filter(labno %in% manual_prep_data$labno)
+                                auto_prep_data) 
 
-write_csv(auto_vs_manual_df_wide, file = paste0(data_path,
-                                           "validation/DOC6588_manual_library_prep/",
-                                           "collated_data/",
-                                           "DOC6588_automated_vs_manual_results.csv"))
+auto_vs_manual_no_repeats <- auto_vs_manual_df_wide |> 
+  filter(repeat_sample_auto != "repeat")
 
-auto_vs_manual_summary <- auto_vs_manual_df_wide |> 
-  filter(repeat_sample_auto != "repeat") |> 
-  select(labno, 
-         worksheet_auto, worksheet_manual,
-         LGA_auto, LGA_manual,
-         LPC_auto, LPC_manual,
-         score_auto, score_manual,
-         status_auto, status_manual)
-
-write_csv(auto_vs_manual_summary, file = paste0(data_path,
-                                           "validation/DOC6588_manual_library_prep/",
-                                           "collated_data/",
-                                           "auto_vs_manual_summary.csv"))
+write_csv(auto_vs_manual_no_repeats, file = paste0(
+  data_path,
+  "validation/DOC6588_manual_library_prep/",
+  "collated_data/",
+  "DOC6588_automated_vs_manual_results.csv"))
 
 ```
 
@@ -310,69 +470,32 @@ write_csv(auto_vs_manual_summary, file = paste0(data_path,
 
 # Results
 
-## Overall results
+## Quality control
 
-Quality control: all samples had over 0.5X coverage. All samples except
-23016526 had DNA concentrations greater than 3.3 ng/ul.
+The initial validation of the SeqOne SomaHRD pipeline 
+([DOC6192]{custom-style="Strong"})
+specified that results should have an average whole genome coverage greater 
+than 0.5X. All results from the manual 
+library preparation had over 0.5X coverage, and all samples except 23016526 had 
+DNA concentrations greater than 7.2 ng/ul. 23016526 was deliberately included in 
+this validation due to its low DNA concentration.
 
-```{r}
-#| label: overall-results
-#| include: FALSE
+## Correlation of automated and manual method results
 
-overall_results <- auto_vs_manual_df_wide |> 
-  filter(repeat_sample_auto != "repeat" &
-           repeat_sample_manual != "repeat") |> 
-  select(labno, score_auto, score_manual,
-         status_auto, status_manual, outcome) |>  
-  mutate(
-    score_auto = round(score_auto, 2),
-    score_manual = round(score_manual, 2)) |> 
-  arrange(outcome, status_auto)
-
-stopifnot(length(setdiff(labno_vector, overall_results$labno)) == 0)
-
-```
-
-In total, 
-`r nrow(overall_results[overall_results$outcome == "Same", ])` samples had the
-same HRD status on the manual library preparation as on the automated 
-preparation, with
-`r nrow(overall_results[overall_results$outcome == "Different", ])` 
-samples having different HRD statuses.
-
-The samples with discrepant results are shown in @tbl-discrepant-results. 
-2 samples had improved confidence in genomic instability scores using the 
-manual method, which changed the overall HRD status from "Non-conclusive" to
-"Positive" and "Negative". The threshold for classifying samples as 
-"non-conclusive" is a genomic instability score of 0.85 or below.
-
-```{r}
-#| label: tbl-discrepant-results
-#| tbl-cap: "Discrepant results"
-#| echo: FALSE
-
-discrepant_results <- auto_vs_manual_df_wide |> 
-  filter(outcome == "Different") |> 
-  mutate(gi_confidence_auto = round(gi_confidence_auto, 2),
-         gi_confidence_manual = round(gi_confidence_manual, 2)) |> 
-  select(labno, score_auto, score_manual,
-         gi_confidence_auto, gi_confidence_manual,
-         status_auto, status_manual) |> 
-  mutate(status_auto = factor(status_auto, levels = c(
-    "Non-conclusive", "Negative", "Positive"
-  ))) |> 
-  arrange(status_auto)
-
-knitr::kable(discrepant_results)
-
-```
+There was a strong correlation between the automated and manual methods for the
+9 variables calculated by the SomaHRD pipeline for each sample
+(@fig-comparison-plots1 and @fig-comparison-plots2). Notably there
+was a poorer correlation for both the confidence in genomic instability metric
+and sample coverage, but in both cases the results were generally improved
+when the manual method was used.
 
 ```{r}
 #| label: make-plots
 #| include: FALSE
 
 plot_auto_v_manual <- function(df, xvar, yvar, axismin, axismax,
-                               breaks, xlabel, ylabel, title) {
+                               breaks, xlabel, ylabel, title,
+                               pearson_x, pearson_y) {
   
   plot <- df |> 
     ggplot(aes(x = {{ xvar }}, y = {{ yvar }})) +
@@ -385,99 +508,117 @@ plot_auto_v_manual <- function(df, xvar, yvar, axismin, axismax,
       scale_y_continuous(breaks = breaks,
                          limits = c(axismin, axismax)) +
     labs(x = xlabel, y = ylabel, 
-         title = title)
+         title = title) +
+    ggpubr::stat_cor(method = "pearson", 
+                     label.x = pearson_x, label.y = pearson_y)
   
   return(plot)
   
 }
 
-data_without_repeats <- auto_vs_manual_df_wide |> 
-  filter(repeat_sample_auto != "repeat" &
-           repeat_sample_manual != "repeat") 
-
-lga_plot <- plot_auto_v_manual(df = data_without_repeats,
+lga_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = LGA_auto, yvar = LGA_manual,
                                0, 40,
                                seq(0, 40, by = 10),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "LGA")
+                               title = "LGA",
+                               pearson_x = 15,
+                               pearson_y = 5) 
 
-lpc_plot <- plot_auto_v_manual(df = data_without_repeats,
+lpc_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = LPC_auto, yvar = LPC_manual,
                                0, 40,
                                seq(0, 40, by = 10),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "LPC")
+                               title = "LPC",
+                               pearson_x = 15,
+                               pearson_y = 5)
 
-score_plot <- plot_auto_v_manual(df = data_without_repeats,
+score_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = score_auto, yvar = score_manual,
                                0, 1,
                                seq(0, 1, by = 0.1),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "HRD score")
-
-coverage_plot <- plot_auto_v_manual(df = data_without_repeats,
-                               xvar = coverage_auto, yvar = coverage_manual,
-                               0, 3,
-                               seq(0, 3, by = 0.5),
-                               xlabel = "Automated",
-                               ylabel = "Manual",
-                               title = "Coverage")
+                               title = "HRD score",
+                               pearson_x = 0.3,
+                               pearson_y = 0.1)
   
-gi_conf_plot <- plot_auto_v_manual(df = data_without_repeats,
+gi_conf_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = gi_confidence_auto, 
                                yvar = gi_confidence_manual,
                                0.65, 1,
                                seq(0.65, 1, by = 0.05),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "GI confidence")
+                               title = "GI confidence",
+                               pearson_x = 0.75, 
+                               pearson_y = 0.7)
 
-pct_mapped_plot <- plot_auto_v_manual(df = data_without_repeats,
+coverage_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
+                               xvar = coverage_auto, yvar = coverage_manual,
+                               0, 3,
+                               seq(0, 3, by = 0.5),
+                               xlabel = "Automated",
+                               ylabel = "Manual",
+                               title = "Coverage",
+                               pearson_x = 1.25,
+                               pearson_y = 0.5)
+
+pct_mapped_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = pct_mapped_reads_auto, 
                                yvar = pct_mapped_reads_manual,
                                0.9, 1,
                                seq(0.9, 1, by = 0.02),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "Percent mapped reads")
+                               title = "Percent mapped reads",
+                               pearson_x = 0.93,
+                               pearson_y = 0.91)
 
-ccne1_plot <- plot_auto_v_manual(df = data_without_repeats,
+ccne1_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = ccne1_cn_auto, 
                                yvar = ccne1_cn_manual,
                                0, 12,
                                seq(0, 12, by = 2),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "CCNE1 copy number")
+                               title = "CCNE1 copy number",
+                               pearson_x = 5,
+                               pearson_y = 2)
 
-rad51b_plot <- plot_auto_v_manual(df = data_without_repeats,
+rad51b_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = rad51b_cn_auto, 
                                yvar = rad51b_cn_manual,
                                0, 4,
                                seq(0, 4, by = 1),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "RAD51B copy number")
+                               title = "RAD51B copy number",
+                               pearson_x = 1.5,
+                               pearson_y = 0.5)
 
-low_tumour_plot <- plot_auto_v_manual(df = data_without_repeats,
+low_tumour_plot <- plot_auto_v_manual(df = auto_vs_manual_no_repeats,
                                xvar = low_tumor_fraction_auto, 
                                yvar = low_tumor_fraction_manual,
                                0, 6,
                                seq(0, 6, by = 1),
                                xlabel = "Automated",
                                ylabel = "Manual",
-                               title = "Low tumour fraction")
+                               title = "Low tumour fraction",
+                               pearson_x = 2.5,
+                               pearson_y = 1) 
 
 ```
 
 ```{r}
 #| label: fig-comparison-plots1
-#| fig-cap: "Comparison of metrics from automated and manual library preparation methods."
-#| fig-height: 8
+#| fig-cap: "Comparison of metrics from automated and manual library 
+#| preparation methods, showing the Pearson correlation coefficient 
+#| for each metric."
+#| fig-height: 6
 #| echo: FALSE
 
 ggarrange(plotlist = list(lga_plot, lpc_plot, 
@@ -490,12 +631,12 @@ ggarrange(plotlist = list(lga_plot, lpc_plot,
 
 ```
 
-{{< pagebreak >}}
-
 ```{r}
 #| label: fig-comparison-plots2
-#| fig-cap: "Comparison of metrics from automated and manual library preparation methods."
-#| fig-height: 8
+#| fig-cap: "Comparison of metrics from automated and manual library 
+#| preparation methods, showing the Pearson correlation coefficient 
+#| for each metric."
+#| fig-height: 7
 #| echo: FALSE
 
 ggarrange(plotlist = list(coverage_plot, pct_mapped_plot, 
@@ -511,12 +652,126 @@ ggarrange(plotlist = list(coverage_plot, pct_mapped_plot,
 
 {{< pagebreak >}}
 
+## Comparison of GI statuses
+
+In total, 
+`r nrow(auto_vs_manual_no_repeats[auto_vs_manual_no_repeats$outcome == "Same", ])` 
+samples had the same HRD status on the manual method as on the automated 
+method, with
+`r nrow(auto_vs_manual_no_repeats[auto_vs_manual_no_repeats$outcome == "Different", ])` 
+samples having different HRD statuses. Notably, sample 23016526, 
+which had a low DNA concentration of 2.2ng/ul, had
+a negative GI status on the both the manual and automated methods. Myriad 
+Genetics reported this sample as GI positive, and this sample was identified
+as a discrepant result on SeqOne SomaHRD testing in
+[DOC6192]{custom-style="Strong"}.
+
+```{r}
+#| label: tbl-status-summary
+#| tbl-cap: "GI status comparison"
+#| echo: FALSE
+
+tbl_status_summary <- auto_vs_manual_no_repeats |> 
+  group_by(status_auto, status_manual) |> 
+  count() |> 
+  mutate(Outcome = case_when(
+    status_auto == status_manual ~"Same result",
+    status_auto != status_manual ~"Different result"),
+    Outcome = factor(Outcome, levels = c("Same result",
+                                         "Different result"))) |>
+  arrange(Outcome) |> 
+  rename("Samples" = n,
+         "GI status (manual)" = status_manual,
+         "GI status (auto)" = status_auto)
+  
+knitr::kable(tbl_status_summary)
+
+```
+
+## Discrepant results
+
+The samples with discrepant results are shown in @tbl-discrepant-results. 
+2 samples had improved confidence in genomic instability scores using the 
+manual method, which changed the overall HRD status from "Non-conclusive" to
+"Positive" and "Negative". The threshold for classifying samples as 
+"non-conclusive" is a genomic instability score of 0.85 or below. The HRD scores
+for each sample show that the manual method results are consistent with the 
+automated method results: the manual and automated results for 21003549 are 
+both above 0.5 and the manual and automated results for 23053361 are 
+both below 0.5. These results are consistent with the Myriad results for these
+samples: 23053361 (R23-0D84) had a negative Myriad GI status and
+21003549 (R21-0SN8) had a positive Myriad GI status.
+
+The remaining 2 discrepant results show different levels of variation between
+the two methods. 24021526 is sample with a borderline result on the automated
+method (GI score: 0.50). The result from the manual method decreased the 
+number of LGA and LPC events by 1 each. This is a comparatively small difference,
+but, as the automated result lies exactly on the threshold, this small difference
+caused a change in HRD status.
+
+The difference in LGA events for 24055693 is greater, with 6 more events 
+detected on the manual method (19) than the automated method (13), which changes
+the HRD status from negative on the automated method to positive on the manual
+method. The causes of this variation are investigated in 
+@sec-genotype-variation.
+
+```{r}
+#| label: tbl-discrepant-results
+#| tbl-cap: "Discrepant results"
+#| echo: FALSE
+
+discrepant_results <- auto_vs_manual_df_wide |> 
+  filter(outcome == "Different") |> 
+  mutate(score_auto = round(score_auto, 2),
+         score_manual = round(score_manual, 2),
+         gi_confidence_auto = round(gi_confidence_auto, 2),
+         gi_confidence_manual = round(gi_confidence_manual, 2)) |> 
+  left_join(manual_data_with_cohorts |> 
+              select(labno, cohort), by = "labno") |> 
+  select(labno, cohort, LGA_auto, LGA_manual, LPC_auto,
+         LPC_manual, score_auto, score_manual,
+         gi_confidence_auto, gi_confidence_manual,
+         status_auto, status_manual) |> 
+  mutate(status_auto = factor(status_auto, levels = c(
+    "Non-conclusive", "Negative", "Positive"
+  ))) |> 
+  arrange(status_auto) |> 
+  rename(`Lab number` = labno,
+         `Cohort` = cohort,
+         `LGA (auto)` = LGA_auto,
+         `LGA (manual)` = LGA_manual,
+         `LPC (auto)` = LPC_auto,
+         `LPC (manual)` = LPC_manual,
+         `GI score (auto)` = score_auto,
+         `GI score (manual)` = score_manual,
+         `GI confidence (auto)` = gi_confidence_auto,
+         `GI confidence (manual)` = gi_confidence_manual,
+         `GI status (auto)` = status_auto,
+         `GI status (manual)` = status_manual)
+
+knitr::kable(discrepant_results)
+
+```
+
+{{< pagebreak >}}
+
 ## Variation
+
+The variation in results between the manual and automated methods can be viewed
+in the context of the variation in results from samples repeated on the 
+automated method as part of the initial validation (@fig-lga-lpc-results and
+@fig-lga-lpc-results2). In nearly all samples the results from the manual and
+automated method are highly correlated, with the exception of samples 21003549
+and 24055963.
 
 ```{r}
 #| label: fig-lga-lpc-results
-#| fig-cap: "LGA and LPC results"
-#| fig-height: 8
+#| fig-cap: "LGA and LPC results for samples in this validation. The black
+#| line on each facet shows the SomaHRD pipeline threshold for classifying a
+#| sample as GI negative (to the left of the line) or GI positive (to the right
+#| of the line). Replicates for each sample are coloured by the method used:
+#| white for the automated method and red for the manual method."
+#| fig-height: 6
 #| echo: FALSE
 
 make_lga_lpc_facet <- function(df) {
@@ -554,8 +809,13 @@ facet_plot1
 
 ```{r}
 #| label: fig-lga-lpc-results2
-#| fig-cap: "LGA and LPC results"
-#| fig-height: 8
+#| fig-cap: "LGA and LPC results for samples in this validation (continued).
+#| The black line on each facet shows the SomaHRD pipeline threshold for 
+#| classifying a sample as GI negative (to the left of the line) or GI positive 
+#| (to the right
+#| of the line). Replicates for each sample are coloured by the method used:
+#| white for the automated method and red for the manual method."
+#| fig-height: 6
 #| echo: FALSE
 
 facet_plot2 <- make_lga_lpc_facet(auto_vs_manual_df_long |> 
@@ -566,26 +826,195 @@ facet_plot2
 
 ```
 
-## Variation due to sample genotype
+{{< pagebreak >}}
 
-The variation observed is influenced by the size of the copy number segments
-within the sample.
+## Variation due to sample genotype {#sec-genotype-variation}
 
-Samples with larger copy number segments have less variation when repeated, and
-less variation between the manual and automated methods (example: 20127786).
+```{r}
+#| label: image-paths
+#| include: FALSE
 
-Conversely, samples with smaller copy number segments are more impacted by 
-repeat variation (example: 21003549).
+path_20127786 <- paste0(data_path, 
+                        "validation/DOC6588_manual_library_prep/images/",
+                        "lga-variation-20127786.png")
 
-It's similar to uncertainty of measurement for repeat expansions: the 
-variation is much less for small alleles, but when the expansion gets big there
-is more variation (but it's not as important - either way, the expansion is big,
-so the clinical outcome is the same).
+caption_20127786 <- "Whole genome plots for sample 20127786, 
+focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+as being part of LGA events are shown in red, whilst unannotated segments 
+are shown in blue. The number of LGA events detected for each chromosome
+is broadly consistent across replicates."
 
-23016526: low DNA input. False negative on original SeqOne validation. Still a 
-false negative when tested by the manual method.
+path_21003549 <-paste0(data_path, 
+                        "validation/DOC6588_manual_library_prep/images/",
+                        "lga-variation-21003549.png")
+
+caption_21003549 <- "Whole genome plots for sample 21003549, 
+focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+as being part of LGA events are shown in red, whilst unannotated segments 
+are shown in blue. The number of LGA events detected for each chromosome
+varies across the replicates due to the presence of many small segments of 
+different copy number states."
+
+path_24055693 <-paste0(data_path, 
+                        "validation/DOC6588_manual_library_prep/images/",
+                        "lga-variation-24055693.png")
+
+caption_24055693 <- "Whole genome plots for sample 24055693, 
+focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+as being part of LGA events are shown in red, whilst unannotated segments 
+are shown in blue."
+
+```
+
+The whole genome copy number plots for these samples were reviewed, which 
+revealed that the level of variation observed for sample replicates was 
+influenced by the size of the copy number segments within the sample. Samples 
+with larger copy number segments had less variation in detected
+LGA and LPC events when repeated. This is likely because larger copy number
+segments are easier for the SomaHRD pipeline to consistently identify with the
+same genomic coordinates and dosage levels. This results in
+less variation between replicates on the automated method, and less variation
+between the automated method and manual method. 
+@fig-lga-variation-20127786 shows an example of this
+for sample 20127786, focussing on chromosomes 1 to 3.
+
+![`r caption_20127786`](`r path_20127786`){#fig-lga-variation-20127786 height=5in}
+
+{{< pagebreak >}}
+
+Conversely, sample 21003549 has a disordered genome with smaller copy number 
+segments, which leads to inconsistent annotation of segments coordinates and 
+dosage levels by the SomaHRD pipeline (@fig-lga-variation-21003549). 
+Whilst the underlying 
+pattern of coverage is broadly consistent between replicates, subtle variation 
+leads to different numbers of LGA events annotated by the pipeline. This 
+variation is observed between replicates on the automated method, and between 
+the automated method and manual method.
+
+![`r caption_21003549`](`r path_21003549`){#fig-lga-variation-21003549 height=5in}
+
+{{< pagebreak >}}
+
+Sample 24055693 had a different GI status when tested on the manual method
+compared to the automated method, with a difference of 6 LGA events and 2 LPC
+events (@tbl-discrepant-results). When the whole genome plots for this sample
+were inspected, it showed a similar pattern to 21003549 with many small copy
+number segments.
+This indicates that the variation causing the change in GI status for this
+sample on the manual method is due to the sample genotype, rather than the the
+manual method itself.
+For context, the result from the automated workflow for this sample 
+(R24-1FR3) was reported as "inconclusive" in the clinical HRD service.
+
+![`r caption_24055693`](`r path_24055693`){#fig-lga-variation-24055693 height=2in}
+
+{{< pagebreak >}}
 
 # Discussion
 
+```{r}
+#| label: lga-lpc-diffs
+#| include: FALSE
+
+lga_diff_tbl <- auto_vs_manual_no_repeats |> 
+  filter(lga_diff <= 1)
+
+lpc_diff_tbl <- auto_vs_manual_no_repeats |> 
+  filter(lpc_diff <= 1)
+
+```
+
+The results from the SomaHRD pipeline for the manual method showed general
+concordance with the results for the automated method across
+`r length(labno_vector)`
+samples tested over 
+`r length(unique(auto_vs_manual_no_repeats$worksheet_manual))`
+worksheets.
+`r nrow(auto_vs_manual_no_repeats[auto_vs_manual_no_repeats$outcome == "Same", ])` 
+samples showed the same GI status as determined on the automated method. 
+The variation in the number of detected LGA events ranged from
+`r min(auto_vs_manual_no_repeats$lga_diff)`-
+`r max(auto_vs_manual_no_repeats$lga_diff)`,
+with a median of 
+`r median(auto_vs_manual_no_repeats$lga_diff)`. 
+The variation in the number of detected LPC events varied from
+`r min(auto_vs_manual_no_repeats$lpc_diff)`-
+`r max(auto_vs_manual_no_repeats$lpc_diff)`,
+with a median of 
+`r median(auto_vs_manual_no_repeats$lpc_diff)`.
+
+The low median value for each range shows that the majority of samples had 
+identical or very similar results.
+`r nrow(lga_diff_tbl)`/`r nrow(auto_vs_manual_no_repeats)`` 
+samples had LGA counts which
+were identical or only varied by 1 between the manual and automated methods, and
+`r nrow(lpc_diff_tbl)`/`r nrow(auto_vs_manual_no_repeats)`` 
+samples had LPC counts which
+were identical or only varied by 1 between the manual and automated methods.
+For context the variation in LGA and LPC during repeat testing on the 
+automated method was 0-19 and 0-26 ([DOC6192]{custom-style="Strong"}). 
+Therefore the manual method does not 
+appear to introduce more variation than currently exists with the 
+automated method.
+
+```{r}
+#| label: discrepant-rate
+#| include: FALSE
+
+conclusive_results <- auto_vs_manual_no_repeats |> 
+  filter(status_auto != "Non-conclusive")
+
+discrepant_results <- nrow(conclusive_results[conclusive_results$outcome == "Different", ])
+
+discrepant_rate <- round((discrepant_results / nrow(conclusive_results)) * 100, 1)
+
+```
+The manual method showed generally higher GI confidence scores, which led to
+the GI statuses for 2 samples changing from "non-conclusive" to conclusive
+GI statuses.
+However, this left 
+`r discrepant_results`/`r nrow(conclusive_results)` 
+(`r discrepant_rate`%)
+conclusive GI statuses which were different on the manual method. 
+
+Investigation of these discrepant GI statuses revealed a subset of samples 
+which appear to have higher variation on repeat testing, due to the presence 
+of smaller copy number segments (@sec-genotype-variation). These samples show 
+variability in LGA
+and LPC events when repeatedly tested on the automated method. 
+Future planned updates to the SomaHRD pipeline may be able to reduce the variation
+observed for these samples.
+
+Variation in GI status on repeated samples has been reported in the scientific 
+literature. 
+@pfarr2024 tested 8 different HRD assays and showed that each assay could give
+different GI statuses when samples were repeated, with the rate of discrepant
+results ranging from 1-25%. Therefore the variation described in this 
+validation is equivalent to similar assays performed in different laboratories.
+
+# Review of requirements
+
+The manual method meets both of the requirements for this validation:
+
+**Capacity:** the manual method allows the setup of 7 samples per worksheet,
+which is the standard for the automated method. The manual method does require
+higher DNA concentrations than the automated method, which may reduce the 
+proportion of samples that can be processed. However, as the manual approach is
+intended as a backup method in the event of an Agilent Bravo failure, this
+reduction in capacity is acceptable.
+
+**Accuracy:** the manual method was able to provide consistent GI statuses to 
+the automated method for 
+`r (nrow(conclusive_results) - discrepant_results)`/`r nrow(conclusive_results)` 
+conclusive results. The discrepant results were due to variation in GI results
+which was equivalent to the variation observed on repeatability studies with the
+automated method.
+
 # Conclusion
 
+The manual library preparation method is validated for use with the SeqOne
+SomaHRD testing workflow at the Manchester GLH.
+
+{{< pagebreak >}}
+
+# References
