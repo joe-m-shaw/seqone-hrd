@@ -708,7 +708,7 @@ read_seqone_csv <- function(file) {
                      n_max = 1,
                      col_types = list(
                        sample = col_character(),
-                       analysis_date = col_datetime("%d/%m/%Y"),
+                       analysis_date = col_character(),
                        somahrd_version = col_character(),
                        LGA = col_integer(),
                        LPC = col_integer(),

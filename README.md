@@ -1,25 +1,23 @@
-# Homologous Recombination Deficiency Validation
+# Homologous Recombination Deficiency Testing 
 
-This repo contains the analysis script for the validation of Homologous Recombination Deficiency (HRD) testing using SeqOne shallow whole genome sequencing at the North West Genomic Laboratory Hub (Manchester).
+This repo contains scripts for validating and monitoring Homologous Recombination Deficiency (HRD) testing using SeqOne shallow whole genome sequencing at the North West Genomic Laboratory Hub (GLH) in Manchester.
 
-## Data
+## Project structure
 
-Reports were downloaded from the SeqOne website (https://seqone.com) as PDFs, and the pdftools package was used to convert them into dataframes. SeqOne do not currently offer the option of downloading information in a tabulated form.
+### data
 
-The separate dlms_queries.R script was used to extract sample information from the DNA Laboratory Management System (DLMS) via an ODBC connection, which is set up for PC38698. The tables were then saved as csvs. The dlms_queries.R script will not run on a computer not set up with an ODBC DLMS connection, and is not required to rerun the hrd_analysis.R script. 
+HRD results from the SeqOne SomaHRD pipeline are downloaded as csvs or PDFs the SeqOne website (https://seqone.com). All results are saved internally at the North West GLH. **No data should be available in this Github repository.**
 
-All the data used in this validation is saved in the "data" folder at this interal location: S:\central shared\Genetics\Mol_Shared\Development.Team\SeqOne Homologous Recombination Deficiency Validation\HRD R script files\data
+The filepath for the data is specified in the config.yml file and called in R using `config::get()`.
 
-## Script
+### functions
 
-The hrd_analysis.R script includes all analysis for the validation and uses local filepaths.
+Functions for reading and manipulating HRD results are saved in the functions folder.
 
-## Running the Analysis
+### scripts
 
-To recreate the analysis performed for the validation, copy the data folder into the project folder. You will also need to create "outputs" and "plots" folders.
+The scripts folder contains scripts that process, collate and reformat HRD results. 
 
-The hrd_analysis.R analysis script should then produce the plots and tables included in the final validation document.
+### vignettes
 
-## SomaHRD Versions
-
-During the validation, versions 1.1. and 1.2 of the SomaHRD pipeline were examined. Full details of the differences between the versions are provided in the validation document. There are some differences in report formatting between versions, and the "robustness" and "low tumour fraction" metrics are only provided for version 1.2.
+Final reports for validations (DOC prefix) or incident investigations (INC prefix) are prepared as Quarto markdown documents and saved in the vignettes folder. The documents are named with the document identifiers from the Manchester GLH quality management system, QPulse.

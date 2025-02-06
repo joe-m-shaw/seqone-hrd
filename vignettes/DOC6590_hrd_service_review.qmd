@@ -1,0 +1,539 @@
+---
+title: "DOC6590: SeqOne HRD Service Review"
+format: 
+  docx:
+    reference-doc: "C:/Users/joseph.shaw2/Documents/pansolid_cnv_validation/vignettes/north_west_glh_document_template.docx"
+    link-citations: true
+toc: true
+toc-title: "Table of Contents"
+bibliography: hrd_library.bib
+csl: harvard-manchester-metropolitan-university.csl
+fig-align: "left"
+date: today
+date-format: "DD/MM/YYYY"
+fig-width: 6
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+library(here)
+library(patchwork)
+library(odbc)
+library(DBI)
+library(dbplyr)
+
+```
+
+```{r}
+#| label: get-dlims-data
+#| include: FALSE
+
+source(here("scripts/get_dlims_hrd_review_data.R"))
+
+```
+
+```{r}
+#| label: filepath
+#| include: FALSE
+
+DOC6590_filepath <- paste0(config::get("data_filepath"), "live_service/DOC6590/")
+
+```
+
+Authors: Joe Shaw (CS20980), Antonio Pereira and Des Halligan
+
+# Acronyms
+
+**BRCA1:** Breast cancer 1 gene
+
+**BRCA2:** Breast Cancer 2 gene
+
+**DLIMS:** DNA Laboratory Information Management System
+
+**GIS:** Genome Instability Score
+
+**GLH:** Genomic Laboratory Hub
+
+**HRD:** Homologous Recombination Deficiency
+
+**HRP:** Homologous Recombination Proficiency
+
+**HRR:** Homologous Recombination Repair
+
+**NCC:** Neoplastic Cell Content
+
+**NGS:** Next Generation Sequencing
+
+**WGS:** Whole Genome Sequencing
+
+# Introduction
+
+This is a review of the first year of the homologous recombination deficiency (HRD) testing service using the SeqOne SomaHRD pipeline at the Manchester Genomics Laboratory Hub (GLH).
+
+## Timeline and references
+
+- **November 2023:** HRD testing at the North West GLH was performed by sending samples to Myriad Genetics in Salt Lake City, Utah, USA.
+
+- **December 2023:** the SeqOne SomaHRD v1.2.0 pipeline was validated for HRD testing ([DOC6192]{custom-style="Strong"}).
+
+- **December 2023:** the SeqOne HRD clinical service began, replacing the Myriad service. DNA was extracted using the Cobas extraction method (Qiagen). Results were entered and reported by GLH scientists on the DNA Database (also known as the DNA Laboratory Information Management System - DLIMS).
+
+- **April 2024:** the QIAsymphony DNA extraction method was validated for use with SeqOne ([DOC6255]{custom-style="Strong"}).
+
+- **April 2024:** results were entered by GLH scientists on the iGene database.
+
+- **April 2024:** SomaHRD was upgraded to v1.2.7 ([INC9110]{custom-style="Strong"}).
+
+- **November 2024:** SomaHRD was upgraded to v1.2.8 ([INC9891]{custom-style="Strong"}).
+
+## Background
+
+"HRD testing" comprises of two tests:
+
+1) Sequence analysis for pathogenic variants in specific genes, including *BRCA1* and *BRCA2*. At the North West GLH, this is performed with Illumina NGS on the PanSolid QIAseq enrichment.
+
+2) Genomic instability testing for genomic copy number variation, which indicates a defective homologous recombination repair (HRR) pathway. At the North West GLH, this is performed via shallow whole genome sequencing (WGS) with the SeqOne SomaHRD pipeline.
+
+These two tests are concordant in the majority of cases, however they may give discordant results:
+
+- A sample may have a positive genomic instability score without the presence of a *BRCA1/2* variant. This may be caused by pathogenic variants in other HRR pathway genes, or  a reversion mutation [@konstantinopoulos2015].
+
+- A sample may have a negative genomic instability score with the presence of a *BRCA1/2* variant. This was reported in the original publication of the Genomic Instability Score (GIS) by Myriad Genomics: approximately 5% of *BRCA*-deficient samples in the training dataset had a negative GIS of below 42 [@telli2016]. 
+
+## Aims
+
+The aims of this service review are:
+
+1. To establish the impact of a "borderline" category for SeqOne HRD scores between 0.4 and 0.6.
+
+2. To check the frequency of samples with *BRCA1/2* pathogenic variants that have negative SeqOne HRD scores.
+
+3. The overall range of neoplastic cell contents (NCC) for the samples supplied.
+
+# Methods
+
+## Data sources
+
+Data was collated from the following sources:
+
+- The DNA Database (DLIMS) MicroSoft SQL server, via an ODBC connection. Data was extracted for samples with disease code 204 (tumour BRCA) recieved after 01/12/2023.
+
+- The iGene database, via a custom data export. Data were saved on the MicrosoftSQL server as "Eval_HRD" and accessed using the odbc package.
+
+```{r}
+#| label: eval-hrd-connection
+#| echo: FALSE
+
+dbi_con <- DBI::dbConnect(
+  drv = odbc::odbc(),
+  dsn = "moldb")
+
+eval_hrd <- tbl(dbi_con, dbplyr::in_catalog(catalog = "MolecularDB",
+                                              schema = "dbo",
+                                              table = "Eval_HRD")) |> 
+  janitor::clean_names() |> 
+  collect()
+
+DBI::dbDisconnect(conn = dbi_con)
+
+```
+
+- Comma separated value (.csv) files downloaded from the SeqOne website: [https://seqone.com/]()
+
+## Analysis
+
+Analysis was performed in R (v4.4.1) and is saved in a [public Github repository](https://github.com/joe-m-shaw/seqone-hrd/tree/hrd_audit).
+
+{{< pagebreak >}}
+
+# Results
+
+## Service Overview
+
+@tbl-service-total shows the total number of samples tested by the SeqOne HRD service in the first year.
+
+```{r}
+#| label: tbl-service-total
+#| tbl-cap: "SeqOne service overall results"
+#| echo: FALSE
+
+seqone_live_csv_data <- read_csv(file = paste0(config::get("data_filepath"), 
+                                               "live_service/service/",
+                                               "collated_data/",
+                                               "collated_live_csv_data.csv"),
+                                 col_types = "cccdddclldddddddcc") |> 
+  mutate(score_category = case_when(
+    score > 0.6 ~"Positive (>0.6)",
+    score <= 0.6 & score >= 0.4 ~"Borderline (0.4-0.6)",
+    score < 0.4 ~"Negative (<0.4)"
+  ),
+  score_category = factor(score_category, levels = c("Positive (>0.6)",
+                                                     "Borderline (0.4-0.6)",
+                                                     "Negative (<0.4)")))
+
+csv_summary_tbl <- seqone_live_csv_data |> 
+  filter(!is.na(score)) |> 
+  group_by(score_category) |> 
+  summarise(total = n()) |> 
+  arrange(desc(total)) |> 
+  mutate(percentage = round((total / sum(total)) * 100, 1)) |> 
+  adorn_totals() |> 
+  arrange(score_category) |> 
+  rename("SeqOne HRD score category" = score_category)
+
+knitr::kable(csv_summary_tbl)
+
+```
+
+```{r}
+#| label: seqone-score-distribution
+#| include: FALSE
+
+score_cat_colours <- c("#D55E00", "#F0E442", "#56B4E9")
+
+score_histo_plot <- seqone_live_csv_data |> 
+  filter(!is.na(score)) |> 
+  ggplot(aes(x = score, y = )) +
+    geom_histogram(binwidth = 0.01, aes(fill = score_category),
+                   colour = "black") +
+  scale_fill_manual(values = score_cat_colours) +
+  geom_vline(xintercept = 0.6, linetype = "dashed") +
+  geom_vline(xintercept = 0.4, linetype = "dashed") +
+  theme_bw() +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1)) +
+  labs(x = "SeqOne HRD score", y = "Samples",
+       fill = "Score category")
+
+score_dot_plot <- seqone_live_csv_data |> 
+  filter(!is.na(score)) |> 
+  ggplot(aes(x = reorder(sample, score), y = score)) +
+    geom_point(shape = 21, size = 2, alpha = 0.8, 
+               colour = "black", aes(fill = score_category)) +
+  scale_fill_manual(values = score_cat_colours) +
+  geom_hline(yintercept = 0.6, linetype = "dashed") +
+  geom_hline(yintercept = 0.4, linetype = "dashed") +
+  theme_bw() +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.grid = element_blank()) +
+  labs(x = "Samples", y = "SeqOne HRD score",
+       fill = "Score category")
+
+both_plots <- score_histo_plot + score_dot_plot +
+  plot_layout(ncol = 1)
+
+```
+
+```{r}
+#| label: fig-seqone-score-plots
+#| fig-cap: "SeqOne HRD score distribution"
+#| fig-height: 6
+#| echo: FALSE
+
+both_plots
+
+```
+
+{{< pagebreak >}}
+
+# Genomic instability and *BRCA1/2* variants
+
+## Results from DNA Database
+
+```{r}
+#| label: load-dlims-data
+#| include: FALSE
+
+dlims_sample_info <- read_csv(file = paste0(DOC6590_filepath,
+                                            "dlims_sample_info.csv"),
+                              col_types = "cccccccc")
+
+dlims_seqone_results <- read_csv(file = paste0(DOC6590_filepath,
+                                              "dlims_seqone_results.csv"),
+                                 col_types = "ccccc")
+
+dlims_pansolid_results <- read_csv(file = paste0(DOC6590_filepath,
+                                                 "dlims_pansolid_results.csv"),
+                                   col_types = "ccccc") |> 
+  mutate(pansolid_result = case_when(
+    
+    genotype == "Analysis failed" ~"Fail",
+    
+    grepl(pattern = ".*BRCA(1|2)\\sc..*", x = genotype,
+          ignore.case = TRUE) ~"BRCA variant identified",
+    
+    grepl(pattern = "No\\spathogenic(\\sBRCA1\\s|\\sBRCA2\\s|\\s)variant\\sidentified.*",
+          x = genotype,
+          ignore.case = TRUE) ~"No BRCA variant identified",
+    
+    is.na(genotype) ~NA
+    
+  ),
+  pansolid_result = factor(pansolid_result, levels = c("BRCA variant identified",
+                                                       "No BRCA variant identified",
+                                                       "Fail",
+                                                       NA)))
+
+tbrca_seqone_dlims_df <- dlims_seqone_results |> 
+  left_join(seqone_live_csv_data,
+            by = c("labno", "worksheet")) |> 
+  left_join(dlims_pansolid_results, by = "labno")
+
+tbrca_seqone_dlims_df_filtered <- tbrca_seqone_dlims_df |> 
+  filter(genotype.x %in% c("Negative", "Positive") &
+           pansolid_result %in% c("No BRCA variant identified",
+                             "BRCA variant identified"))
+
+```
+
+There are `r nrow(tbrca_seqone_dlims_df_filtered)` samples which have results on DLIMS from both SeqOne HRD testing and *BRCA1/2* sequencing on the PanSolid next generation sequencing panel. Samples with an inconclusive or fail result for either test were excluded. Results were joined by the "labno" field from DLIMS. A sample is classified as having homologous recombination deficiency when the SeqOne score is 0.5 or greater. Three samples were classified as being homologous recombination proficient by SeqOne but were also found to have pathogenic *BRCA1/2* variants (@fig-dlims-plot).
+
+```{r}
+#| label: fig-dlims-plot
+#| fig-cap: "SeqOne results from the DLIMS database, coloured by the findings on DNA sequencing, also taken from DLIMS."
+#| echo: FALSE
+
+ggplot(tbrca_seqone_dlims_df_filtered, aes(x = score, y = )) +
+  geom_histogram(aes(fill = pansolid_result),
+                 binwidth = 0.01) +
+  scale_fill_manual(values = c("#CC6677", "#888888")) +
+  theme_bw() +
+  theme(legend.position = "bottom",
+        legend.title.position = "bottom") +
+  labs(title = paste0("Results for ", nrow(tbrca_seqone_dlims_df_filtered), 
+                      " samples from DNA database"),
+       subtitle = "Joined by DNA number",
+       x = "SeqOne HRD score (from csv files)",
+       y = "Number of samples",
+       fill = "tBRCA result from DNA database")
+
+```
+
+Here are the details of the samples with *BRCA1/2* variants.
+
+```{r}
+#| label: tbl-dlims-brca-variants
+#| tbl-cap: "Somatic NGS BRCA1/2 variants" 
+#| echo: FALSE
+
+dlims_brca_samples <- tbrca_seqone_dlims_df_filtered |> 
+  filter(pansolid_result == "BRCA variant identified") |> 
+  select(labno, score, LGA, LPC, genotype.y) |> 
+  rename(seqone_score = score,
+         brca_variant = genotype.y) |> 
+  mutate(seqone_score = round(seqone_score, 2)) |> 
+  arrange(seqone_score)
+
+knitr::kable(dlims_brca_samples)
+
+```
+
+{{< pagebreak >}}
+
+## Results from iGene
+
+```{r}
+#| label: load-igene-data
+#| include: FALSE
+
+widen_by_test <- function(df = eval_hrd, test_string,
+                          prefix_string) {
+  
+  output <- eval_hrd |> 
+    filter(test == test_string) |> 
+    select(-box) |> 
+    pivot_wider(id_cols = c(referral:test_id),
+                names_from = field,
+                values_from = value,
+                names_prefix = prefix_string) |> 
+    clean_names()
+  
+  if(nrow(output) == 0){
+    stop("Output dataframe is empty")
+  }
+  
+  return(output)
+  
+}
+
+igene_test_strings <- c("PANEL: M2_tBRCA_PS", "PANEL: M2.5 - SeqOne HRD Status", 
+                        "PANEL: R207.1 - Inherited ovarian cancer (without breast cancer) v4.0 (ICP)")
+
+tbrca_igene_df <- widen_by_test(test_string = igene_test_strings[1], prefix_string = "t_BRCA")
+
+seqone_igene_df <- widen_by_test(test_string = igene_test_strings[2], 
+                                 prefix_string = "seqone") |> 
+  mutate(seqone_seq_one_hrd_score = as.numeric(seqone_seq_one_hrd_score))
+
+icp_igene_df <- widen_by_test(test_string = igene_test_strings[3],
+                              prefix_string = "icp")
+
+```
+
+```{r}
+#| label: igene-data-checks
+#| include: FALSE
+
+if(any(duplicated(tbrca_igene_df$test_id)) |
+      any(duplicated(seqone_igene_df$test_id)) |
+      any(duplicated(icp_igene_df$test_id))) {
+  stop("Test IDs are duplicated in iGene data")
+}
+
+if(length(setdiff(unique(eval_hrd$test), igene_test_strings)) > 0){
+  stop("Other test anames are present in iGene data")
+}
+
+```
+
+```{r}
+#| label: join-igene-results
+#| include: FALSE
+
+pass_headlines <- c("No reportable variant(s) detected",
+                    "Reportable variant(s) detected")
+
+tbrca_seqone_df <- tbrca_igene_df |> 
+  filter(t_brca_headline_result %in% pass_headlines) |> 
+  inner_join(seqone_igene_df |> 
+               filter(seqone_headline_result %in% pass_headlines),
+             by = c("nhs_no", "referral"))
+
+icp_seqone_df <- icp_igene_df |> 
+  filter(icp_headline_result %in% pass_headlines) |> 
+  inner_join(seqone_igene_df |> 
+               filter(seqone_headline_result %in% pass_headlines),
+             by = c("nhs_no"))
+
+```
+
+The same analysis was performed on data from the iGene database. There were `r nrow(tbrca_seqone_df)` samples with reportable results from SeqOne testing and *BRCA1/2* sequencing. Samples with an inconclusive or fail result for either test were excluded. Results were joined using the "nhs_no" and "referral" (R number) fields from iGene.
+
+```{r}
+#| label: fig-tbrca-seqone
+#| fig-cap: "This figure shows the results for samples tested with both SeqOne SomaHRD and tBRCA NGS. Samples where either test failed are excluded."
+#| echo: FALSE
+
+tbrca_seqone_plot <- ggplot(tbrca_seqone_df, aes(x = seqone_seq_one_hrd_score, y = )) +
+  geom_histogram(aes(fill = t_brca_headline_result),
+                 binwidth = 0.01) +
+  scale_fill_manual(values = c("#888888", "#CC6677")) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Results for ", nrow(tbrca_seqone_df), " samples from iGene"),
+       x = "SeqOne HRD score (from iGene)",
+       y = "Number of samples",
+       fill = "tBRCA result")
+
+tbrca_seqone_plot
+
+```
+
+```{r}
+#| label: tbl-igene-tbrca-somatic
+#| tbl-cap: "Somatic BRCA1/2 variants in iGene samples"
+#| echo: FALSE
+
+igene_brca_somatic_tbl <- tbrca_seqone_df |> 
+  filter(!is.na(t_brcahgvs_description)) |> 
+  select(referral, seqone_seq_one_hrd_score, t_brcahgvs_description,
+         t_brca_classification) |> 
+  arrange(seqone_seq_one_hrd_score)
+
+knitr::kable(igene_brca_somatic_tbl)
+
+```
+
+Samples were also checked to see if the patient had a germ-line *BRCA1/2* variant identified on the Inherited Cancer Panel (ICP) test. Results were joined by the "nhs_no" field from iGene.
+
+```{r}
+#| label: fig-icp-seqone
+#| fig-cap: "iGene results"
+#| echo: FALSE
+
+icp_seqone_plot <- ggplot(icp_seqone_df, aes(x = seqone_seq_one_hrd_score, y = )) +
+  geom_histogram(aes(fill = icp_headline_result),
+                 binwidth = 0.01) +
+  scale_fill_manual(values = c("#888888", "#CC6677")) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  labs(title = paste0("Results for ", nrow(icp_seqone_df), " samples from iGene"),
+       x = "SeqOne HRD score (from iGene)",
+       y = "Number of samples",
+       fill = "ICP result")
+
+icp_seqone_plot
+
+```
+
+```{r}
+#| label: tbl-igene-tbrca-germline
+#| tbl-cap: "Germline BRCA1/2 variants in iGene samples"
+#| echo: FALSE
+
+igene_brca_germline_tbl <- icp_seqone_df |> 
+  filter(!is.na(icp_hgvs_description)) |> 
+  select(referral.x, referral.y, seqone_seq_one_hrd_score, icp_hgvs_description,
+         icp_classification) |> 
+  rename(seqone_referral = referral.y,
+         icp_referral = referral.x) |> 
+  arrange(seqone_seq_one_hrd_score)
+
+knitr::kable(igene_brca_germline_tbl)
+
+```
+
+
+# Neoplastic Cell Content
+
+The neoplastic cell content (NCC) was extracted from the free-type "Comments" field of DNA Database.
+
+```{r}
+#| label: tbl-ncc
+#| tbl-cap: "NCC values"
+#| echo: FALSE
+
+ncc_tbl <- dlims_sample_info |> 
+  filter(labno %in% seqone_live_csv_data$labno) |> 
+  mutate(ncc_char = case_when(
+    is.na(ncc_char) ~"No NCC",
+    TRUE ~ncc_char
+  ),
+  ncc_char = factor(ncc_char, levels = c("No NCC",
+                                         "<10%",
+                                         "10-20%",
+                                         "20-30%",
+                                         ">20%",
+                                         ">30%"))) |> 
+  count(ncc_char) |> 
+  mutate(percent = round((n / sum(n)) * 100, 0)) |> 
+  rename("Samples" = n,
+         "NCC" = ncc_char) |> 
+  janitor::adorn_totals()
+
+knitr::kable(ncc_tbl)
+
+```
+
+{{< pagebreak >}}
+
+# Conclusion
+
+From this analysis we can make the following conclusions:
+
+1. 8% of samples have SeqOne HRD scores between 0.4 and 0.6.
+
+2. 3 out of 24 samples with *BRCA1/2* pathogenic variants have negative SeqOne HRD scores (`r (3/24)*100` %).
+
+3. 4% of samples have NCC values below 20%.
+
+# References
+
+::: {#refs}
+:::

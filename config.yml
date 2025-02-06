@@ -1,0 +1,3 @@
+default:
+  data_filepath: "S:/central shared/Genetics/Mol_Shared/Development.Team/SeqOne HRD/data/"
+  ws_filepath: "S:/central shared/Genetics/Repository/WorksheetAnalysedData/"
