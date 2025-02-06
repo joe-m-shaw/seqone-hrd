@@ -1,4 +1,4 @@
-# Homologous Recombination Deficiency Testing 
+# Ovarian Cancer HRD Testing
 
 This repo contains scripts for validating and monitoring Homologous Recombination Deficiency (HRD) testing using SeqOne shallow whole genome sequencing at the North West Genomic Laboratory Hub (GLH) in Manchester.
 
