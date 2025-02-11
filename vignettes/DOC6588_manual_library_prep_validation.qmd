@@ -44,7 +44,8 @@ Date: `r Sys.Date()`
 # Purpose
 
 The purpose of this document is to describe the validation of the manual setup
-for homologous recombination deficiency (HRD) testing at the North West Genomic Laboratory Hub (GLH). 
+for homologous recombination deficiency (HRD) testing at the North West Genomic
+Laboratory Hub (GLH). 
 
 ```{r}
 #| label: packages
@@ -73,7 +74,8 @@ GI testing was validated using 2 Agilent Bravo automated liquid handling
 stations and the Agilent SureSelect XT HS2 library preparation kit 
 (validation document: [DOC6192]{custom-style="Strong"};
 SOP: [DOC6163]{custom-style="Strong"}). 
-A full description of the testing process, including definition of large genomic alterations (LGA) and loss of parental copy (LPC) events is given in 
+A full description of the testing process, including definition of large genomic
+alterations (LGA) and loss of parental copy (LPC) events is given in 
 ([DOC6192]{custom-style="Strong"}). As one Agilent Bravo is being decommissioned,
 a validated manual protocol for performing the library preparation is 
 required as a backup method.
@@ -320,13 +322,13 @@ knitr::kable(tbl_cohorts)
 
 ## Laboratory workflow
 
-### Protocol
+### Protocol {#sec-protocol}
 
 All samples were prepared with the Agilent SureSelect XT HS2 library preparation
 kit. The full protocol is described in 
-[DOC6589 GDL SOP: Manual setup for sWGS HRD_SeqOne (using Agilent SureSelectXT HS2)]{custom-style="Strong"}. 
-The laboratory workflow can be briefly 
-summarised as follows:
+[DOC6589 GDL SOP: Manual setup for sWGS HRD_SeqOne 
+(using Agilent SureSelectXT HS2)]{custom-style="Strong"}. 
+The laboratory workflow can be briefly summarised as follows:
 
 **DNA dilution:** the protocol for SureSelect XT HS2 provided by Agilent 
 specifies different DNA volumes for the automated and manual approaches. To 
@@ -839,7 +841,7 @@ path_20127786 <- paste0(data_path,
                         "lga-variation-20127786.png")
 
 caption_20127786 <- "Whole genome plots for sample 20127786, 
-focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+focussing on chromosomes 1, 2 and 3 for simplicity. Segments identified by SomaHRD 
 as being part of LGA events are shown in red, whilst unannotated segments 
 are shown in blue. The number of LGA events detected for each chromosome
 is broadly consistent across replicates."
@@ -849,7 +851,7 @@ path_21003549 <-paste0(data_path,
                         "lga-variation-21003549.png")
 
 caption_21003549 <- "Whole genome plots for sample 21003549, 
-focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+focussing on chromosomes 1, 2 and 3 for simplicity. Segments identified by SomaHRD 
 as being part of LGA events are shown in red, whilst unannotated segments 
 are shown in blue. The number of LGA events detected for each chromosome
 varies across the replicates due to the presence of many small segments of 
@@ -860,7 +862,7 @@ path_24055693 <-paste0(data_path,
                         "lga-variation-24055693.png")
 
 caption_24055693 <- "Whole genome plots for sample 24055693, 
-focussing on chromosomes 1, 2 and 3 for simplicity Segments identified by SomaHRD 
+focussing on chromosomes 1, 2 and 3 for simplicity. Segments identified by SomaHRD 
 as being part of LGA events are shown in red, whilst unannotated segments 
 are shown in blue."
 
@@ -969,15 +971,20 @@ discrepant_results <- nrow(conclusive_results[conclusive_results$outcome == "Dif
 discrepant_rate <- round((discrepant_results / nrow(conclusive_results)) * 100, 1)
 
 ```
-The manual method showed generally higher GI confidence scores, which led to
-the GI statuses for 2 samples changing from "non-conclusive" to conclusive
-GI statuses.
+
+The results from the manual method showed generally higher GI confidence 
+scores, although the manual method may not necessarily be responsible for this
+trend. The small cohort size meant that any trend observed may not be truly
+significant, or may be caused by factors unrelated to the manual methodology, 
+such as the variation in library pooling concentration (@sec-protocol).
+
+An increase in GI confidence led to the GI statuses for 2 samples changing from 
+"non-conclusive" to conclusive GI statuses.
 However, this left 
 `r discrepant_results`/`r nrow(conclusive_results)` 
 (`r discrepant_rate`%)
-conclusive GI statuses which were different on the manual method. 
-
-Investigation of these discrepant GI statuses revealed a subset of samples 
+conclusive GI statuses which were different on the manual method. Investigation 
+of these discrepant GI statuses revealed a subset of samples 
 which appear to have higher variation on repeat testing, due to the presence 
 of smaller copy number segments (@sec-genotype-variation). These samples show 
 variability in LGA
