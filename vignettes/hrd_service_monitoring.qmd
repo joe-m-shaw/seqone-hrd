@@ -264,9 +264,3 @@ cumulative_samples_plot <- ggplot(cumulative_sample_counts,
 cumulative_samples_plot
 
 ```
-
-
-
-
-
-

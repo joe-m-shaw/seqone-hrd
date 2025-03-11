@@ -138,12 +138,11 @@ file.copy(from = live_ws_filepaths_csv,
           to = paste0(data_config, "live_service/service/",
                       "csv_reports"))
 
-data_folder_live_csv <- list.files(path = paste0(data_config, "live_service/service/",
+data_folder_live_csv <- list.files(path = paste0(data_config, 
+                                                 "live_service/service/",
                                                "csv_reports"),
-                                          pattern = "*.csv",
+                                          pattern = "hrd-results.*csv",
                                           full.names = TRUE)
-
-
 
 collated_live_csv_data <- data_folder_live_csv |> 
   map(\(data_folder_live_csv) read_seqone_csv(file = data_folder_live_csv)) |> 
