@@ -2,7 +2,8 @@
 
 library(tidyverse)
 
-DOC6590_filepath <- paste0(config::get("data_filepath"), "live_service/DOC6590/")
+DOC6590_filepath <- paste0(config::get("data_filepath"), "live_service/",
+                           "DOC6590_service_review/")
 
 dbi_con <- DBI::dbConnect(
   drv = odbc::odbc(),
