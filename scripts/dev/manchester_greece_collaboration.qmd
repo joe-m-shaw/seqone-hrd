@@ -1,0 +1,282 @@
+---
+title: "Manchester Greece Collaboration"
+author: "Joe M. Shaw and George Burghel"
+format: revealjs
+editor: visual
+---
+
+```{r}
+#| label: packages
+#| include: FALSE
+
+library(tidyverse)
+library(readxl)
+library(ggpubr)
+library(patchwork)
+
+```
+
+```{r}
+#| label: data
+#| include: FALSE
+
+tbrca_list <- read_excel(path = paste0(
+  config::get("data_folderpath"), 
+  "live_service/greek_collaboration/",
+  "2025-05-20_tBRCA & HRD active list.xlsx"),
+  sheet = "tBRCA & HRD (SeqOne)") |> 
+  janitor::clean_names()
+
+```
+
+```{r}
+#| label: data-cleaning
+#| include: FALSE
+
+fail_variants <- c("analysis failed",
+                   "Analysis failed",
+                   "Fail", "fail")
+
+tbrca_list_mod <- tbrca_list |> 
+  mutate(hrd_score_numeric = parse_number(hrd_score),
+         hrd_ws_number = as.character(parse_number(hrd_wgs_ws))) |> 
+  filter(!is.na(hrd_score_numeric)) |> 
+  select(lab_id, hrd_wgs_ws, hrd_ws_number,
+         name, hrd_score, hrd_score_numeric,
+         hrd_status, t_brca_mutation_status) 
+  
+tbrca_list_regex <- tbrca_list_mod |> 
+  mutate(brca_status_clean = case_when(
+    t_brca_mutation_status %in% fail_variants ~"fail",
+    grepl(pattern = "BRCA(1|2)\\sc\\.*",
+          x = t_brca_mutation_status) ~"BRCA pathogenic variant",
+    grepl(pattern = "No\\spathogenic\\s.*",
+          x = t_brca_mutation_status) ~"No BRCA variants",
+    TRUE ~"other"
+  ),
+  brca_status_clean = factor(brca_status_clean,
+                             levels = c("No BRCA variants",
+                                        "BRCA pathogenic variant",
+                                        "fail",
+                                        "other")))
+
+tbrca_list_var_type <- tbrca_list_regex |> 
+  mutate(brca_variant_type = case_when(
+    
+    grepl(pattern = "fs", x = t_brca_mutation_status) ~"frameshift",
+    
+    grepl(pattern = "\\d{1,4}Ter", x = t_brca_mutation_status) ~"nonsense",
+    
+    grepl(pattern = "\\+", x = t_brca_mutation_status) ~"splice",
+    
+    grepl(pattern = "\\w{3}\\d{1,4}\\w{3}", x = t_brca_mutation_status) &
+      !grepl(pattern = "Ter", x = t_brca_mutation_status) ~"missense",
+    TRUE ~"none"),
+    
+    brca_variant_type = factor(brca_variant_type,
+                               levels = c("none",
+                                          "frameshift",
+                                          "nonsense",
+                                          "missense",
+                                          "splice"
+                                          )),
+    
+    variant_position = as.numeric(str_extract(string = t_brca_mutation_status,
+                                        pattern = "c.(\\d{1,4})(dup|_|A|T|C|G|del|\\+).*",
+                                        group =1)),
+         gene = str_extract(string = t_brca_mutation_status,
+                            pattern = "(BRCA1|BRCA2).*",
+                            group = 1))
+
+```
+
+At the Manchester lab we test ovarian cancer samples by:
+
+- QIAseq based next generation sequencing
+- Genomic instability testing (SeqOne)
+
+---
+
+```{r}
+#| label: brca-gi-scores
+#| echo: FALSE
+#| fig-width: 6
+#| fig-height: 6
+
+inconclusive_vars <- c("Inconclusive",
+                            "Non-conclusive",
+                            "inconclusive",
+                            "Inconc",
+                            "Incoc")
+
+brca_comps <- list(
+  c("No BRCA variants",
+       "BRCA pathogenic variant"))
+
+tbrca_data_for_plot <- tbrca_list_regex |> 
+  filter(!brca_status_clean %in% c("other", "fail")) |> 
+  filter(!duplicated(lab_id)) |> 
+  filter(!duplicated(name)) |> 
+  filter(!hrd_status %in% inconclusive_vars)
+
+brca_gi_boxplot <- ggplot(tbrca_data_for_plot, 
+       aes(x = brca_status_clean, y = hrd_score_numeric)) +
+  geom_boxplot(outliers = FALSE) +
+  geom_jitter(shape = 21, size = 2, width = 0.1) +
+  theme_bw() +
+  labs(x = "NGS result", 
+       y = "SeqOne GI score") +
+  scale_y_continuous(limits = c(0, 1.2),
+                     breaks = seq(0, 1.0, by = 0.1),
+                     minor_breaks = FALSE) +
+  stat_compare_means(comparisons = brca_comps,
+                     label.y = 1.1)
+
+```
+
+### BRCA variants correlate with GI scores 
+
+```{r}
+#| label: plot
+#| echo: FALSE
+
+brca_gi_boxplot
+
+```
+
+---
+
+### All our results over time
+
+```{r}
+#| echo: FALSE
+
+base_plot <- tbrca_list_var_type |> 
+  filter(!duplicated(lab_id)) |> 
+  filter(!duplicated(name)) |> 
+  filter(!hrd_status %in% inconclusive_vars) |> 
+  ggplot(aes(x = hrd_ws_number,
+             y = hrd_score_numeric)) +
+  geom_point(shape = 21, size = 2) +
+  theme_bw() +
+  theme(panel.grid = element_blank())+
+  theme(axis.text.x = element_blank()) +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
+  labs(x = "Worksheet",
+       y = "SeqOne GI score")
+
+base_plot
+
+```
+
+---
+
+### All our results over time
+
+```{r}
+#| echo: FALSE
+
+base_plot +
+  geom_hline(yintercept = 0.5, linetype = "dashed")
+
+```
+
+---
+
+### Results coloured by BRCA status
+
+```{r}
+#| echo: FALSE
+
+plot_colours <- c("white", "red", "blue", "green", "grey")
+
+base_plot +
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  geom_point(shape = 21, size = 2, aes(fill = brca_variant_type)) +
+  scale_fill_manual(values = plot_colours) +
+  labs(fill = "BRCA variant type") +
+  theme(legend.position = "bottom")
+
+```
+
+---
+
+### Results coloured by BRCA status
+
+```{r}
+#| echo: FALSE
+
+split_plot <- tbrca_list_var_type |> 
+  filter(!duplicated(lab_id)) |> 
+  filter(!duplicated(name)) |> 
+  filter(!hrd_status %in% inconclusive_vars) |> 
+  ggplot(aes(x = brca_variant_type,
+             y = hrd_score_numeric)) +
+  geom_jitter(shape = 21, size = 2, aes(fill = brca_variant_type),
+              width = 0.2) +
+  scale_fill_manual(values = plot_colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.position = "bottom")+
+  scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
+  labs(x = "BRCA variant",
+       y = "SeqOne GI score",
+       fill = "BRCA variant type")
+
+split_plot
+
+```
+
+---
+
+### There are 3 major zones
+
+```{r}
+#| echo: FALSE
+
+split_plot_lines <- split_plot +
+  geom_hline(yintercept = 0.6, linetype = "dashed") +
+  geom_hline(yintercept = 0.4, linetype = "dashed") 
+
+split_plot_lines
+
+```
+
+---
+
+### 1: What is driving these tumours?
+
+```{r}
+#| echo: FALSE
+
+split_plot_lines +
+  annotate('rect', xmin=0.5, xmax=1.5, ymin=0, ymax=0.4, 
+           alpha= 0.2, fill='red')
+
+```
+
+---
+
+### 2. Are these tumours a distinct sub-type?
+
+```{r}
+#| echo: FALSE
+
+split_plot_lines +
+  annotate('rect', xmin= 0.5, xmax=5.5, ymin=0.4, ymax=0.6, 
+           alpha= 0.2, fill='red')
+
+```
+
+---
+
+### 3. Should these tumours get PARPi?
+
+```{r}
+#| echo: FALSE
+
+split_plot_lines +
+  annotate('rect', xmin=1.5, xmax=5.5, ymin=0, ymax=0.4, 
+           alpha= 0.2, fill='red')
+
+```
