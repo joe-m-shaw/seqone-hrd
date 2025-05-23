@@ -63,9 +63,9 @@ tbrca_list_regex <- tbrca_list_mod |>
 tbrca_list_var_type <- tbrca_list_regex |> 
   mutate(brca_variant_type = case_when(
     
-    grepl(pattern = "fs", x = t_brca_mutation_status) ~"frameshift",
+    grepl(pattern = "fs|Ter", x = t_brca_mutation_status) ~"truncating",
     
-    grepl(pattern = "\\d{1,4}Ter", x = t_brca_mutation_status) ~"nonsense",
+    #grepl(pattern = "\\d{1,4}Ter", x = t_brca_mutation_status) ~"nonsense",
     
     grepl(pattern = "\\+", x = t_brca_mutation_status) ~"splice",
     
@@ -75,8 +75,8 @@ tbrca_list_var_type <- tbrca_list_regex |>
     
     brca_variant_type = factor(brca_variant_type,
                                levels = c("none",
-                                          "frameshift",
-                                          "nonsense",
+                                          "truncating",
+                                          #"nonsense",
                                           "missense",
                                           "splice"
                                           )),
@@ -89,13 +89,6 @@ tbrca_list_var_type <- tbrca_list_regex |>
                             group = 1))
 
 ```
-
-At the Manchester lab we test ovarian cancer samples by:
-
-- QIAseq based next generation sequencing
-- Genomic instability testing (SeqOne)
-
----
 
 ```{r}
 #| label: brca-gi-scores
@@ -124,6 +117,7 @@ brca_gi_boxplot <- ggplot(tbrca_data_for_plot,
   geom_boxplot(outliers = FALSE) +
   geom_jitter(shape = 21, size = 2, width = 0.1) +
   theme_bw() +
+  theme(panel.grid = element_blank())+
   labs(x = "NGS result", 
        y = "SeqOne GI score") +
   scale_y_continuous(limits = c(0, 1.2),
@@ -133,6 +127,16 @@ brca_gi_boxplot <- ggplot(tbrca_data_for_plot,
                      label.y = 1.1)
 
 ```
+
+At the Manchester lab we test ovarian cancer samples by:
+
+- QIAseq based next generation sequencing
+- Genomic instability testing (SeqOne)
+
+Since December 2023, we have conclusive results for 
+`r nrow(tbrca_data_for_plot)` ovarian cancer patients.
+
+---
 
 ### BRCA variants correlate with GI scores 
 
@@ -146,12 +150,13 @@ brca_gi_boxplot
 
 ---
 
-### All our results over time
+### All our results since December 2023
 
 ```{r}
 #| echo: FALSE
 
 base_plot <- tbrca_list_var_type |> 
+  filter(!brca_status_clean %in% c("other", "fail")) |> 
   filter(!duplicated(lab_id)) |> 
   filter(!duplicated(name)) |> 
   filter(!hrd_status %in% inconclusive_vars) |> 
@@ -171,13 +176,30 @@ base_plot
 
 ---
 
-### All our results over time
+### All our results since December 2023
 
 ```{r}
 #| echo: FALSE
 
 base_plot +
-  geom_hline(yintercept = 0.5, linetype = "dashed")
+  geom_hline(yintercept = 0.5, linetype = "dashed") +
+  annotate('rect', xmin= 0, 
+           xmax = length(unique(tbrca_list_var_type$hrd_ws_number)), 
+           ymin = 0.5, 
+           ymax = 1, 
+           alpha= 0.2, 
+           fill='red') +
+  annotate('rect', xmin= 0, 
+           xmax = length(unique(tbrca_list_var_type$hrd_ws_number)), 
+           ymin = 0, 
+           ymax = 0.5, 
+           alpha= 0.2, 
+           fill = "blue") +
+  annotate(geom = "text", x = 35, y = 0.6,
+           label = "GI Positive") +
+  annotate(geom = "text", x = 35, y = 0.4,
+           label = "GI Negative")
+  
 
 ```
 
@@ -201,7 +223,7 @@ base_plot +
 
 ---
 
-### Results coloured by BRCA status
+### Results sorted by BRCA status
 
 ```{r}
 #| echo: FALSE
@@ -236,7 +258,13 @@ split_plot
 
 split_plot_lines <- split_plot +
   geom_hline(yintercept = 0.6, linetype = "dashed") +
-  geom_hline(yintercept = 0.4, linetype = "dashed") 
+  geom_hline(yintercept = 0.4, linetype = "dashed") +
+  annotate(geom = "text", x = 4, y = 0.9,
+           label = "GI Positive") +
+  annotate(geom = "text", x = 4, y = 0.1,
+           label = "GI Negative") +
+  annotate(geom = "text", x = 4, y = 0.5,
+           label = "Borderline")
 
 split_plot_lines
 
@@ -244,7 +272,7 @@ split_plot_lines
 
 ---
 
-### 1: What is driving these tumours?
+### What is driving these tumours?
 
 ```{r}
 #| echo: FALSE
@@ -257,26 +285,85 @@ split_plot_lines +
 
 ---
 
-### 2. Are these tumours a distinct sub-type?
+### Are these tumours a distinct sub-type?
 
 ```{r}
 #| echo: FALSE
 
 split_plot_lines +
-  annotate('rect', xmin= 0.5, xmax=5.5, ymin=0.4, ymax=0.6, 
+  annotate('rect', xmin= 0.5, xmax=4.5, ymin=0.4, ymax=0.6, 
            alpha= 0.2, fill='red')
 
 ```
 
 ---
 
-### 3. Should these tumours get PARPi?
+### Should these tumours get PARPi?
 
 ```{r}
 #| echo: FALSE
 
 split_plot_lines +
-  annotate('rect', xmin=1.5, xmax=5.5, ymin=0, ymax=0.4, 
+  annotate('rect', xmin=1.5, xmax=4.5, ymin=0, ymax=0.4, 
+           alpha= 0.2, fill='red')
+
+```
+
+---
+```{r}
+#| include: FALSE
+
+var_gi_range_tbl <- tbrca_list_var_type |> 
+  mutate(gi_score_range = case_when(
+    hrd_score_numeric > 0.6  ~"GI positive",
+    hrd_score_numeric <= 0.6 &
+      hrd_score_numeric >= 0.4 ~"Borderline",
+    hrd_score_numeric < 0.4 ~"GI negative"),
+    gi_score_range = factor(gi_score_range,
+                            levels = c("GI positive",
+                                       "Borderline",
+                                       "GI negative"))) |> 
+  group_by(gi_score_range, brca_variant_type) |> 
+  count() |> 
+  pivot_wider(id_cols = gi_score_range,
+              names_from = brca_variant_type,
+              values_from = n,
+              values_fill = 0)
+
+fisher_result <- fisher.test(x = matrix(c(var_gi_range_tbl$truncating,
+                         var_gi_range_tbl$missense),
+       nrow = 3))
+
+```
+
+### Are missenses enriched in borderline cases?
+
+```{r}
+#| echo: FALSE
+
+split_plot_lines +
+  annotate('rect', xmin=1.5, xmax=3.5, ymin=0, ymax=1, 
+           alpha= 0.2, fill='red') +
+  annotate(geom = "text", 
+           x = 3, y = 0.7,
+           label = paste0("Fisher exact test: ",
+                          round(fisher_result$p.value, 2)))
+
+```
+
+---
+
+### What is going on in these germline BRCA cases?
+
+```{r}
+#| echo: FALSE
+
+germline_brca_cases <- c("24069447", "25000823", "24067433")
+
+split_plot_lines +
+  annotate('rect', xmin=1.8, xmax=2.2, 
+           ymin=0.1, 
+           ymax=0.25, 
            alpha= 0.2, fill='red')
 
 ```
